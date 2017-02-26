@@ -15,3 +15,20 @@ class PTToolInterface:
 
     def exec(self, args):
         pass
+
+    def manage_folders_reads(self, args):
+
+        if (args.folders == None and args.reads == None):
+            print("error: Either folders or reads must be set!")
+            self.subparser.print_help()
+            exit(-1)
+
+        if args.folders != None:
+            folders = args.folders
+        else:
+            folders = []
+
+        if args.reads != None:
+            folders.append( '' )
+
+        return folders

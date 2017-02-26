@@ -7,6 +7,6 @@ setup(name='porestat',
       author='Markus Joppich',
       author_email='joppich@bio.ifi.lmu.de',
       license='GNU GPL v3',
-      packages=['.', 'porestat.hdf5tool', 'porestat.tools'],
+      packages=['.', 'porestat.hdf5tool', 'porestat.tools', 'porestat.plots'],
       zip_safe=False
       )

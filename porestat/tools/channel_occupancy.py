@@ -1,5 +1,5 @@
 from .PTToolInterface import PTToolInterface
-from ..hdf5tool.Fast5File import Fast5File
+from ..hdf5tool.Fast5File import Fast5File, Fast5Directory
 
 class Channel_occupancy(PTToolInterface):
 
@@ -22,3 +22,21 @@ class Channel_occupancy(PTToolInterface):
     def exec(self, args):
 
         print("executed CO")
+
+        folders = self.manage_folders_reads(args)
+
+        channelLengths = {}
+
+        for folder in folders:
+
+            f5folder = Fast5Directory(folder)
+
+            for file in f5folder.collect():
+
+                channelID = file.channelID()
+                readLength = len(file.fastq())
+
+                if not channelID in channelLengths:
+                    channelLengths[channelID] = [readLength]
+                else:
+                    channelLengths[channelID].append(readLength)
