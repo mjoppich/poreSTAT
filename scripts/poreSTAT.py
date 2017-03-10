@@ -3,25 +3,27 @@ import argparse
 
 from porestat.tools.experiment_ls import Experiment_ls
 from porestat.tools.channel_occupancy import Channel_occupancy
-from porestat.plots.poreplot import PorePlot
 from porestat.tools.stats_summary import StatsSummary
+from porestat.tools.extract_sequences import ExtractSequences
 
 import random
 
 if __name__ == '__main__':
+    from porestat.plots.poreplot import PorePlot
 
-    random.random()
+    counts = {}
+    for x in range(1,513):
 
-    pore2count = {}
-    for x in range(1, 16*8+1):
+        counts[x] = []
 
-        pore2count[x] = []
+        for j in range(0, random.randint(5,10)):
+            counts[x].append(  random.randint(1000,60000) )
 
-        for i in range(0, random.randint(2,20)):
-            pore2count[x].append( 1000 + random.randint(1000, 15000) )
+        if random.randint(0, 100) % 10 == 0:
+            counts[x] = []
 
-    PorePlot.plotLoadOut(pore2count)
-
+    #PorePlot.plotLoadOut(counts, pores=(32,16))
+    #exit(0)
 
     parser = argparse.ArgumentParser(prog='porestat')
     #parser.add_argument('command', type=str, help='foo help')
@@ -31,6 +33,7 @@ if __name__ == '__main__':
     cmd2tool['EXPLS'] = Experiment_ls(parser, subparsers)
     cmd2tool['OCC'] = Channel_occupancy(parser, subparsers)
     cmd2tool['STAT'] = StatsSummary(parser, subparsers)
+    cmd2tool['FASTQ'] = ExtractSequences(parser, subparsers)
 
     args = parser.parse_args()
 
