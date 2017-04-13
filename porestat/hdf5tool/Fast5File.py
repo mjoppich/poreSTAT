@@ -210,7 +210,8 @@ class Fast5File:
                 exists = temp_path in self.hdf5file
 
                 if not exists:
-                    print( temp_path + " " + str(temp_path in self.hdf5file))
+                    #print( temp_path + " " + str(temp_path in self.hdf5file))
+                    pass
 
             return filetype
 
@@ -359,7 +360,7 @@ class Fast5Directory:
             raise ValueError("Given path is not a directory: " + path)
 
         self.path = fu.makePath(path)
-        self.filesIT = glob.iglob(self.path + "*.fast5")
+        self.filesIT = glob.iglob(self.path + "**/*.fast5", recursive=True)
 
     def collect(self):
 

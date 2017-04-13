@@ -24,7 +24,7 @@ class Experiment_ls(PTToolInterface):
 
         parser_expls = subparsers.add_parser('expls', help='expls help')
         parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
-        parser_expls.add_argument('-r', '--reads', type=str, help='minion read folder', required=False)
+        parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser_expls.set_defaults(func=self.exec)
 
         return parser_expls

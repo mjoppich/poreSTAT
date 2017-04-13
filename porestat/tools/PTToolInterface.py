@@ -38,30 +38,32 @@ class PTToolInterface:
 
         if args.reads != None:
 
-            # if downloads folder, then take the downloads folder + fail/pass plus any batch folder within
-            downloadpath = os.path.join(args.reads, "downloads")
-            if os.path.isdir( downloadpath ):
+            for readfolder in args.reads:
 
-                for x in ['fail', 'skip', 'pass']:
+                # if downloads folder, then take the downloads folder + fail/pass plus any batch folder within
+                downloadpath = os.path.join(readfolder, "downloads")
+                if os.path.isdir(downloadpath):
 
-                    if os.path.isdir(os.path.join(downloadpath, x)):
+                    for x in ['fail', 'skip', 'pass']:
 
-                        curfolder = os.path.join(downloadpath, x)
+                        if os.path.isdir(os.path.join(downloadpath, x)):
 
-                        folders.append( curfolder )
+                            curfolder = os.path.join(downloadpath, x)
 
-                        all_subdirs = self._getsubdirs(curfolder)
+                            folders.append(curfolder)
 
-                        for x in all_subdirs:
+                            all_subdirs = self._getsubdirs(curfolder)
 
-                            if x.startswith("batch"):
-                                folders.append( os.path.join(curfolder, x) )
+                            for x in all_subdirs:
+
+                                if x.startswith("batch"):
+                                    folders.append(os.path.join(curfolder, x))
 
 
-            else:
-                # if not downloads folder
-                folders.append( os.path.join(args.reads, 'fail') )
-                folders.append(os.path.join(args.reads, 'skip'))
-                folders.append(os.path.join(args.reads, 'pass'))
+                else:
+                    # if not downloads folder
+                    folders.append(os.path.join(readfolder, 'fail'))
+                    folders.append(os.path.join(readfolder, 'skip'))
+                    folders.append(os.path.join(readfolder, 'pass'))
 
         return folders
