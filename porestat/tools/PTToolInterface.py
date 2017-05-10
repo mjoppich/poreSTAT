@@ -1,5 +1,7 @@
 import os
 
+from ..utils.Utils import eprint
+
 class PTToolInterface:
 
     def __init__(self, parser, subparser):
@@ -27,7 +29,7 @@ class PTToolInterface:
     def manage_folders_reads(self, args):
 
         if (args.folders == None and args.reads == None):
-            print("error: Either folders or reads must be set!")
+            eprint("error: Either folders or reads must be set!")
             self.subparser.print_help()
             exit(-1)
 
@@ -61,9 +63,10 @@ class PTToolInterface:
 
 
                 else:
-                    # if not downloads folder
-                    folders.append(os.path.join(readfolder, 'fail'))
-                    folders.append(os.path.join(readfolder, 'skip'))
-                    folders.append(os.path.join(readfolder, 'pass'))
+
+                    for x in os.walk(readfolder):
+                        eprint("Adding path: " + x[0])
+
+                        folders.append(x[0])
 
         return folders

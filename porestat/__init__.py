@@ -1,4 +1,4 @@
-__all__ = ['hdf5tool', 'tools', 'runner']
+__all__ = ['hdf5tool', 'tools', 'runner', 'utils']
 
 def poreSTATModules():
 

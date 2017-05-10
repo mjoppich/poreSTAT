@@ -1,8 +1,11 @@
-from .PTToolInterface import PTToolInterface
+from .ParallelPTTInterface import ParallelPTTInterface
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
+from ..utils.Parallel import Parallel as ll
+from ..utils.Utils import mergeDicts
 
-class Experiment_ls(PTToolInterface):
+
+class Experiment_ls(ParallelPTTInterface):
 
     def __init__(self, parser, subparsers):
 
@@ -38,49 +41,74 @@ class Experiment_ls(PTToolInterface):
         for ftype in self.fileType2Str:
             props['TYPE'][ftype] = []
 
+        props['NAMES'] = {}
+        props['NAMES']['USER_RUN_NAME'] = set()
+
         return props
 
+    def prepareInputs(self, args):
+        return self.manage_folders_reads(args)
 
-
-    def exec(self, args):
-
-        folders = self.manage_folders_reads(args)
-
-        makeObservations = ['runid', 'files', 'AVG_LENGTH', 'N50', 'BASECALL_2D', 'BASECALL_1D_COMPL', 'BASECALL_1D', 'BASECALL_RNN_1D', 'PRE_BASECALL', 'UNKNOWN']
+    def execParallel(self, procID, environment, data):
 
         counterRunID = {}
 
-        for folder in folders:
+        f5folder = Fast5Directory(data)
 
-            f5folder = Fast5Directory(folder)
+        iFilesInFolder = 0
 
-            for file in f5folder.collect():
+        for file in f5folder.collect():
 
-                runid = file.runID()
+            runid = file.runID()
 
-                if not runid in counterRunID:
-                    counterRunID[runid] = self._makePropDict()
+            iFilesInFolder += 1
 
-                propDict = counterRunID[runid]
+            if not runid in counterRunID:
+                counterRunID[runid] = self._makePropDict()
 
-                fastq = file.getFastQ()
+            propDict = counterRunID[runid]
 
-                if fastq == None:
-                    propDict['TYPE'][file.type].append( 0 )
-                else:
-                    propDict['TYPE'][file.type].append( len(fastq) )
+            propDict['NAMES']['USER_RUN_NAME'].add(file.user_filename_input());
+
+            fastq = file.getFastQ()
+
+            # if file.type == Fast5TYPE.UNKNOWN:
+            #    osignal = file._get_signal()
+
+            if fastq == None:
+                propDict['TYPE'][file.type].append(0)
+            else:
+                propDict['TYPE'][file.type].append(len(fastq))
+
+        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
+
+        return counterRunID
 
 
+    def joinParallel(self, existResult, newResult, oEnvironment):
+
+        if existResult == None:
+            existResult = {}
+
+        existResult = mergeDicts(existResult, newResult)
+
+        return existResult
+
+
+    def makeResults(self, parallelResult, oEnvironment, args):
+
+        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'AVG_LENGTH', 'N50', 'BASECALL_2D', 'BASECALL_1D_COMPL',
+                            'BASECALL_1D', 'BASECALL_RNN_1D', 'PRE_BASECALL', 'UNKNOWN']
 
         allobservations = {}
-        for runid in counterRunID:
+        for runid in parallelResult:
 
             allLengths = []
             countByType = Counter()
 
-            for type in counterRunID[runid]['TYPE']:
+            for type in parallelResult[runid]['TYPE']:
 
-                lengths = counterRunID[runid]['TYPE'][type]
+                lengths = parallelResult[runid]['TYPE'][type]
 
                 allLengths += lengths
 
@@ -89,11 +117,13 @@ class Experiment_ls(PTToolInterface):
             fileCount = len(allLengths)
             avgLength = sum(allLengths) / fileCount
             n50 = self._calcN50(allLengths)
+            run_user_name = parallelResult[runid]['NAMES']['USER_RUN_NAME']
 
             observations = {
 
-                'runid': runid,
-                'files': fileCount,
+                'RUNID': runid,
+                'USER_RUN_NAME': ",".join(run_user_name),
+                'FILES': fileCount,
                 'AVG_LENGTH': avgLength,
                 'N50': n50,
                 'BASECALL_2D': countByType[self.str2fileType['BASECALL_2D']],
@@ -118,7 +148,6 @@ class Experiment_ls(PTToolInterface):
                 allobs.append(str(allobservations[runid][x]))
 
             print("\t".join(allobs))
-
 
     def _calcN50(self, lengths):
 

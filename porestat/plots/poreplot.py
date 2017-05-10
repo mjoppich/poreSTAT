@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from numpy import genfromtxt
+import os
 
 from collections import Counter
 
@@ -25,24 +27,28 @@ class PorePlot:
         return cls.getColor(colormap=colormap, value=value)
 
     @classmethod
-    def plotLoadOut(cls, pore2length, pores=(16,8)):
+    def plotLoadOut(cls, pore2length, title='Title', xlabel='channels', ylabel='flowcell inlet'):
 
         p2c = Counter()
         p2l = {}
 
         minCount = 0
         maxCount = 0
-        minPore = pores[0]*pores[1]
+
+        this_dir, this_filename = os.path.split(__file__)
+        chipLayout = genfromtxt(this_dir + '/../data/chip_layout.csv', delimiter=',', dtype=int)
+        pores = chipLayout.shape
+        minPore = np.amin(chipLayout)
+        maxPore = np.amax(chipLayout)
 
         minAvgLength = 1000000
         maxAvgLength = 0
 
         scolormap = "plasma"
 
-        for i in pore2length:
-            p2c[i] = 0
+        for i in range(1, maxPore+1):
 
-            minPore = min(i, minPore)
+            p2c[i] = 0
 
             if i in pore2length:
                 count = len(pore2length[i])
@@ -62,7 +68,6 @@ class PorePlot:
             else:
                 p2c[i] = 0
                 p2l[i] = -1
-                #minCount = 0
 
         minPoreRad = 50
         maxPoreRad = 200
@@ -96,32 +101,34 @@ class PorePlot:
         area = []
         color = []
 
-        for x in p2c:
+        for i in range(0, chipLayout.shape[0]):
+            for j in range(0,chipLayout.shape[1]):
 
-            coords = p2coord[x]
-            xvec.append( coords[0] )
-            yvec.append( coords[1] )
-            area.append( p2area[x] )
+                channelID = int(chipLayout[i,j])
 
-            if p2l[x] == -1:
-                color.append( (1,1,1,1) )
+                xvec.append(i)
+                yvec.append(j)
+                area.append(p2area[channelID])
 
-            else:
-                frac = p2l[x] / (maxAvgLength - minAvgLength)
-                color.append(cls.getColor(colormap=scolormap, value=frac))
+                if p2l[channelID] == -1:
+                    color.append((1, 1, 1, 1))
+
+                else:
+                    frac = p2l[channelID] / (maxAvgLength - minAvgLength)
+                    color.append(cls.getColor(colormap=scolormap, value=frac))
 
         fig, axarr = plt.subplots(2, figsize=(10, 10), gridspec_kw = {'height_ratios':[10, 1]})
         fig.set_dpi(100)
 
-        axarr[0].set_title('title')
-        axarr[0].set_xlabel('xlabel', fontsize=18)
-        axarr[0].set_ylabel('ylabel', fontsize=18)
+        axarr[0].set_title( title )
+        axarr[0].set_xlabel( xlabel , fontsize=18)
+        axarr[0].set_ylabel( ylabel , fontsize=18)
 
-        axarr[0].axes.get_xaxis().set_ticks( [x for x in range(0, pores[1])] )
-        axarr[0].axes.get_yaxis().set_ticks( [x for x in range(0, pores[0])])
+        axarr[0].axes.get_xaxis().set_ticks( [x for x in range(0, pores[0])] )
+        axarr[0].axes.get_yaxis().set_ticks( [x for x in range(0, pores[1])])
 
-        axarr[0].axes.get_xaxis().set_ticklabels( [str(x) for x in range(1, pores[1]+1)] )
-        axarr[0].axes.get_yaxis().set_ticklabels( [str(x) for x in range(1, pores[0]+1)])
+        axarr[0].axes.get_xaxis().set_ticklabels( [str(x) for x in range(1, pores[0]+1)] )
+        axarr[0].axes.get_yaxis().set_ticklabels( [str(x) for x in range(1, pores[1]+1)])
 
         axarr[0].tick_params(axis='both', left='off', top='off', right='off', bottom='off', labelleft='on', labeltop='off',
                         labelright='off', labelbottom='on')

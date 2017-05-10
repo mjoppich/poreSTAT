@@ -13,7 +13,7 @@ class Channel_occupancy(PTToolInterface):
 
         parser_chocc = subparsers.add_parser('occ', help='occ help')
         parser_chocc.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan')
-        parser_chocc.add_argument('-r', '--reads', type=str, help='minion read folder', required=False)
+        parser_chocc.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser_chocc.add_argument('-e', '--experiments', nargs='+', type=str, help='experiments to list')
         parser_chocc.set_defaults(func=self.exec)
 
@@ -54,7 +54,7 @@ class Channel_occupancy(PTToolInterface):
                     channelLengths = exp2cl[runid]
 
                     channelID = file.channelID()
-                    readLength = len(file.winnerFQ())
+                    readLength = len(file.getFastQ())
 
                     if not channelID in channelLengths:
                         channelLengths[channelID] = [readLength]
@@ -75,4 +75,4 @@ class Channel_occupancy(PTToolInterface):
             print(myset)
             print(len(myset))
 
-            PorePlot.plotLoadOut(exp2cl[runid], pores=(32,16))
+            PorePlot.plotLoadOut(exp2cl[runid], runid2filename[runid])

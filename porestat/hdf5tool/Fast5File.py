@@ -50,7 +50,8 @@ class Fast5PATH(Enum):
     COMPLEMENT=2,
     TEMPLATE_2D=3,
 
-
+class Fast5FileException(Exception):
+    pass
 
 class Fast5File:
 
@@ -154,7 +155,13 @@ class Fast5File:
             # get analyses_group . 'basecall_1d'
             if filetype == Fast5TYPE.BASECALL_2D:
 
-                basecall1dpath = '/' + self._get_attribute(analyses_group, 'basecall_1d')
+                basecallAttrib = self._get_attribute(analyses_group, 'basecall_1d')
+
+                # if that returns None, attrib not existant => no 2D basecall
+                if basecallAttrib == None:
+                    continue
+
+                basecall1dpath = '/Analyses/' + basecallAttrib
 
                 self.sequence_paths[Fast5PATH.TEMPLATE] = self.join_paths( basecall1dpath , "BaseCalled_template" )
                 self.sequence_paths[Fast5PATH.COMPLEMENT] = self.join_paths( basecall1dpath , "BaseCalled_complement" )
@@ -217,36 +224,53 @@ class Fast5File:
 
         return Fast5TYPE.UNKNOWN
 
-    def getFastQ(self, type = None):
+    def getFastQ(self, readType = None):
 
-        if type == None:
-            type = self.winner
+        if readType == None:
+            readType = self.winner
 
-        return self._read_fastq(type)
+        return self._read_fastq(readType)
 
-    def getFastA(self, type = None):
+    def getFastA(self, readType = None):
 
-        if type == None:
-            type = self.winner
+        if readType == None:
+            readType = self.winner
 
-        fastq = self._read_fastq(type)
+        fastq = self._read_fastq(readType)
 
         if fastq != None:
             return fastq.to_fasta()
 
         return None
 
-    def _read_fastq(self, type):
+    def _get_signal(self):
+
+        iReadNum = self.readNumber()
+
+        sSignalPath = 'Raw/Reads/Read_' + str(iReadNum)
+
+        hdf_elem = self.hdf5file[sSignalPath]
+
+        raw_signal = hdf_elem['Signal'][()]
+
+        iSignalLength = len(raw_signal)
+
+        return iSignalLength
+
+    def _read_fastq(self, readType):
 
         try:
 
-            if type == None:
+            if readType == None:
                 return None
 
-            pathToFQ = self.sequence_paths[type]
+            pathToFQ = self.sequence_paths[readType]
 
             hdf_elem = self.hdf5file[pathToFQ]
-            fastq_seq = hdf_elem['Fastq'][()].decode("utf-8")
+            fastq_seq = hdf_elem['Fastq'][()]
+
+            if not type(fastq_seq) == str:
+                fastq_seq = fastq_seq.decode("utf-8")
 
             return FASTQ.parseFromStr(fastq_seq)
 
@@ -291,11 +315,18 @@ class Fast5File:
 
     def _get_attribute(self, path, attrib, default = None):
         try:
-            hdf_elem = self.hdf5file[path]
 
-            run_id = hdf_elem.attrs[attrib]
+            if path in self.hdf5file:
+                hdf_elem = self.hdf5file[path]
 
-            return run_id.decode("utf-8")
+                run_id = hdf_elem.attrs[attrib]
+
+                if not type(run_id) == str:
+                    return run_id.decode("utf-8")
+                else:
+                    return run_id
+
+            raise Fast5FileException("Path does not exist: " + path)
 
         except:
             return default
@@ -360,7 +391,7 @@ class Fast5Directory:
             raise ValueError("Given path is not a directory: " + path)
 
         self.path = fu.makePath(path)
-        self.filesIT = glob.iglob(self.path + "**/*.fast5", recursive=True)
+        self.filesIT = glob.iglob(self.path + "*.fast5")
 
     def collect(self):
 
@@ -370,6 +401,14 @@ class Fast5Directory:
 
 
 if __name__ == "__main__":
+
+    testFile = "/home/proj/projekte/sequencing/HPYLORI_MINION_ILLUMINA_JIMENEZ/reads/minion_p12_030417/chip2/reads_170425_chip2_run1_Tx30a_bc/workspace/0/"
+    testFile += "MVPI22502_20170425_FNFAF18023_MN19136_sequencing_run_20170425_Sequencing_run_2_1_Tx30a_pooled_57075_ch24_read133_strand.fast5"
+    f5File = Fast5File(testFile)
+
+
+
+    exit(0)
 
     folderpath = "/home/proj/projekte/sequencing/HPYLORI_MINION_ILLUMINA_JIMENEZ/reads/reads_P12_pooled/fail/"
 
