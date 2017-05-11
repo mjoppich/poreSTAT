@@ -35,6 +35,12 @@ if __name__ == '__main__':
     cmd2tool['STAT'] = StatsSummary(parser, subparsers)
     cmd2tool['FASTQ'] = ExtractSequences(parser, subparsers)
 
+    cmd2tool['TIME'] = TimelineReads(parser, subparsers)
+
     args = parser.parse_args()
 
-    args.func(args)
+    if not 'func' in vars(args):
+        parser.print_help()
+    else:
+
+        args.func(args)
