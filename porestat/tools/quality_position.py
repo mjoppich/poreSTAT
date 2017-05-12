@@ -4,22 +4,24 @@ from collections import Counter
 from ..utils.Parallel import Parallel as ll
 from ..utils.Utils import mergeDicts, mergeCounter
 
+import argparse
+import numpy as np
+import matplotlib.pyplot as plt
 
-class NucleotideDistribution(ParallelPTTInterface):
+class QualityDistribution(ParallelPTTInterface):
 
     def __init__(self, parser, subparsers):
 
-        super(NucleotideDistribution, self).__init__(parser, self.__addParser(subparsers))
+        super(QualityDistribution, self).__init__(parser, self.__addParser(subparsers))
 
-        self.nucTypes = [
-            'A','C','T','G','N'
-         ]
+        self.qualTypes = [chr(x) for x in range(ord('!'), ord('~')+1)]
 
     def __addParser(self, subparsers):
 
-        parser_expls = subparsers.add_parser('nuc_dist', help='expls help')
+        parser_expls = subparsers.add_parser('qual_pos', help='expls help')
         parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser_expls.add_argument('-p', '--plot', '--out', action='store', type=argparse.FileType('w'), default=None)
         parser_expls.set_defaults(func=self.exec)
 
         return parser_expls
@@ -27,7 +29,7 @@ class NucleotideDistribution(ParallelPTTInterface):
     def _makePropDict(self):
 
         propDict = {}
-        propDict['NUCS'] = Counter()
+        propDict['QUALS'] = {}
         propDict['USER_RUN_NAME'] = set()
         propDict['READ_COUNT'] = 0
 
@@ -61,8 +63,16 @@ class NucleotideDistribution(ParallelPTTInterface):
 
             if fastq != None:
 
-                for x in fastq.seq:
-                    propDict['NUCS'][x] += 1
+                qualDict = propDict['QUALS']
+
+                for i in range(0, len(fastq.qual)):
+
+                    if not i in qualDict:
+                        qualDict[i] = Counter()
+
+                    qualDict[i][fastq.qual[i]] += 1
+
+                propDict['QUALS'] = qualDict
 
 
         print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
@@ -82,12 +92,11 @@ class NucleotideDistribution(ParallelPTTInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'TOTAL_BASES']
-
-        for x in self.nucTypes:
+        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES']
+        for x in self.qualTypes:
             makeObservations.append(x)
 
-        for x in self.nucTypes:
+        for x in self.qualTypes:
             makeObservations.append(x + "%")
 
         allobservations = {}
@@ -98,24 +107,15 @@ class NucleotideDistribution(ParallelPTTInterface):
             run_user_name = props['USER_RUN_NAME']
             fileCount = props['READ_COUNT']
 
-            nuclCounts = props['NUCS']
+            qualCounter = props['QUALS']
 
             observations = {
 
                 'RUNID': runid,
                 'USER_RUN_NAME': ",".join(run_user_name),
-                'FILES': fileCount
+                'FILES': fileCount,
+                'QUALPOS': qualCounter
             }
-
-            allNucl = 0
-            for x in self.nucTypes:
-                observations[x] = nuclCounts[x]
-                allNucl += nuclCounts[x]
-
-            observations['TOTAL_BASES'] = allNucl
-
-            for x in self.nucTypes:
-                observations[x + "%"] = nuclCounts[x] / allNucl
 
             allobservations[runid] = observations
 
@@ -130,3 +130,38 @@ class NucleotideDistribution(ParallelPTTInterface):
                 allobs.append(str(allobservations[runid][x]))
 
             print("\t".join(allobs))
+
+            # make plot for runid
+
+            # pos -> qual -> count
+            qualCounter = observations['QUALPOS']
+
+            self.plotQualCounter(qualCounter)
+
+
+    def plotQualCounter(self, qualCounter):
+
+
+        foundLengths = set()
+        for length in qualCounter:
+            foundLengths.add(length)
+
+        foundLengths = sorted([foundLengths])
+        maxLength = max(foundLengths)
+        step = maxLength / 10;
+
+        fig, axes = plt.subplots(nrows=1, ncols=10, figsize=(6, 6))
+
+        for i in range(0, 10):
+
+            stepMin = i*step
+            stepMax = stepMin + step
+
+            allData = []
+            for 
+
+            axes[0, i].violinplot(data, pos, points=20, widths=0.3, showmeans=True, showextrema=True, showmedians=True)
+
+
+
+

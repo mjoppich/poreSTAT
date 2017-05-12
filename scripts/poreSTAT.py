@@ -3,6 +3,8 @@ import argparse
 
 from porestat.tools.experiment_ls import Experiment_ls
 from porestat.tools.channel_occupancy import Channel_occupancy
+from porestat.tools.nucleotide_distribution import NucleotideDistribution
+from porestat.tools.quality_distribution import QualityDistribution
 from porestat.tools.stats_summary import StatsSummary
 from porestat.tools.extract_sequences import ExtractSequences
 from porestat.tools.timelineReads import TimelineReads
@@ -36,6 +38,8 @@ if __name__ == '__main__':
     cmd2tool['STAT'] = StatsSummary(parser, subparsers)
     cmd2tool['FASTQ'] = ExtractSequences(parser, subparsers)
     cmd2tool['TIME'] = TimelineReads(parser, subparsers)
+    cmd2tool['NUC_DIST'] = NucleotideDistribution(parser, subparsers)
+    cmd2tool['QUAL_DIST'] = QualityDistribution(parser, subparsers)
 
     args = parser.parse_args()
 

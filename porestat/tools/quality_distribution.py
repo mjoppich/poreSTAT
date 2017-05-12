@@ -5,21 +5,20 @@ from ..utils.Parallel import Parallel as ll
 from ..utils.Utils import mergeDicts, mergeCounter
 
 
-class NucleotideDistribution(ParallelPTTInterface):
+class QualityDistribution(ParallelPTTInterface):
 
     def __init__(self, parser, subparsers):
 
-        super(NucleotideDistribution, self).__init__(parser, self.__addParser(subparsers))
+        super(QualityDistribution, self).__init__(parser, self.__addParser(subparsers))
 
         self.qualTypes = [chr(x) for x in range(ord('!'), ord('~')+1)]
-
-        self.str2fileType = {self.fileType2Str[x]: x for x in self.fileType2Str}
 
     def __addParser(self, subparsers):
 
         parser_expls = subparsers.add_parser('qual_dist', help='expls help')
         parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser_expls.add_argument('-p', '--plot', nargs='?', type=bool, const=True, default=False, help='issue plot?', required=False)
         parser_expls.set_defaults(func=self.exec)
 
         return parser_expls
@@ -55,7 +54,7 @@ class NucleotideDistribution(ParallelPTTInterface):
 
             propDict = counterRunID[runid]
             propDict['READ_COUNT'] += 1
-            propDict['RUNNAME'].add( file.user_filename_input() )
+            propDict['USER_RUN_NAME'].add( file.user_filename_input() )
 
             fastq = file.getFastQ()
 
@@ -82,7 +81,7 @@ class NucleotideDistribution(ParallelPTTInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES',]
+        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'TOTAL_BASES']
         for x in self.qualTypes:
             makeObservations.append(x)
 
@@ -97,7 +96,7 @@ class NucleotideDistribution(ParallelPTTInterface):
             run_user_name = props['USER_RUN_NAME']
             fileCount = props['READ_COUNT']
 
-            nuclCounts = props['NUCS']
+            nuclCounts = props['QUALS']
 
             observations = {
 
@@ -110,6 +109,8 @@ class NucleotideDistribution(ParallelPTTInterface):
             for x in self.qualTypes:
                 observations[x] = nuclCounts[x]
                 allNucl += nuclCounts[x]
+
+            observations['TOTAL_BASES'] = allNucl
 
             for x in self.qualTypes:
                 observations[x + "%"] = nuclCounts[x] / allNucl
@@ -127,3 +128,4 @@ class NucleotideDistribution(ParallelPTTInterface):
                 allobs.append(str(allobservations[runid][x]))
 
             print("\t".join(allobs))
+
