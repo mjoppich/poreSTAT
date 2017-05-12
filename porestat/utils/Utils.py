@@ -1,6 +1,6 @@
 import sys
 from itertools import chain
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 
 def eprint(*args, **kwargs):
@@ -37,3 +37,15 @@ def mergeDicts( dict1, dict2):
             dict3[k] = v
 
     return dict3
+
+def mergeCounter(self, counter1, counter2):
+
+    mergedCounter = Counter()
+
+    for x in counter1:
+        mergedCounter[x] = counter1[x]
+
+    for x in counter2:
+        mergedCounter[x] += counter2[x]
+
+    return mergedCounter

@@ -69,19 +69,6 @@ class TimelineReads(ParallelPTTInterface):
 
         return [createdReadsTime, createdReadsBasecalledTime]
 
-    def mergeCounter(self, counter1, counter2):
-
-        mergedCounter = Counter()
-
-        for x in counter1:
-            mergedCounter[x] = counter1[x]
-
-        for x in counter2:
-            mergedCounter[x] += counter2[x]
-
-        return mergedCounter
-
-
     def joinParallel(self, existResult, newResult, oEnvironment):
 
         if existResult == None:
@@ -89,8 +76,8 @@ class TimelineReads(ParallelPTTInterface):
 
 
         existResult = [
-            self.mergeCounter(existResult[0], newResult[0]),
-            self.mergeCounter(existResult[1], newResult[1])
+            mergeCounter(existResult[0], newResult[0]),
+            mergeCounter(existResult[1], newResult[1])
         ]
 
         return existResult
