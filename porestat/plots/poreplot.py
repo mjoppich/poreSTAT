@@ -5,6 +5,20 @@ from numpy import genfromtxt
 import os
 
 from collections import Counter
+import datetime as dt
+from matplotlib.ticker import Formatter
+
+
+class TimestampDateFormatter(Formatter):
+    def __init__(self, fmt='%Y-%m-%d %H:%M:%S'):
+        self.fmt = fmt
+
+    def __call__(self, x, pos=0):
+        'Return the label for time x at position pos'
+
+        date = dt.datetime.fromtimestamp(x)
+
+        return date.strftime(self.fmt)
 
 class PorePlot:
 
@@ -145,4 +159,52 @@ class PorePlot:
 
         fig.tight_layout()
 
+        plt.show()
+
+
+
+    @classmethod
+    def plotTimeLine(cls, readsPerTime, labels, colors = None):
+
+        """
+
+        :param readsPerTime: vector of counters of timestamp -> #reads
+        :param labels: vector of string with label for each element in readsPerTime
+        :return:
+        """
+
+        histInput = []
+
+        for x in readsPerTime:
+
+            readsTime = x
+
+            timePoints = sorted(list(readsTime.keys()))
+
+            histInTime = []
+            for x in readsTime:
+                for i in range(0, readsTime[x]):
+                    histInTime.append(x)
+
+            histInput.append( histInTime )
+
+        if colors == None or len(colors) != len(histInput):
+
+            colors = []
+            for i in range(0, len(histInput)):
+
+                color = cls.getColorLin(0, len(histInput)-1, i)
+                colors.append(color)
+
+
+        fig, ax = plt.subplots()
+
+        formatter = TimestampDateFormatter()
+        ax.xaxis.set_major_formatter(formatter)
+
+        linebc, bins, patches  = ax.hist(histInput, 100, histtype='bar', stacked=True, ls='dotted', color=colors, label=labels)
+
+        plt.legend()
+
+        fig.autofmt_xdate()
         plt.show()

@@ -281,6 +281,30 @@ class Fast5File:
 
             return None
 
+    def getSampleFrequency(self):
+        return int(self._get_attribute('/UniqueGlobalKey/context_tags', 'sample_frequency', 4000))
+
+    def getExperimentStartTime(self):
+        return int(self._get_attribute('/UniqueGlobalKey/tracking_id', 'exp_start_time', None))
+
+    def readCreateTime(self):
+
+        expStartTime = self.getExperimentStartTime()
+        sampleFrequency = self.getSampleFrequency()
+
+        if expStartTime == None:
+            return None
+
+        startTimes = self._read_attrib('start_time')
+
+        if type(startTimes) == list:
+            vReturn = [x + expStartTime for x in startTimes]
+            return vReturn
+
+        else:
+            iReadStart = int(expStartTime + (startTimes / sampleFrequency))
+            return iReadStart
+
 
     def _read_attrib(self, attribname):
 

@@ -1,31 +1,18 @@
+
+from ..plots.poreplot import PorePlot
 from ..utils.Utils import eprint
 from .ParallelPTTInterface import ParallelPTTInterface
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 
+import argparse
+
 from collections import Counter
 
-import numpy as np
-from matplotlib.mlab import csv2rec
-import matplotlib.pyplot as plt
-import matplotlib.cbook as cbook
-from matplotlib.ticker import Formatter
-import sys, argparse, os
 
 class Environment(object):
     pass
 
-class MyFormatter(Formatter):
-    def __init__(self, dates, fmt='%Y-%m-%d %H:%M:%S'):
-        self.dates = dates
-        self.fmt = fmt
 
-    def __call__(self, x, pos=0):
-        'Return the label for time x at position pos'
-        ind = int(np.round(x))
-        if ind >= len(self.dates) or ind < 0:
-            return ''
-
-        return self.dates[ind].strftime(self.fmt)
 
 class TimelineReads(ParallelPTTInterface):
 
@@ -36,7 +23,7 @@ class TimelineReads(ParallelPTTInterface):
 
     def __addParser(self, subparsers):
 
-        parser_expls = subparsers.add_parser('seq', help='seq help')
+        parser_expls = subparsers.add_parser('time', help='timeline help')
         parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser_expls.add_argument('-o', '--out', action='store', type=argparse.FileType('w'), default=None)
@@ -70,8 +57,8 @@ class TimelineReads(ParallelPTTInterface):
 
             runid = file.runID()
 
-            winnerseq = file.winner()
-            creationTime = file.createTime()
+            winnerseq = file.getFastQ()
+            creationTime = file.readCreateTime()
 
             if winnerseq != None:
                 createdReadsBasecalledTime[creationTime] += 1
@@ -114,24 +101,7 @@ class TimelineReads(ParallelPTTInterface):
         readsTime = parallelResult[0]
         readsBCTime = parallelResult[1]
 
-        timePoints = readsTime.keys().sort()
-        timePointsBC = readsBCTime.keys().sort()
-
-        valPoints = [readsTime[x] for x in timePoints]
-        valPointsBC = [readsBCTime[x] for x in timePointsBC]
-
-        fig, ax = plt.subplots()
-
-        formatter = MyFormatter(timePoints)
-        ax.xaxis.set_major_formatter(formatter)
-        ax.plot(np.arange(len(timePoints)), valPoints, 'o-')
-
-        formatter = MyFormatter(timePoints)
-        ax.xaxis.set_major_formatter(formatter)
-        ax.plot(np.arange(len(timePointsBC)), valPointsBC, 'x-')
-
-        fig.autofmt_xdate()
-        plt.show()
+        PorePlot.plotTimeLine([readsBCTime, readsTime], ['basecalled', 'non-basecalled'])
 
 
 

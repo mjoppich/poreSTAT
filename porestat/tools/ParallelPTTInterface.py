@@ -16,11 +16,14 @@ class ParallelPTTInterface(PTToolInterface):
 
         iStart = time.time()
         environment = self.prepareEnvironment(args)
-        result = ll.mapReduce(4, self.prepareInputs(args), self.execParallel, environment, self.chunkSize, self.joinParallel)
+        inputs = self.prepareInputs(args)
+
+        result = ll.mapReduce(4, inputs, self.execParallel, environment, self.chunkSize, self.joinParallel)
+
         self.makeResults(result, environment, args)
         iEnd = time.time()
 
-        eprint("Execution Time: " + str(time.strftime('%H:%M:%S HH:MM:SS', time.gmtime(iEnd-iStart))))
+        eprint("Execution Time: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd-iStart))))
 
     def prepareEnvironment(self, args):
         return None

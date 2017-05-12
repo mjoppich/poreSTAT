@@ -5,6 +5,7 @@ from porestat.tools.experiment_ls import Experiment_ls
 from porestat.tools.channel_occupancy import Channel_occupancy
 from porestat.tools.stats_summary import StatsSummary
 from porestat.tools.extract_sequences import ExtractSequences
+from porestat.tools.timelineReads import TimelineReads
 
 import random
 
@@ -34,7 +35,6 @@ if __name__ == '__main__':
     cmd2tool['OCC'] = Channel_occupancy(parser, subparsers)
     cmd2tool['STAT'] = StatsSummary(parser, subparsers)
     cmd2tool['FASTQ'] = ExtractSequences(parser, subparsers)
-
     cmd2tool['TIME'] = TimelineReads(parser, subparsers)
 
     args = parser.parse_args()
