@@ -8,48 +8,161 @@ import os
 import multiprocessing
 import pickle
 
+from pathos import multiprocessing as mp
+
 from .Utils import eprint
+
+import itertools
+
+class MapReduce:
+
+    def __init__(self, procs = 4):
+        self.pool = mp.ProcessPool(nodes=procs)
+
+
+    def exec(self, oIterable, oFunc, sEnvironment, chunkSize = 1, pReduceFunc = None):
+
+        allResults = []
+
+        resultObj = None
+
+        for x in oIterable:
+            allResults.append( self.pool.apipe( oFunc, x, sEnvironment ) )
+
+        while len(allResults) > 0:
+
+            i=0
+            while i < len(allResults):
+
+                if allResults[i].ready():
+
+                    result = allResults[i].get()
+
+                    if pReduceFunc != None:
+
+                        resultObj = pReduceFunc(resultObj, result, sEnvironment)
+
+                    else:
+
+                        if resultObj == None:
+                            resultObj = []
+
+                        resultObj.append(result)
+
+                    del allResults[i]
+
+                else:
+                    i += 1
+
+            time.sleep(0.5)
+
+        return resultObj
+
+
+
+
+def chunkIterable(iterable, size):
+
+    it = iter(iterable)
+    item = list(itertools.islice(it, size))
+
+    while item:
+        yield item
+        item = list(itertools.islice(it, size))
+
+class Thread (threading.Thread):
+    def __init__(self, threadID, work, result, calcFunc, reduceFunc ):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+
+        self.workLoad = calcFunc
+        self.joinLoad = reduceFunc
+
+        self.bStop = False
+
+        (self.workQueue, self.workLock) = work
+        (self.resultObj, self.resultLock) = result
+
+    def run(self):
+
+        while not self.bStop:
+
+            # get the next workload
+            self.workLock.acquire()
+            if not self.workQueue.empty():
+                chunkData = self.workQueue.get()
+                self.workLock.release()
+
+                eprint("Thread working: " + str(self.threadID) + " " + str(chunkData))
+
+                for data in chunkData:
+                    chunkResult = self.workLoad(self.threadID, None, data)
+
+                    self.resultLock.acquire()
+                    self.resultObj = self.joinLoad(self.resultObj, chunkResult, None)
+                    self.resultLock.release()
+
+            else:
+                self.workLock.release()
+
+            time.sleep(0.1)
+
+
+    def cancel(self):
+        self.bStop = True
+
+    def reset(self):
+        self.bStop = False
 
 class Parallel:
 
+    @classmethod
+    def threading(cls, iThreads, oIterable, oFunc, sEnvironment, chunkSize = 1, reduceFunc = None):
+
+        workLock = threading.Lock()
+        resultLock = threading.Lock()
+
+
+        workQueue = queue.Queue( len(oIterable) )
+        resultObj = None
+
+        vThreads = []
+
+        bFinished = False
+
+        # Create new threads
+        for iThreadID in range(0, iThreads):
+
+            thread = Thread(iThreadID, (workQueue, workLock), (resultObj, resultLock), oFunc, reduceFunc)
+
+            thread.start()
+            vThreads.append(thread)
+
+        # now fill the queue
+        workLock.acquire()
+        for oElem in chunkIterable(oIterable, chunkSize):
+            workQueue.put(oElem)
+
+        workLock.release()
+
+        # wait for all elements processed # TODO why busy waiting?
+        while not workQueue.empty():
+            pass
+
+        # finish all threads
+        for oThread in vThreads:
+            oThread.cancel()
+            oThread.join()
+
+        return resultObj
+
+
+
+
+
     datamanager = None
 
-    class Thread (threading.Thread):
-        def __init__(self, threadID, oQueue, oLock, oFunc):
-            threading.Thread.__init__(self)
-            self.threadID = threadID
-            self.oQueue = oQueue
-            self.oLock = oLock
 
-            self.process = oFunc
-
-            self.bFinished = False
-
-        def run(self):
-            eprint ( "Starting Thread" + str(self.threadID))
-            self.process_data()
-            eprint ("Exiting Thread" + str(self.threadID))
-
-        def process_data(self):
-
-            while not self.bFinished:
-                self.oLock.acquire()
-                if not self.oQueue.empty():
-                    data = self.oQueue.get()
-                    self.oLock.release()
-
-                    self.process(self.threadID, data)
-
-                else:
-                    self.oLock.release()
-
-                time.sleep(0.1)
-
-        def cancel(self):
-            self.bFinished = True
-
-        def reset(self):
-            self.bFinished = False
 
     @classmethod
     def foreach(cls, iThreads, oIterable, oFunc):

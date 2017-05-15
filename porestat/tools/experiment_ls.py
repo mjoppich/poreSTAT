@@ -1,15 +1,40 @@
-from .ParallelPTTInterface import ParallelPTTInterface
+from .ParallelPTTInterface import ParallelPSTInterface
+from .PTToolInterface import PSToolInterfaceFactory,PSToolException
+
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
 from ..utils.Parallel import Parallel as ll
 from ..utils.Utils import mergeDicts
 
-
-class Experiment_ls(ParallelPTTInterface):
+class ExperimentLsFactory(PSToolInterfaceFactory):
 
     def __init__(self, parser, subparsers):
 
-        super(Experiment_ls, self).__init__(parser, self.__addParser(subparsers))
+        super(ExperimentLsFactory, self).__init__(parser, self._addParser(subparsers))
+
+
+    def _addParser(self, subparsers):
+
+        parser_expls = subparsers.add_parser('expls', help='expls help')
+        parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
+        parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser_expls.set_defaults(func=self._prepObj)
+
+        return parser_expls
+
+    def _prepObj(self, args):
+
+        simArgs = self._makeArguments(args)
+
+        return ExperimentLs(simArgs)
+
+
+
+class ExperimentLs(ParallelPSTInterface):
+
+    def __init__(self, args):
+
+        super(ExperimentLs, self).__init__(args)
 
         self.fileType2Str = {
 
@@ -22,15 +47,6 @@ class Experiment_ls(ParallelPTTInterface):
          }
 
         self.str2fileType = {self.fileType2Str[x]: x for x in self.fileType2Str}
-
-    def __addParser(self, subparsers):
-
-        parser_expls = subparsers.add_parser('expls', help='expls help')
-        parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
-        parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser_expls.set_defaults(func=self.exec)
-
-        return parser_expls
 
     def _makePropDict(self):
 
@@ -49,7 +65,7 @@ class Experiment_ls(ParallelPTTInterface):
     def prepareInputs(self, args):
         return self.manage_folders_reads(args)
 
-    def execParallel(self, procID, environment, data):
+    def execParallel(self, data, environment):
 
         counterRunID = {}
 
@@ -99,6 +115,9 @@ class Experiment_ls(ParallelPTTInterface):
 
         makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'AVG_LENGTH', 'N50', 'BASECALL_2D', 'BASECALL_1D_COMPL',
                             'BASECALL_1D', 'BASECALL_RNN_1D', 'PRE_BASECALL', 'UNKNOWN']
+
+        if parallelResult == None:
+            raise PSToolException("No Files collected")
 
         allobservations = {}
         for runid in parallelResult:

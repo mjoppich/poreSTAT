@@ -1,26 +1,28 @@
-from .PTToolInterface import PTToolInterface
-from ..utils.Parallel import Parallel as ll
+from .PTToolInterface import PSToolInterface
+from ..utils.Parallel import MapReduce
 from ..utils.Utils import eprint
 import time
 
-class ParallelPTTInterface(PTToolInterface):
+class ParallelPSTInterface(PSToolInterface):
 
-    def __init__(self, parser, subparsers):
+    def __init__(self, args):
 
-        super(ParallelPTTInterface, self).__init__(parser, subparsers)
+        super(ParallelPSTInterface, self).__init__(args)
 
         self.chunkSize = 1
 
 
-    def exec(self, args):
+    def exec(self):
 
         iStart = time.time()
-        environment = self.prepareEnvironment(args)
-        inputs = self.prepareInputs(args)
+        environment = self.prepareEnvironment(self.args)
+        inputs = self.prepareInputs(self.args)
 
-        result = ll.mapReduce(4, inputs, self.execParallel, environment, self.chunkSize, self.joinParallel)
+        ll = MapReduce(4)
 
-        self.makeResults(result, environment, args)
+        result = ll.exec( inputs, self.execParallel, environment, self.chunkSize, self.joinParallel)
+
+        self.makeResults(result, environment, self.args)
         iEnd = time.time()
 
         eprint("Execution Time: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd-iStart))))
@@ -31,7 +33,7 @@ class ParallelPTTInterface(PTToolInterface):
     def prepareInputs(self, args):
         pass
 
-    def execParallel(self, procID, environment, data):
+    def execParallel(self, data, environment):
         pass
 
     def joinParallel(self, existResult, newResult, oEnvironment):

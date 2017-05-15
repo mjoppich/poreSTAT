@@ -1,45 +1,45 @@
 import sys
+
+#import porestat.utils.PickleArgparse as pickArg
 import argparse
 
-from porestat.tools.experiment_ls import Experiment_ls
-from porestat.tools.channel_occupancy import Channel_occupancy
-from porestat.tools.nucleotide_distribution import NucleotideDistribution
-from porestat.tools.quality_distribution import QualityDistribution
-from porestat.tools.stats_summary import StatsSummary
-from porestat.tools.extract_sequences import ExtractSequences
-from porestat.tools.timelineReads import TimelineReads
+from porestat.tools.experiment_ls import ExperimentLsFactory
+from porestat.tools.channel_occupancy import ChannelOccupancyFactory
+from porestat.tools.nucleotide_distribution import NucleotideDistributionFactory
+from porestat.tools.quality_distribution import QualityDistributionFactory
+from porestat.tools.stats_summary import StatsSummaryFactory
+from porestat.tools.extract_sequences import ExtractSequencesFactory
+from porestat.tools.timelineReads import TimelineReadsFactory
+from porestat.tools.quality_position import QualityPositionFactory
+
+from porestat.tools.PTToolInterface import PSToolException
+from porestat.utils import eprint
 
 import random
 
+
+def argParseID(elem):
+
+    return elem
+
 if __name__ == '__main__':
-    from porestat.plots.poreplot import PorePlot
-
-    counts = {}
-    for x in range(1,513):
-
-        counts[x] = []
-
-        for j in range(0, random.randint(5,10)):
-            counts[x].append(  random.randint(1000,60000) )
-
-        if random.randint(0, 100) % 10 == 0:
-            counts[x] = []
-
-    #PorePlot.plotLoadOut(counts, pores=(32,16))
-    #exit(0)
 
     parser = argparse.ArgumentParser(prog='porestat')
+
+    parser.register('type', None, argParseID)
+
     #parser.add_argument('command', type=str, help='foo help')
     subparsers = parser.add_subparsers(help='sub-command help')
 
     cmd2tool = {}
-    cmd2tool['EXPLS'] = Experiment_ls(parser, subparsers)
-    cmd2tool['OCC'] = Channel_occupancy(parser, subparsers)
-    cmd2tool['STAT'] = StatsSummary(parser, subparsers)
-    cmd2tool['FASTQ'] = ExtractSequences(parser, subparsers)
-    cmd2tool['TIME'] = TimelineReads(parser, subparsers)
-    cmd2tool['NUC_DIST'] = NucleotideDistribution(parser, subparsers)
-    cmd2tool['QUAL_DIST'] = QualityDistribution(parser, subparsers)
+    cmd2tool['EXPLS'] = ExperimentLsFactory(parser, subparsers)
+    cmd2tool['OCC'] = ChannelOccupancyFactory(parser, subparsers)
+    cmd2tool['STAT'] = StatsSummaryFactory(parser, subparsers)
+    cmd2tool['FASTQ'] = ExtractSequencesFactory(parser, subparsers)
+    cmd2tool['TIME'] = TimelineReadsFactory(parser, subparsers)
+    cmd2tool['NUC_DIST'] = NucleotideDistributionFactory(parser, subparsers)
+    cmd2tool['QUAL_DIST'] = QualityDistributionFactory(parser, subparsers)
+    cmd2tool['QUAL_POS'] = QualityPositionFactory(parser, subparsers)
 
     args = parser.parse_args()
 
@@ -47,4 +47,11 @@ if __name__ == '__main__':
         parser.print_help()
     else:
 
-        args.func(args)
+        try:
+            calcObj = args.func(args)
+
+            calcObj.exec()
+
+        except PSToolException as e:
+            eprint(e)
+

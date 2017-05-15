@@ -1,28 +1,44 @@
-from .ParallelPTTInterface import ParallelPTTInterface
+from .ParallelPTTInterface import ParallelPSTInterface
+from .PTToolInterface import PSToolInterfaceFactory
+
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
-from ..utils.Parallel import Parallel as ll
 from ..utils.Utils import mergeDicts, mergeCounter
 
-
-class NucleotideDistribution(ParallelPTTInterface):
+class NucleotideDistributionFactory(PSToolInterfaceFactory):
 
     def __init__(self, parser, subparsers):
 
-        super(NucleotideDistribution, self).__init__(parser, self.__addParser(subparsers))
+        super(NucleotideDistributionFactory, self).__init__(parser, self._addParser(subparsers))
+
+
+    def _addParser(self, subparsers):
+
+        parser_expls = subparsers.add_parser('nuc_dist', help='expls help')
+        parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
+        parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser_expls.set_defaults(func=self._prepObj)
+
+        return parser_expls
+
+
+    def _prepObj(self, args):
+
+        simArgs = self._makeArguments(args)
+
+        return NucleotideDistribution(simArgs)
+
+class NucleotideDistribution(ParallelPSTInterface):
+
+    def __init__(self, args):
+
+        super(NucleotideDistribution, self).__init__( args )
 
         self.nucTypes = [
             'A','C','T','G','N'
          ]
 
-    def __addParser(self, subparsers):
 
-        parser_expls = subparsers.add_parser('nuc_dist', help='expls help')
-        parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
-        parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser_expls.set_defaults(func=self.exec)
-
-        return parser_expls
 
     def _makePropDict(self):
 

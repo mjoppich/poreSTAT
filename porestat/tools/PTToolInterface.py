@@ -2,7 +2,10 @@ import os
 
 from ..utils.Utils import eprint
 
-class PTToolInterface:
+class ArgObj(object):
+    pass
+
+class PSToolInterfaceFactory:
 
     def __init__(self, parser, subparser):
 
@@ -15,6 +18,33 @@ class PTToolInterface:
 
     def print_help(self):
         self.subparser.print_help()
+
+    def _makeArguments(self, args):
+
+        newArgs = ArgObj()
+
+        for x in vars(args):
+            newArgs.__dict__[x] = args.__dict__[x]
+
+        return newArgs
+
+
+class PSToolException(Exception):
+
+    def __init__(self, msg):
+
+        super(PSToolException, self).__init__()
+
+        self.msg = msg
+
+
+
+
+class PSToolInterface:
+
+    def __init__(self, args):
+
+        self.args = args
 
     def exec(self, args):
         pass
@@ -30,8 +60,7 @@ class PTToolInterface:
 
         if (args.folders == None and args.reads == None):
             eprint("error: Either folders or reads must be set!")
-            self.subparser.print_help()
-            exit(-1)
+            raise PSToolException("bla")
 
         if args.folders != None:
             folders = args.folders

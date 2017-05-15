@@ -1,33 +1,47 @@
-from .PTToolInterface import PTToolInterface
+from .ParallelPTTInterface import ParallelPSTInterface
+from .PTToolInterface import PSToolInterfaceFactory
+
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from porestat.plots.poreplot import PorePlot
 
-class Channel_occupancy(PTToolInterface):
+class ChannelOccupancyFactory(PSToolInterfaceFactory):
 
     def __init__(self, parser, subparsers):
 
-        super(Channel_occupancy, self).__init__(parser, self.__addParser(subparsers))
+        super(ChannelOccupancyFactory, self).__init__(parser, self._addParser(subparsers))
 
 
-    def __addParser(self, subparsers):
+    def _addParser(self, subparsers):
 
         parser_chocc = subparsers.add_parser('occ', help='occ help')
         parser_chocc.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan')
         parser_chocc.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser_chocc.add_argument('-e', '--experiments', nargs='+', type=str, help='experiments to list')
-        parser_chocc.set_defaults(func=self.exec)
+        parser_chocc.set_defaults(func=self._prepObj)
 
         return parser_chocc
 
+    def _prepObj(self, args):
 
-    def exec(self, args):
+        simArgs = self._makeArguments(args)
+
+        return ChannelOccupancy(simArgs)
 
 
-        folders = self.manage_folders_reads(args)
+
+class ChannelOccupancy(ParallelPSTInterface):
+
+    def __init__(self, args):
+        super(ChannelOccupancy, self).__init__(args)
+
+    def exec(self):
+
+
+        folders = self.manage_folders_reads(self.args)
 
         experiments = None
-        if not args.experiments == None:
-            experiments = set(args.experiments)
+        if not self.args.experiments == None:
+            experiments = set(self.args.experiments)
 
         exp2cl = {}
         runid2filename = {}

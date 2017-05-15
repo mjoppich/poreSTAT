@@ -1,36 +1,53 @@
 
 from ..plots.poreplot import PorePlot
 from ..utils.Utils import eprint, mergeCounter
-from .ParallelPTTInterface import ParallelPTTInterface
+from .ParallelPTTInterface import ParallelPSTInterface
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 
 import argparse
 
 from collections import Counter
 
+from .ParallelPTTInterface import ParallelPSTInterface
+from .PTToolInterface import PSToolInterfaceFactory
+
+from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
+from collections import Counter
+from ..utils.Utils import mergeDicts, mergeCounter
+
+from ..utils.PickleArgparse import FileType
 
 class Environment(object):
     pass
 
-
-
-class TimelineReads(ParallelPTTInterface):
+class TimelineReadsFactory(PSToolInterfaceFactory):
 
     def __init__(self, parser, subparsers):
 
-        super(TimelineReads, self).__init__(parser, self.__addParser(subparsers))
+        super(TimelineReadsFactory, self).__init__(parser, self._addParser(subparsers))
 
-
-    def __addParser(self, subparsers):
-
+    def _addParser(self, subparsers):
         parser_expls = subparsers.add_parser('time', help='timeline help')
         parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser_expls.add_argument('-o', '--out', action='store', type=argparse.FileType('w'), default=None)
 
-        parser_expls.set_defaults(func=self.exec)
+        parser_expls.set_defaults(func=self._prepObj)
 
         return parser_expls
+
+    def _prepObj(self, args):
+
+        simArgs = self._makeArguments(args)
+
+        return TimelineReads(simArgs)
+
+class TimelineReads(ParallelPSTInterface):
+
+    def __init__(self, args):
+
+        super(TimelineReads, self).__init__( args )
+
 
     def prepareEnvironment(self, args):
 

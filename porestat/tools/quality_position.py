@@ -1,30 +1,43 @@
-from .ParallelPTTInterface import ParallelPTTInterface
+from .ParallelPTTInterface import ParallelPSTInterface
+from .PTToolInterface import PSToolInterfaceFactory
+
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
-from ..utils.Parallel import Parallel as ll
 from ..utils.Utils import mergeDicts, mergeCounter
 
 import argparse
-import numpy as np
-import matplotlib.pyplot as plt
-
-class QualityDistribution(ParallelPTTInterface):
+class QualityPositionFactory(PSToolInterfaceFactory):
 
     def __init__(self, parser, subparsers):
 
-        super(QualityDistribution, self).__init__(parser, self.__addParser(subparsers))
+        super(QualityPositionFactory, self).__init__(parser, self._addParser(subparsers))
 
-        self.qualTypes = [chr(x) for x in range(ord('!'), ord('~')+1)]
 
-    def __addParser(self, subparsers):
+    def _addParser(self, subparsers):
 
         parser_expls = subparsers.add_parser('qual_pos', help='expls help')
         parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser_expls.add_argument('-p', '--plot', '--out', action='store', type=argparse.FileType('w'), default=None)
-        parser_expls.set_defaults(func=self.exec)
+        parser_expls.set_defaults(func=self._prepObj)
 
         return parser_expls
+
+    def _prepObj(self, args):
+
+        simArgs = self._makeArguments(args)
+
+        return QualityPosition(simArgs)
+
+class QualityPosition(ParallelPSTInterface):
+
+    def __init__(self, args):
+
+        super(QualityPosition, self).__init__( args )
+
+        self.qualTypes = [chr(x) for x in range(ord('!'), ord('~')+1)]
+
+
 
     def _makePropDict(self):
 
@@ -45,6 +58,8 @@ class QualityDistribution(ParallelPTTInterface):
         f5folder = Fast5Directory(data)
 
         iFilesInFolder = 0
+
+        print("Folder started: " + f5folder.path)
 
         for file in f5folder.collect():
 
@@ -157,10 +172,22 @@ class QualityDistribution(ParallelPTTInterface):
             stepMin = i*step
             stepMax = stepMin + step
 
-            allData = []
-            for 
+            allData = Counter()
+            for pos in qualCounter:
 
-            axes[0, i].violinplot(data, pos, points=20, widths=0.3, showmeans=True, showextrema=True, showmedians=True)
+                if stepMin <= pos and pos < stepMax:
+
+                    for k in qualCounter[pos]:
+                        allData[k] += qualCounter[pos][k]
+
+            dataVal = []
+            dataPos = []
+
+            for x in allData:
+                dataVal.append(allData[x])
+                dataPos.append(x)
+
+            axes[0, i].violinplot(dataVal, dataPos, points=20, widths=0.3, showmeans=True, showextrema=True, showmedians=True)
 
 
 

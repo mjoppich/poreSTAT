@@ -1,20 +1,18 @@
-from ..utils.Utils import eprint
-from .ParallelPTTInterface import ParallelPTTInterface
-from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
+from .ParallelPTTInterface import ParallelPSTInterface
+from .PTToolInterface import PSToolInterfaceFactory, PSToolException
 
-import sys, argparse, os
+from ..hdf5tool.Fast5File import Fast5Directory, Fast5TYPE
+import argparse
+import sys
 
-class Environment(object):
-    pass
-
-class ExtractSequences(ParallelPTTInterface):
+class ExtractSequencesFactory(PSToolInterfaceFactory):
 
     def __init__(self, parser, subparsers):
 
-        super(ExtractSequences, self).__init__(parser, self.__addParser(subparsers))
+        super(ExtractSequencesFactory, self).__init__(parser, self._addParser(subparsers))
 
 
-    def __addParser(self, subparsers):
+    def _addParser(self, subparsers):
 
         parser_expls = subparsers.add_parser('seq', help='seq help')
         parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
@@ -25,9 +23,24 @@ class ExtractSequences(ParallelPTTInterface):
         parser_expls.add_argument('-o', '--out', action='store', type=argparse.FileType('w'), default=sys.stdout)
         parser_expls.add_argument('-t', '--type', required=False, default =None)
 
-        parser_expls.set_defaults(func=self.exec)
+        parser_expls.set_defaults(func=self._prepObj)
 
         return parser_expls
+
+    def _prepObj(self, args):
+
+        simArgs = self._makeArguments(args)
+
+        return ExtractSequences(simArgs)
+
+
+class Environment(object):
+    pass
+
+class ExtractSequences(ParallelPSTInterface):
+
+    def __init__(self, args):
+        super(ExtractSequences, self).__init__(args)
 
     def prepareEnvironment(self, args):
 
