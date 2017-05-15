@@ -11,6 +11,8 @@ from porestat.tools.stats_summary import StatsSummaryFactory
 from porestat.tools.extract_sequences import ExtractSequencesFactory
 from porestat.tools.timelineReads import TimelineReadsFactory
 from porestat.tools.quality_position import QualityPositionFactory
+from porestat.tools.length_histogram import LengthHistogramFactory
+from porestat.tools.yield_plot import YieldPlotFactory
 
 from porestat.tools.PTToolInterface import PSToolException
 from porestat.utils import eprint
@@ -40,6 +42,8 @@ if __name__ == '__main__':
     cmd2tool['NUC_DIST'] = NucleotideDistributionFactory(parser, subparsers)
     cmd2tool['QUAL_DIST'] = QualityDistributionFactory(parser, subparsers)
     cmd2tool['QUAL_POS'] = QualityPositionFactory(parser, subparsers)
+    cmd2tool['HIST'] = LengthHistogramFactory(parser, subparsers)
+    cmd2tool['YIELD'] = YieldPlotFactory(parser, subparsers)
 
     args = parser.parse_args()
 

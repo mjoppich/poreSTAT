@@ -1,51 +1,50 @@
+from porestat.plots.poreplot import PorePlot
+
 from .ParallelPTTInterface import ParallelPSTInterface
 from .PTToolInterface import PSToolInterfaceFactory
+from ..utils.Stats import calcN50
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
 from ..utils.Utils import mergeDicts, mergeCounter
 
-class NucleotideDistributionFactory(PSToolInterfaceFactory):
+class LengthHistogramFactory(PSToolInterfaceFactory):
 
     def __init__(self, parser, subparsers):
 
-        super(NucleotideDistributionFactory, self).__init__(parser, self._addParser(subparsers))
+        super(LengthHistogramFactory, self).__init__(parser, self._addParser(subparsers))
 
 
     def _addParser(self, subparsers):
+        parser = subparsers.add_parser('hist', help='expls help')
+        parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
+        parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser.add_argument('-p', '--plot', nargs='?', type=bool, const=True, default=False, help='issue plot?', required=False)
+        parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
 
-        parser_expls = subparsers.add_parser('nuc_dist', help='expls help')
-        parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
-        parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser_expls.set_defaults(func=self._prepObj)
+        parser.set_defaults(func=self._prepObj)
 
-        return parser_expls
-
+        return parser
 
     def _prepObj(self, args):
 
         simArgs = self._makeArguments(args)
 
-        return NucleotideDistribution(simArgs)
+        return LengthHistogram(simArgs)
 
-class NucleotideDistribution(ParallelPSTInterface):
+class LengthHistogram(ParallelPSTInterface):
 
     def __init__(self, args):
 
-        super(NucleotideDistribution, self).__init__( args )
-
-        self.nucTypes = [
-            'A','C','T','G','N'
-         ]
-
-
+        super(LengthHistogram, self).__init__( args )
 
     def _makePropDict(self):
 
         propDict = {}
-        propDict['NUCS'] = Counter()
         propDict['USER_RUN_NAME'] = set()
         propDict['READ_COUNT'] = 0
+        propDict['LENGTHS'] = []
 
         return propDict
 
@@ -76,10 +75,7 @@ class NucleotideDistribution(ParallelPSTInterface):
             fastq = file.getFastQ()
 
             if fastq != None:
-
-                for x in fastq.seq:
-                    propDict['NUCS'][x] += 1
-
+                propDict['LENGTHS'].append(len(fastq))
 
         print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
 
@@ -98,13 +94,7 @@ class NucleotideDistribution(ParallelPSTInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'TOTAL_BASES']
-
-        for x in self.nucTypes:
-            makeObservations.append(x)
-
-        for x in self.nucTypes:
-            makeObservations.append(x + "%")
+        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'TOTAL_LENGTH', 'N50', 'L50']
 
         allobservations = {}
         for runid in parallelResult:
@@ -113,27 +103,27 @@ class NucleotideDistribution(ParallelPSTInterface):
 
             run_user_name = props['USER_RUN_NAME']
             fileCount = props['READ_COUNT']
+            lengthObversations = props['LENGTHS']
 
-            nuclCounts = props['NUCS']
+            (n50, l50) = calcN50(lengthObversations)
 
             observations = {
 
                 'RUNID': runid,
                 'USER_RUN_NAME': ",".join(run_user_name),
-                'FILES': fileCount
+                'FILES': fileCount,
+                'TOTAL_LENGTH': sum(lengthObversations),
+                'N50': n50,
+                'L50': l50,
+                'LENGTHS': lengthObversations
             }
 
-            allNucl = 0
-            for x in self.nucTypes:
-                observations[x] = nuclCounts[x]
-                allNucl += nuclCounts[x]
+            key = ",".join(run_user_name) if args.groupByUser else runid
 
-            observations['TOTAL_BASES'] = allNucl
-
-            for x in self.nucTypes:
-                observations[x + "%"] = nuclCounts[x] / allNucl
-
-            allobservations[runid] = observations
+            if key in allobservations:
+                allobservations[key] = mergeDicts(allobservations[key], observations)
+            else:
+                allobservations[key] = observations
 
         sortedruns = sorted([x for x in allobservations])
 
@@ -146,3 +136,9 @@ class NucleotideDistribution(ParallelPSTInterface):
                 allobs.append(str(allobservations[runid][x]))
 
             print("\t".join(allobs))
+
+            if args.violin:
+                PorePlot.plotViolin(allobservations[runid]['LENGTHS'])
+            else:
+                PorePlot.plotHistogram(allobservations[runid]['LENGTHS'])
+

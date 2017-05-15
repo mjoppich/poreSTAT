@@ -20,7 +20,27 @@ class TimestampDateFormatter(Formatter):
 
         return date.strftime(self.fmt)
 
+class TimestampTimeFormatter(Formatter):
+    def __init__(self, fmt='%H:%M:%S'):
+        self.fmt = fmt
+
+    def __call__(self, x, pos=0):
+        'Return the label for time x at position pos'
+
+        date = dt.datetime.fromtimestamp(x)
+
+        return date.strftime(self.fmt)
+
 class PorePlot:
+
+    @classmethod
+    def getColorVector(cls, elems, colormap="Viridis"):
+
+        colors = []
+        for i in range(0, elems):
+            color = cls.getColorLin(0, elems, i)
+            colors.append(color)
+        return colors
 
     @classmethod
     def getColorMap(cls, colormap="Viridis"):

@@ -9,5 +9,6 @@ setup(name='porestat',
       license='GNU GPL v3',
       packages=['.', 'porestat.hdf5tool', 'porestat.tools', 'porestat.plots', 'porestat.utils'],
       package_data = {'': ['data/*.*']},
-      zip_safe=False
+      zip_safe=False,
+      install_requires=['numpy', 'scipy', 'matplotlib', 'pathos']
       )
