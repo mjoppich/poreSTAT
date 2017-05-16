@@ -6,8 +6,6 @@ from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 
 import argparse
 
-from collections import Counter
-
 from .ParallelPTTInterface import ParallelPSTInterface
 from .PTToolInterface import PSToolInterfaceFactory
 

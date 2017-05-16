@@ -37,9 +37,6 @@ class PSToolException(Exception):
 
         self.msg = msg
 
-
-
-
 class PSToolInterface:
 
     def __init__(self, args):
