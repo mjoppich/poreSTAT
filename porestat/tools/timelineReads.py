@@ -55,7 +55,7 @@ class TimelineReads(ParallelPSTInterface):
     def prepareInputs(self, args):
         return self.manage_folders_reads(args)
 
-    def execParallel(self, procID, environment, data):
+    def execParallel(self, data, environment):
 
         f5folder = Fast5Directory(data)
 

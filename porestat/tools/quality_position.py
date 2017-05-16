@@ -5,6 +5,8 @@ from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
 from ..utils.Utils import mergeDicts, mergeCounter
 
+import matplotlib.pyplot as plt
+
 import argparse
 class QualityPositionFactory(PSToolInterfaceFactory):
 
@@ -14,14 +16,14 @@ class QualityPositionFactory(PSToolInterfaceFactory):
 
 
     def _addParser(self, subparsers):
+        parser = subparsers.add_parser('qual_pos', help='expls help')
+        parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
+        parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser.add_argument('-p', '--plot', '--out', nargs='?', action='store', type=argparse.FileType('w'), default=None)
+        parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
+        parser.set_defaults(func=self._prepObj)
 
-        parser_expls = subparsers.add_parser('qual_pos', help='expls help')
-        parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
-        parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser_expls.add_argument('-p', '--plot', '--out', action='store', type=argparse.FileType('w'), default=None)
-        parser_expls.set_defaults(func=self._prepObj)
-
-        return parser_expls
+        return parser
 
     def _prepObj(self, args):
 
@@ -34,15 +36,13 @@ class QualityPosition(ParallelPSTInterface):
     def __init__(self, args):
 
         super(QualityPosition, self).__init__( args )
-
-        self.qualTypes = [chr(x) for x in range(ord('!'), ord('~')+1)]
-
-
+        self.qualTypes = [chr(x) for x in range(33, 126+1)]
 
     def _makePropDict(self):
 
         propDict = {}
         propDict['QUALS'] = {}
+        propDict['QUAL_SIMPLE'] = Counter()
         propDict['USER_RUN_NAME'] = set()
         propDict['READ_COUNT'] = 0
 
@@ -51,7 +51,7 @@ class QualityPosition(ParallelPSTInterface):
     def prepareInputs(self, args):
         return self.manage_folders_reads(args)
 
-    def execParallel(self, procID, environment, data):
+    def execParallel(self, data, environment):
 
         counterRunID = {}
 
@@ -82,10 +82,14 @@ class QualityPosition(ParallelPSTInterface):
 
                 for i in range(0, len(fastq.qual)):
 
+                    found_qual = fastq.qual[i]
+
                     if not i in qualDict:
                         qualDict[i] = Counter()
 
-                    qualDict[i][fastq.qual[i]] += 1
+                    qualDict[i][ found_qual] += 1
+
+                    propDict['QUAL_SIMPLE'][found_qual] += 1
 
                 propDict['QUALS'] = qualDict
 
@@ -108,11 +112,16 @@ class QualityPosition(ParallelPSTInterface):
     def makeResults(self, parallelResult, oEnvironment, args):
 
         makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES']
-        for x in self.qualTypes:
-            makeObservations.append(x)
+
+        qualObservations = []
 
         for x in self.qualTypes:
-            makeObservations.append(x + "%")
+            qualObservations.append(x)
+
+        qualObservations.append("NTs")
+
+        for x in self.qualTypes:
+            qualObservations.append(x + "%")
 
         allobservations = {}
         for runid in parallelResult:
@@ -121,7 +130,7 @@ class QualityPosition(ParallelPSTInterface):
 
             run_user_name = props['USER_RUN_NAME']
             fileCount = props['READ_COUNT']
-
+            simpleQualCounter = props['QUAL_SIMPLE']
             qualCounter = props['QUALS']
 
             observations = {
@@ -129,20 +138,40 @@ class QualityPosition(ParallelPSTInterface):
                 'RUNID': runid,
                 'USER_RUN_NAME': ",".join(run_user_name),
                 'FILES': fileCount,
-                'QUALPOS': qualCounter
+                'QUALPOS': qualCounter,
+                'QUAL_SIMPLE': simpleQualCounter
             }
 
-            allobservations[runid] = observations
+            key = ",".join(run_user_name) if args.groupByUser else runid
+
+            if key in allobservations:
+                allobservations[key] = mergeDicts(allobservations[key], observations)
+            else:
+                allobservations[key] = observations
 
         sortedruns = sorted([x for x in allobservations])
 
-        print("\t".join(makeObservations))
+        print("\t".join(makeObservations + qualObservations))
 
         for runid in sortedruns:
 
             allobs = []
             for x in makeObservations:
-                allobs.append(str(allobservations[runid][x]))
+                allobs.append( str(allobservations[runid][x]) )
+
+            simpleQualObs = allobservations[runid]['QUAL_SIMPLE']
+
+            totalCount = 0
+            for qual in self.qualTypes:
+                count = simpleQualObs[qual]
+                totalCount += count
+                allobs.append( str(count) )
+
+            allobs.append(str(totalCount))
+
+            for qual in self.qualTypes:
+                count = simpleQualObs[qual] / totalCount
+                allobs.append( "{0:.4g}".format(count) )
 
             print("\t".join(allobs))
 
@@ -154,6 +183,8 @@ class QualityPosition(ParallelPSTInterface):
             self.plotQualCounter(qualCounter)
 
 
+
+
     def plotQualCounter(self, qualCounter):
 
 
@@ -161,16 +192,22 @@ class QualityPosition(ParallelPSTInterface):
         for length in qualCounter:
             foundLengths.add(length)
 
-        foundLengths = sorted([foundLengths])
+        foundLengths = sorted(foundLengths)
         maxLength = max(foundLengths)
         step = maxLength / 10;
 
-        fig, axes = plt.subplots(nrows=1, ncols=10, figsize=(6, 6))
+        allDataPlot = []
+        stepLabels = []
+
+        minQual = None
+        maxQual = None
 
         for i in range(0, 10):
 
             stepMin = i*step
             stepMax = stepMin + step
+
+            stepLabels.append( "{0:.0f}-{1:.0f}".format(stepMin, stepMax) )
 
             allData = Counter()
             for pos in qualCounter:
@@ -184,10 +221,30 @@ class QualityPosition(ParallelPSTInterface):
             dataPos = []
 
             for x in allData:
-                dataVal.append(allData[x])
-                dataPos.append(x)
+                dataVal = dataVal + [ord(x)] * allData[x]
 
-            axes[0, i].violinplot(dataVal, dataPos, points=20, widths=0.3, showmeans=True, showextrema=True, showmedians=True)
+                minQual = ord(x) if (minQual == None) or (minQual > ord(x)) else minQual
+                maxQual = ord(x) if (maxQual == None) or (maxQual < ord(x)) else maxQual
+
+
+            allDataPlot.append(dataVal)
+
+        minQual = 32
+        maxQual = 127
+
+        fig, ax = plt.subplots()
+        ax.violinplot(allDataPlot, showmeans=True, showextrema=True, showmedians=True)
+
+        ax.axes.get_xaxis().set_ticks( [i for i in range(1, len(stepLabels)+1)] )
+        ax.axes.get_xaxis().set_ticklabels( stepLabels, rotation=90 )
+
+        ax.axes.get_yaxis().set_ticks([i for i in range(minQual, maxQual+1)])
+        ax.axes.get_yaxis().set_ticklabels([str(chr(i)) for i in range(minQual, maxQual+1)])
+
+        plt.tight_layout()
+
+        plt.show()
+
 
 
 

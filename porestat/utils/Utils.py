@@ -29,16 +29,29 @@ def mergeDicts( dict1, dict2):
 
                 dict3[k] = mergeDicts(dict3[k], v)
 
-            else:
+            elif type(v) == Counter:
+
+                dict3[k] = mergeCounter(dict3[k], v)
+
+            elif type(v) == int or type(v) == float:
 
                 dict3[k] = dict3[k] + v
+
+            else:
+
+                retSet = set()
+                retSet.add(v)
+                retSet.add(dict3[k])
+
+                if len(retSet) != 1:
+                    dict3[k] = retSet
         else:
 
             dict3[k] = v
 
     return dict3
 
-def mergeCounter(self, counter1, counter2):
+def mergeCounter( counter1, counter2):
 
     mergedCounter = Counter()
 

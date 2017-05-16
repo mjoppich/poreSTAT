@@ -5,6 +5,7 @@ from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
 from ..utils.Parallel import Parallel as ll
 from ..utils.Utils import mergeDicts
+from ..utils.Stats import calcN50
 
 class ExperimentLsFactory(PSToolInterfaceFactory):
 
@@ -135,7 +136,7 @@ class ExperimentLs(ParallelPSTInterface):
 
             fileCount = len(allLengths)
             avgLength = sum(allLengths) / fileCount
-            n50 = self._calcN50(allLengths)
+            (n50, l50) = calcN50(allLengths)
             run_user_name = parallelResult[runid]['NAMES']['USER_RUN_NAME']
 
             observations = {
@@ -168,31 +169,4 @@ class ExperimentLs(ParallelPSTInterface):
 
             print("\t".join(allobs))
 
-    def _calcN50(self, lengths):
 
-        slengths = sorted(lengths, reverse=True)
-        totalLength = sum(slengths)
-
-        currentLength = 0
-        neededLength = totalLength / 2.0
-
-        print(neededLength)
-
-        n50Value = 0
-        L50 = 0
-
-        for i in range(0, len(slengths)):
-
-            x = slengths[i]
-
-            currentLength += x
-            L50 += 1
-
-            if currentLength >= neededLength:
-                n50Value = x
-
-                print("N50 value is " + str(x) + " for length " + str(totalLength) + " (in half: " + str(neededLength) + " ) and L50: " + str(i) + " " + str(len(slengths)))
-                break
-
-
-        return n50Value
