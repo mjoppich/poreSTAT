@@ -105,7 +105,7 @@ class TimelineReads(ParallelPSTInterface):
         readsTime = parallelResult[0]
         readsBCTime = parallelResult[1]
 
-        PorePlot.plotTimeLine([readsBCTime, readsTime], ['basecalled', 'non-basecalled'])
+        PorePlot.plotTimeLine([readsBCTime, readsTime], ['basecalled', 'non-basecalled'], 'Timeline plot')
 
 
 

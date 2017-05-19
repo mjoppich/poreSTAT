@@ -21,6 +21,8 @@ class LengthHistogramFactory(PSToolInterfaceFactory):
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-p', '--plot', nargs='?', type=bool, const=True, default=False, help='issue plot?', required=False)
         parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
+
+        parser.add_argument('-c', '--combined', dest='combineRuns', action='store_true', default=False)
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
 
         parser.set_defaults(func=self._prepObj)
@@ -129,16 +131,39 @@ class LengthHistogram(ParallelPSTInterface):
 
         print("\t".join(makeObservations))
 
-        for runid in sortedruns:
+        if args.combineRuns:
 
-            allobs = []
-            for x in makeObservations:
-                allobs.append(str(allobservations[runid][x]))
+            plotData = []
+            labels = []
 
-            print("\t".join(allobs))
+            for runid in sortedruns:
 
-            if args.violin:
-                PorePlot.plotViolin(allobservations[runid]['LENGTHS'])
-            else:
-                PorePlot.plotHistogram(allobservations[runid]['LENGTHS'])
+                plotData.append(allobservations[runid]['LENGTHS'])
+                labels.append(runid)
+
+                self.printObservation(makeObservations, allobservations[runid])
+
+            PorePlot.plotHistogram(plotData, labels, 'Length Histogram')
+
+
+        else:
+
+            for runid in sortedruns:
+
+                self.printObservation(makeObservations, allobservations[runid])
+
+                plotData =  [ allobservations[runid]['LENGTHS'] ]
+
+                if args.violin:
+                    PorePlot.plotHistogram(plotData, [runid], 'Length Histogram for ' + str(runid), xlabel="Read Length", ylabel="Read Count")
+                else:
+                    PorePlot.plotHistogram(plotData, [runid], 'Length Histogram for ' + str(runid), xlabel="Read Length", ylabel="Read Count")
+
+    def printObservation(self, makeObservations, thisObservation):
+
+        allobs = []
+        for x in makeObservations:
+            allobs.append(str(thisObservation[x]))
+
+        print("\t".join(allobs))
 
