@@ -20,7 +20,8 @@ class YieldPlotFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-p', '--plot', nargs='?', type=bool, const=True, default=False, help='issue plot?', required=False)
-        parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-u', '--user_run', dest='groupByRunName', action='store_true', default=False)
+        parser.add_argument('-q', '--read_type', dest='addTypeSubplot', action='store_true', default=False, help='add type subplots')
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
 
         parser.set_defaults(func=self._prepObj)
@@ -78,8 +79,9 @@ class YieldPlot(ParallelPSTInterface):
 
                 timeOfCreation = file.readCreateTime() - file.getExperimentStartTime()
                 readLength = len(fastq)
+                readType = file.type
 
-                propDict['TIME_LENGTHS'].append( (timeOfCreation, readLength) )
+                propDict['TIME_LENGTHS'].append( (timeOfCreation, readLength, readType) )
 
         print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
 
@@ -122,7 +124,7 @@ class YieldPlot(ParallelPSTInterface):
                 'TIME_LENGTHS': props['TIME_LENGTHS']
             }
 
-            key = ",".join(run_user_name) if args.groupByUser else runid
+            key = ",".join(run_user_name) if args.groupByRunName else runid
 
             if key in allobservations:
                 allobservations[key] = mergeDicts(allobservations[key], observations)

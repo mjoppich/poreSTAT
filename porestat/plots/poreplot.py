@@ -62,6 +62,14 @@ class PorePlot:
 
     @classmethod
     def plotLoadOut(cls, pore2length, title='Title', xlabel='channels', ylabel='flowcell inlet'):
+        """
+
+        :param pore2length: dictionary channelID -> read-length
+        :param title: title of the plot
+        :param xlabel: xlabel of the plot
+        :param ylabel: ylabel of the plot
+        :return:
+        """
 
         p2c = Counter()
         p2l = {}

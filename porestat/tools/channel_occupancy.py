@@ -1,5 +1,15 @@
+import argparse
+import os
+
+import sys
+
+from numpy import genfromtxt
+
+from porestat.utils import mergeDicts
+from porestat.utils.Stats import calcN50
+
 from .ParallelPTTInterface import ParallelPSTInterface
-from .PTToolInterface import PSToolInterfaceFactory
+from .PTToolInterface import PSToolInterfaceFactory, PSToolException
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from porestat.plots.poreplot import PorePlot
@@ -10,16 +20,18 @@ class ChannelOccupancyFactory(PSToolInterfaceFactory):
 
         super(ChannelOccupancyFactory, self).__init__(parser, self._addParser(subparsers))
 
-
     def _addParser(self, subparsers):
 
-        parser_chocc = subparsers.add_parser('occ', help='occ help')
-        parser_chocc.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan')
-        parser_chocc.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser_chocc.add_argument('-e', '--experiments', nargs='+', type=str, help='experiments to list')
-        parser_chocc.set_defaults(func=self._prepObj)
+        parser = subparsers.add_parser('occ', help='occ help')
+        parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan')
+        parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser.add_argument('-e', '--experiments', nargs='+', type=str, help='experiments to list')
+        parser.add_argument('-u', '--user_run', dest='groupByRunName', action='store_true', default=False)
+        parser.add_argument('-t', '--tsv', nargs='?', action='store', type=argparse.FileType('w'), const=sys.stdout, default=None)
 
-        return parser_chocc
+        parser.set_defaults(func=self._prepObj)
+
+        return parser
 
     def _prepObj(self, args):
 
@@ -34,59 +46,167 @@ class ChannelOccupancy(ParallelPSTInterface):
     def __init__(self, args):
         super(ChannelOccupancy, self).__init__(args)
 
-    def exec(self):
+        this_dir, this_filename = os.path.split(__file__)
+        chipLayout = genfromtxt(this_dir + '/../data/chip_layout.csv', delimiter=',', dtype=int)
+
+        self.channelCount = chipLayout.shape[0] * chipLayout.shape[1]
 
 
-        folders = self.manage_folders_reads(self.args)
+    def _makePropDict(self):
 
-        experiments = None
-        if not self.args.experiments == None:
-            experiments = set(self.args.experiments)
+        propDict = {}
+        propDict['USER_RUN_NAME'] = set()
+        propDict['READ_COUNT'] = 0
+        propDict['CHANNELS'] = {}
 
-        exp2cl = {}
-        runid2filename = {}
+        return propDict
 
-        for folder in folders:
+    def prepareInputs(self, args):
+        return self.manage_folders_reads(args)
 
-            print("Checking folder: " + folder)
+    def execParallel(self, data, environment):
 
-            f5folder = Fast5Directory(folder)
+        dataByRunID = {}
 
-            for file in f5folder.collect():
+        f5folder = Fast5Directory(data)
 
-                if file.type == Fast5TYPE.UNKNOWN:
-                    continue
+        iFilesInFolder = 0
 
-                runid = file.runID()
-                runid2filename[runid] = file.user_filename_input()
+        for file in f5folder.collect():
 
-                if (experiments != None and len(experiments) > 0 and runid in experiments) or (experiments == None):
+            runid = file.runID()
 
-                    if not runid in exp2cl:
-                        exp2cl[runid] = {}
+            iFilesInFolder += 1
 
-                    channelLengths = exp2cl[runid]
+            if not runid in dataByRunID:
+                dataByRunID[runid] = self._makePropDict()
 
-                    channelID = file.channelID()
-                    readLength = len(file.getFastQ())
+            propDict = dataByRunID[runid]
+            propDict['READ_COUNT'] += 1
+            propDict['USER_RUN_NAME'].add(file.user_filename_input())
 
-                    if not channelID in channelLengths:
-                        channelLengths[channelID] = [readLength]
-                    else:
-                        channelLengths[channelID].append(readLength)
+            channelID = file.channelID()
+            channelDict = propDict['CHANNELS']
+            timeOfCreation = file.readCreateTime() - file.getExperimentStartTime()
 
-                    exp2cl[runid] = channelLengths
+            fastq = file.getFastQ()
 
-        for runid in exp2cl:
+            readLength = 0
+            if fastq != None:
+                readLength = len(fastq)
 
-            myset = set()
+            if channelID in channelDict:
+                channelDict[ channelID ].append((timeOfCreation, readLength))
+            else:
+                channelDict[channelID] = [(timeOfCreation, readLength)]
 
-            for x in exp2cl[runid]:
-                myset.add(x)
+        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
 
-            print(runid)
-            print(runid2filename[runid])
-            print(myset)
-            print(len(myset))
+        return dataByRunID
 
-            PorePlot.plotLoadOut(exp2cl[runid], runid2filename[runid])
+    def joinParallel(self, existResult, newResult, oEnvironment):
+
+        if existResult == None:
+            existResult = {}
+
+        existResult = mergeDicts(existResult, newResult)
+
+        return existResult
+
+    def makeResults(self, parallelResult, oEnvironment, args):
+
+        if parallelResult == None:
+            raise PSToolException("Something went wrong. Empty result.")
+
+        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'TOTAL_LENGTH', 'N50', 'L50']
+
+        allobservations = {}
+        for runid in parallelResult:
+
+            props = parallelResult[runid]
+
+            run_user_name = props['USER_RUN_NAME']
+            fileCount = props['READ_COUNT']
+
+            lengthObversations = []
+            for channelID in props['CHANNELS']:
+                lengthObversations = lengthObversations + [x[1] for x in props['CHANNELS'][channelID]]
+
+            (n50, l50) = calcN50(lengthObversations)
+
+            observations = {
+
+                'RUNID': runid,
+                'USER_RUN_NAME': ",".join(run_user_name),
+                'FILES': fileCount,
+                'TOTAL_LENGTH': sum(lengthObversations),
+                'N50': n50,
+                'L50': l50,
+                'CHANNELS': props['CHANNELS']
+            }
+
+            key = ",".join(run_user_name) if args.groupByRunName else runid
+
+            if key in allobservations:
+                allobservations[key] = mergeDicts(allobservations[key], observations)
+            else:
+                allobservations[key] = observations
+
+        sortedruns = sorted([x for x in allobservations])
+
+        print("\t".join(makeObservations))
+
+        for runid in sortedruns:
+
+            allobs = []
+            for x in makeObservations:
+                allobs.append(str(allobservations[runid][x]))
+
+            print("\t".join(allobs))
+
+
+        if args.tsv:
+            # print header
+
+            vChannels = [ x for x in range(1, self.channelCount+1) ]
+            args.tsv.write( 'run_name' + "\t" + "\t".join([str(x) for x in vChannels]) + "\n" )
+
+        for runid in sortedruns:
+
+            if args.tsv:
+                self.printChannelHistogram(args.tsv, runid, vChannels, allobservations[runid]['CHANNELS'])
+            else:
+                self.makePlot(runid, allobservations[runid]['CHANNELS'])
+
+        if args.tsv:
+            args.tsv.flush()
+            args.tsv.close()
+
+    def printChannelHistogram(self, file, runid, vChannels, channelDict):
+
+        channel2rl = {}
+
+        for channelID in channelDict:
+            channel2rl[ channelID ] = [str(x[1]) for x in channelDict[channelID]]
+
+        file.write(runid + "\t")
+
+        channelVec = []
+        for channelID in vChannels:
+
+            if not channelID in channel2rl:
+                channelVec.append( "" )
+            else:
+                channelVec.append( ",".join(channel2rl[channelID]) )
+
+        file.write("\t".join(channelVec) + "\n")
+
+
+    def makePlot(self, runKey, channelDict):
+
+        channel2rl = {}
+
+        for channelID in channelDict:
+            channel2rl[channelID] = [x[1] for x in channelDict[channelID]]
+
+        PorePlot.plotLoadOut(channel2rl, runKey)
