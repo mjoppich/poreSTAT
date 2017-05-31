@@ -7,6 +7,7 @@ from porestat.tools.experiment_ls import ExperimentLsFactory
 from porestat.tools.channel_occupancy import ChannelOccupancyFactory
 from porestat.tools.nucleotide_distribution import NucleotideDistributionFactory
 from porestat.tools.quality_distribution import QualityDistributionFactory
+from porestat.tools.read_info import ReadInfoFactory
 from porestat.tools.stats_summary import StatsSummaryFactory
 from porestat.tools.extract_sequences import ExtractSequencesFactory
 from porestat.tools.timelineReads import TimelineReadsFactory
@@ -44,6 +45,7 @@ if __name__ == '__main__':
     cmd2tool['QUAL_POS'] = QualityPositionFactory(parser, subparsers)
     cmd2tool['HIST'] = LengthHistogramFactory(parser, subparsers)
     cmd2tool['YIELD'] = YieldPlotFactory(parser, subparsers)
+    cmd2tool['INFO'] = ReadInfoFactory(parser, subparsers)
 
     args = parser.parse_args()
 

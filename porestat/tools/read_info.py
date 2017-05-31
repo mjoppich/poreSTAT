@@ -21,7 +21,7 @@ class ReadInfoFactory(PSToolInterfaceFactory):
 
 
     def _addParser(self, subparsers):
-        parser = subparsers.add_parser('expls', help='expls help')
+        parser = subparsers.add_parser('info', help='expls help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
 
@@ -56,12 +56,19 @@ class ReadInfo(ParallelPSTInterface):
 
         dReadSummary = OrderedDict()
 
-        dReadSummary['READ_NAME'] = lambda file: file.runID()
+        dReadSummary['READ_ID'] = lambda file: file.readID()
+        dReadSummary['READ_NAME'] = lambda file: file.getFastQ().id
+
+        dReadSummary['CHANNEL_ID'] = lambda file: file.channelID()
+        dReadSummary['READ_NUMBER'] = lambda file: file.readNumber()
+
+        dReadSummary['TYPE'] = lambda file: file.type
+        dReadSummary['READ_LENGTH'] = lambda file: file.readLength()
+        dReadSummary['AVG_QUALITY'] = lambda file: "0"
+        dReadSummary['TIME'] = lambda file: file.readCreateTime()
+
+        dReadSummary['USER_RUN_NAME'] = lambda file: file.user_filename_input()
         dReadSummary['RUN_ID'] = lambda file: file.runID()
-        dReadSummary['USER_RUN_NAME'] = lambda file: file.runID()
-        dReadSummary['TYPE'] = lambda file: file.runID()
-        dReadSummary['READ_LENGTH'] = lambda file: file.runID()
-        dReadSummary['AVG_QUALITY'] = lambda file: file.runID()
 
         self.endl = os.linesep
         self.dReadSummary = dReadSummary
@@ -84,8 +91,6 @@ class ReadInfo(ParallelPSTInterface):
 
         for file in f5folder.collect():
 
-            runid = file.runID()
-
             iFilesInFolder += 1
 
             dReadInfo = self.makeReadInfo(file)
@@ -99,6 +104,10 @@ class ReadInfo(ParallelPSTInterface):
     def makeReadInfo(self, readFile):
 
         dReadInfo = {}
+
+        for key in self.dReadSummary:
+
+            dReadInfo[key] = str( self.dReadSummary[key](readFile) )
 
         return dReadInfo
 

@@ -276,9 +276,6 @@ class Fast5File:
 
         except Exception as e:
 
-            if self.runID() != "84f1d5bc960cc73afb857b227c377da6f10ce650":
-                return None
-
             return None
 
     def getSampleFrequency(self):
@@ -405,7 +402,14 @@ class Fast5File:
         print(self.type)
         self.hdf5file.visit(printName)
 
+    def readLength(self):
 
+        seq = self.getFastQ()
+
+        if seq == None:
+            return -1
+
+        return len(seq)
 
 class Fast5Directory:
 
