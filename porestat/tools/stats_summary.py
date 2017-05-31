@@ -14,7 +14,7 @@ class StatsSummaryFactory(PSToolInterfaceFactory):
 
     def _addParser(self, subparsers):
 
-        parser_expls = subparsers.add_parser('stats', help='expls help')
+        parser_expls = subparsers.add_parser('summary', help='read performance summary')
         parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser_expls.add_argument('-r', '--reads', type=str, help='minion read folder', required=False)
         parser_expls.set_defaults(func=self._prepObj)

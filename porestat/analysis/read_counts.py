@@ -1,3 +1,5 @@
+import argparse
+
 from ..tools.ParallelPTTInterface import ParallelPSTInterface
 from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
 
@@ -6,6 +8,8 @@ from collections import Counter
 from ..utils.Parallel import Parallel as ll
 from ..utils.Utils import mergeDicts
 from ..utils.Stats import calcN50
+
+import HTSeq
 
 class ReadCountAnalysisFactory(PSToolInterfaceFactory):
 
@@ -16,11 +20,12 @@ class ReadCountAnalysisFactory(PSToolInterfaceFactory):
 
     def _addParser(self, subparsers):
 
-        parser_expls = subparsers.add_parser('expls', help='expls help')
-        parser_expls.add_argument('-s', '--sam', nargs='+', type=str, help='alignment files')
-        parser_expls.set_defaults(func=self._prepObj)
+        parser = subparsers.add_parser('counts', help='expls help')
+        parser.add_argument('-s', '--sam', nargs='+', type=str, help='alignment files')
+        parser.add_argument('-g', '--gff', type=argparse.FileType("r"), help='gene annotation')
+        parser.set_defaults(func=self._prepObj)
 
-        return parser_expls
+        return parser
 
     def _prepObj(self, args):
 
@@ -40,13 +45,8 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
         props = {}
 
-        props['TYPE'] = {}
-
-        for ftype in self.fileType2Str:
-            props['TYPE'][ftype] = []
-
-        props['NAMES'] = {}
-        props['NAMES']['USER_RUN_NAME'] = set()
+        props['COUNTS'] = {}
+        props['COUNTS']['ALL'] = 0
 
         return props
 

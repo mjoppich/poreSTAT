@@ -249,7 +249,7 @@ class HelpFormatter(object):
             args = usage, actions, groups, prefix
             self._add_item(self._format_usage, args)
 
-    def add_argument(self, action):
+    def add_argument(self, action: object) -> object:
         if action.help is not SUPPRESS:
 
             # find all invocations

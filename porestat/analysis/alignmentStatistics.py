@@ -1,3 +1,5 @@
+import argparse
+
 from ..tools.ParallelPTTInterface import ParallelPSTInterface
 from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
 
@@ -6,6 +8,8 @@ from collections import Counter
 from ..utils.Parallel import Parallel as ll
 from ..utils.Utils import mergeDicts
 from ..utils.Stats import calcN50
+
+import HTSeq
 
 class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
 
@@ -16,11 +20,14 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
 
     def _addParser(self, subparsers):
 
-        parser_expls = subparsers.add_parser('expls', help='expls help')
-        parser_expls.add_argument('-s', '--sam', nargs='+', type=str, help='alignment files')
-        parser_expls.set_defaults(func=self._prepObj)
+        parser = subparsers.add_parser('align_stats', help='Alignment statistics (amount aligned, indels, ...)')
+        parser.add_argument('-s', '--sam', nargs='+', type=argparse.FileType('r'), help='alignment files', required=False)
+        parser.add_argument('-f', '--fastq', nargs='+', type=argparse.FileType('r'), help='read inputs for alignment', required=False)
+        parser.add_argument('-r', '--reads', nargs='+', type=argparse.FileType('r'), help='read summary file', required=False)
 
-        return parser_expls
+        parser.set_defaults(func=self._prepObj)
+
+        return parser
 
     def _prepObj(self, args):
 
@@ -51,7 +58,7 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
         return props
 
     def prepareInputs(self, args):
-        return self.manage_folders_reads(args)
+        return [x for x in args.sam]
 
     def execParallel(self, data, environment):
 
