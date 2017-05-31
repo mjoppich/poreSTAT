@@ -1,0 +1,132 @@
+import argparse
+
+import sys
+
+from .ParallelPTTInterface import ParallelPSTInterface
+from .PTToolInterface import PSToolInterfaceFactory,PSToolException
+
+from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
+from collections import Counter
+from ..utils.Parallel import Parallel as ll
+from ..utils.Utils import mergeDicts
+from ..utils.Stats import calcN50
+
+from collections import OrderedDict
+
+class ReadInfoFactory(PSToolInterfaceFactory):
+
+    def __init__(self, parser, subparsers):
+
+        super(ReadInfoFactory, self).__init__(parser, self._addParser(subparsers))
+
+
+    def _addParser(self, subparsers):
+        parser = subparsers.add_parser('expls', help='expls help')
+        parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
+        parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+
+        parser.add_argument('-q', '--read_type', nargs='+', type=str, choices=[x for x in Fast5TYPE.str2type], help='read types ('+ ",".join([x for x in Fast5TYPE.str2type]) +')')
+        parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-e', '--experiments', nargs='+', type=str,
+                            help='run ids of experiments to be extracted. if --user_run, give user_run_name s',
+                            required=False)
+
+        parser.add_argument('-o', '--output', type=argparse.FileType('w'), help='output location, default: std out', default=sys.stdout)
+        parser.set_defaults(func=self._prepObj)
+
+        return parser
+
+    def _prepObj(self, args):
+
+        simArgs = self._makeArguments(args)
+
+        return ReadInfo(simArgs)
+
+import os
+
+class Environment(object):
+    pass
+
+
+class ReadInfo(ParallelPSTInterface):
+
+    def __init__(self, args):
+
+        super(ReadInfo, self).__init__(args)
+
+        dReadSummary = OrderedDict()
+
+        dReadSummary['READ_NAME'] = lambda file: file.runID()
+        dReadSummary['RUN_ID'] = lambda file: file.runID()
+        dReadSummary['USER_RUN_NAME'] = lambda file: file.runID()
+        dReadSummary['TYPE'] = lambda file: file.runID()
+        dReadSummary['READ_LENGTH'] = lambda file: file.runID()
+        dReadSummary['AVG_QUALITY'] = lambda file: file.runID()
+
+        self.endl = os.linesep
+        self.dReadSummary = dReadSummary
+        self.dObservations = [x for x in self.dReadSummary]
+
+
+    def _makePropDict(self):
+        return None
+
+    def prepareInputs(self, args):
+        return self.manage_folders_reads(args)
+
+    def execParallel(self, data, environment):
+
+        foundReads = []
+
+        f5folder = Fast5Directory(data)
+
+        iFilesInFolder = 0
+
+        for file in f5folder.collect():
+
+            runid = file.runID()
+
+            iFilesInFolder += 1
+
+            dReadInfo = self.makeReadInfo(file)
+
+            foundReads.append(dReadInfo)
+
+        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
+
+        return foundReads
+
+    def makeReadInfo(self, readFile):
+
+        dReadInfo = {}
+
+        return dReadInfo
+
+    def prepareEnvironment(self, args):
+
+        env = Environment()
+        env.output = args.output
+
+        env.output.write("\t".join(self.dObservations) + self.endl)
+
+        return env
+
+
+    def joinParallel(self, existResult, newResult, environment):
+
+        if newResult == None:
+            return None
+
+        for readEntry in newResult:
+
+            readinfo = [ readEntry[x] for x in self.dObservations ]
+            environment.output.write("\t".join(readinfo) + self.endl)
+
+        return None
+
+
+    def makeResults(self, parallelResult, oEnvironment, args):
+
+        pass
+
+
