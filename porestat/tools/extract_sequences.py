@@ -3,7 +3,8 @@ from .PTToolInterface import PSToolInterfaceFactory, PSToolException
 
 from ..hdf5tool.Fast5File import Fast5Directory, Fast5TYPE
 import argparse
-import sys
+import sys, os
+from ..utils.Utils import eprint
 
 class ExtractSequencesFactory(PSToolInterfaceFactory):
 
@@ -13,26 +14,27 @@ class ExtractSequencesFactory(PSToolInterfaceFactory):
 
 
     def _addParser(self, subparsers):
+        parser = subparsers.add_parser('seq', help='seq help')
+        parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
+        parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser.add_argument('--fasta', dest='fasta', action='store_true', default=False)
+        parser.add_argument('--fastq', dest='fastq', action='store_true', default=True)
+        parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
 
-        parser_expls = subparsers.add_parser('seq', help='seq help')
-        parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
-        parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser_expls.add_argument('--fasta', dest='fasta', action='store_true', default=False)
-        parser_expls.add_argument('--fastq', dest='fastq', action='store_true', default=True)
-        parser_expls.add_argument('-e', '--experiments', nargs='+', type=str, help='run ids of experiments to be extracts', required=False)
-        parser_expls.add_argument('-o', '--out', action='store', type=argparse.FileType('w'), default=sys.stdout)
-        parser_expls.add_argument('-t', '--type', required=False, default =None)
+        parser.add_argument('-e', '--experiments', nargs='+', type=str, help='run ids of experiments to be extracted. if --user_run, give user_run_name s', required=False)
+        parser.add_argument('-o', '--out', action='store', type=argparse.FileType('w'), default=sys.stdout)
 
-        parser_expls.set_defaults(func=self._prepObj)
+        parser.add_argument('-q', '--read_type', nargs='+', type=str, choices=[x for x in Fast5TYPE.str2type], help='read types ('+ ",".join([x for x in Fast5TYPE.str2type]) +')')
 
-        return parser_expls
+        parser.set_defaults(func=self._prepObj)
+
+        return parser
 
     def _prepObj(self, args):
 
         simArgs = self._makeArguments(args)
 
         return ExtractSequences(simArgs)
-
 
 class Environment(object):
     pass
@@ -49,17 +51,48 @@ class ExtractSequences(ParallelPSTInterface):
         oEnv.experiments = args.experiments
         oEnv.fasta = args.fasta
         oEnv.fastq = args.fastq
+        oEnv.groupByUser = args.groupByUser
 
-        oEnv.readtype = None
-
-        if args.type != None:
-            if args.type in Fast5TYPE.str2type:
-                oEnv.readtype = Fast5TYPE.str2type[args.type]
+        oEnv.readTypes = None
+        if args.read_type != None:
+            oEnv.readTypes = [ Fast5TYPE.str2type[x] for x in args.read_type]
 
         return oEnv
 
     def prepareInputs(self, args):
         return self.manage_folders_reads(args)
+
+    def validFileContent(self, file, environment):
+        """
+        
+        :param file: the Fast5File to check
+        :param environment: the parallel environment / copy of args
+        :return: true if the file is valid for extraction
+        """
+
+
+        """
+        if the file does not contain reads of the desired type => continue
+        """
+        if not environment.readTypes is None:
+            if not file.type in environment.readTypes:
+                return False
+
+        if environment.experiments == None:
+            return True
+
+        if len(environment.experiments) == 0:
+            return True
+
+        if environment.groupByUser:
+
+            userRun = file.user_filename_input()
+            return userRun in environment.experiments
+
+        else:
+
+            runid = file.runID()
+            return runid in environment.experiments
 
     def execParallel(self, data, environment):
 
@@ -76,8 +109,7 @@ class ExtractSequences(ParallelPSTInterface):
 
             runid = file.runID()
 
-            if environment.experiments == None or len(environment.experiments) == 0 or (
-                    len(environment.experiments) > 0 and runid in environment.experiments):
+            if self.validFileContent(file, environment):
 
                 output = None
 
@@ -106,5 +138,6 @@ class ExtractSequences(ParallelPSTInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        pass
+        if oEnvironment.out != sys.stdout:
+            oEnvironment.out.close()
 

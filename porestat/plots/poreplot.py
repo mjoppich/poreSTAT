@@ -62,6 +62,14 @@ class PorePlot:
 
     @classmethod
     def plotLoadOut(cls, pore2length, title='Title', xlabel='channels', ylabel='flowcell inlet'):
+        """
+
+        :param pore2length: dictionary channelID -> read-length
+        :param title: title of the plot
+        :param xlabel: xlabel of the plot
+        :param ylabel: ylabel of the plot
+        :return:
+        """
 
         p2c = Counter()
         p2l = {}
@@ -184,7 +192,7 @@ class PorePlot:
 
 
     @classmethod
-    def plotTimeLine(cls, readsPerTime, labels, colors = None):
+    def plotTimeLine(cls, readsPerTime, labels, title, colors = None, bins = 100):
 
         """
 
@@ -222,9 +230,93 @@ class PorePlot:
         formatter = TimestampDateFormatter()
         ax.xaxis.set_major_formatter(formatter)
 
-        linebc, bins, patches  = ax.hist(histInput, 100, histtype='bar', stacked=True, ls='dotted', color=colors, label=labels)
+        linebc, bins, patches  = ax.hist(histInput, bins, histtype='bar', stacked=True, ls='dotted', color=colors, label=labels)
+        ax.set_title( title )
 
         plt.legend()
 
         fig.autofmt_xdate()
+        plt.show()
+
+    @classmethod
+    def plotHistogram(cls, someData, labels, title, bins = 100, xlabel=None, ylabel=None):
+
+        fig, ax = plt.subplots()
+        linebc, bins, patches = ax.hist( someData , bins, histtype='bar', stacked=False, label=labels)
+        ax.set_title( title )
+
+        if xlabel != None:
+            ax.set_xlabel( xlabel )
+
+        if ylabel != None:
+            ax.set_ylabel( ylabel )
+
+#        ax.axes.get_xaxis().set_ticks( [i for i in range(1, len(stepLabels)+1)] )
+#        ax.axes.get_xaxis().set_ticklabels( stepLabels, rotation=90 )
+
+        if len(someData)>1:
+            ax.legend()
+
+        plt.tight_layout()
+
+        plt.show()
+
+    @classmethod
+    def plotViolin(cls, someData, labels, title, bins = 100, xlabel=None, ylabel=None):
+
+        fig, ax = plt.subplots()
+        ax.violinplot(someData, showmeans=True, showextrema=True, showmedians=True)
+
+        ax.axes.get_xaxis().set_ticks( [i for i in range(1, len(labels)+1)] )
+        ax.axes.get_xaxis().set_ticklabels( labels, rotation=90 )
+
+        ax.axes.get_yaxis().set_ticks([i for i in range(minQual, maxQual+1)])
+        ax.axes.get_yaxis().set_ticklabels([str(chr(i)) for i in range(minQual, maxQual+1)])
+
+        plt.tight_layout()
+
+        plt.show()
+
+
+
+
+
+        fig, ax = plt.subplots()
+        linebc, bins, patches = ax.hist( someData , bins, histtype='bar', stacked=False, label=labels)
+        ax.set_title( title )
+
+        if xlabel != None:
+            ax.set_xlabel( xlabel )
+
+        if ylabel != None:
+            ax.set_ylabel( ylabel )
+
+#        ax.axes.get_xaxis().set_ticks( [i for i in range(1, len(stepLabels)+1)] )
+#        ax.axes.get_xaxis().set_ticklabels( stepLabels, rotation=90 )
+
+        if len(someData)>1:
+            ax.legend()
+
+        plt.tight_layout()
+
+        plt.show()
+
+    @classmethod
+    def yieldPlot(cls, dataDict, title, xlabel, ylabel):
+
+        fig, ax = plt.subplots()
+
+        formatter = TimestampTimeFormatter()
+        ax.xaxis.set_major_formatter(formatter)
+
+
+        colors = PorePlot.getColorVector(len(timeAndLength))
+
+        for i in range(0, len(timeAndLength)):
+            ax.plot(timeAndLength[i], color=colors[i])
+
+        plt.legend( labels, loc='upper left')
+
+        fig.autofmt_xdate()
+        plt.tight_layout()
         plt.show()

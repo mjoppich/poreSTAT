@@ -31,7 +31,7 @@ class ParallelPSTInterface(PSToolInterface):
         return None
 
     def prepareInputs(self, args):
-        pass
+        return self.manage_folders_reads(args)
 
     def execParallel(self, data, environment):
         pass

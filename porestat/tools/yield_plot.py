@@ -20,7 +20,8 @@ class YieldPlotFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-p', '--plot', nargs='?', type=bool, const=True, default=False, help='issue plot?', required=False)
-        parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-u', '--user_run', dest='groupByRunName', action='store_true', default=False)
+        parser.add_argument('-q', '--read_type', dest='addTypeSubplot', action='store_true', default=False, help='add type subplots')
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
 
         parser.set_defaults(func=self._prepObj)
@@ -78,8 +79,9 @@ class YieldPlot(ParallelPSTInterface):
 
                 timeOfCreation = file.readCreateTime() - file.getExperimentStartTime()
                 readLength = len(fastq)
+                readType = file.type
 
-                propDict['TIME_LENGTHS'].append( (timeOfCreation, readLength) )
+                propDict['TIME_LENGTHS'].append( (timeOfCreation, readLength, readType) )
 
         print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
 
@@ -122,7 +124,7 @@ class YieldPlot(ParallelPSTInterface):
                 'TIME_LENGTHS': props['TIME_LENGTHS']
             }
 
-            key = ",".join(run_user_name) if args.groupByUser else runid
+            key = ",".join(run_user_name) if args.groupByRunName else runid
 
             if key in allobservations:
                 allobservations[key] = mergeDicts(allobservations[key], observations)
@@ -141,15 +143,15 @@ class YieldPlot(ParallelPSTInterface):
 
             print("\t".join(allobs))
 
-        self.makePlot( allobservations )
+        self.makePlot( allobservations, args )
 
 
-    def makePlot(self, data):
-
-        import matplotlib.pyplot as plt
+    def makePlot(self, data, args):
 
         timeAndLength = []
         labels = []
+
+        timeLengthData = {}
 
         for runid in data:
 
@@ -168,22 +170,39 @@ class YieldPlot(ParallelPSTInterface):
 
             locTL = cumLocTL
 
-            labels.append(runid)
-            timeAndLength.append(locTL)
+            timeLengthData[runid] = locTL
 
-        fig, ax = plt.subplots()
+            if args.addTypeSubplot:
 
-        formatter = TimestampTimeFormatter()
-        ax.xaxis.set_major_formatter(formatter)
+                cumLocTLbyType = {}
+                cumLByType = {}
+
+                for tpl in locTL:
+
+                    locT = tpl[0]
+                    locL = tpl[1]
+                    locType = tpl[2]
+
+                    if not locType in cumLByType:
+                        cumLByType[locType] = 0
+                        cumLocTLbyType[locType] = []
 
 
-        colors = PorePlot.getColorVector(len(timeAndLength))
+                    cumL = cumLByType[locType]
+                    cumLocTL = cumLocTLbyType[locType]
 
-        for i in range(0, len(timeAndLength)):
-            ax.plot(timeAndLength[i], color=colors[i])
+                    cumLocTL.append( (locT, locL+cumL) )
+                    cumL += locL
 
-        plt.legend( labels, loc='upper left')
+                    cumLByType[locType] = cumL
+                    cumLocTLbyType[locType] = cumLocTL
 
-        fig.autofmt_xdate()
-        plt.tight_layout()
-        plt.show()
+                for dataType in cumLocTLbyType:
+
+                    label = runid + "_" + str(dataType)
+
+                    timeLengthData[ label ] = cumLocTLbyType[dataType]
+
+        PorePlot.yieldPlot(timeLengthData, "Yield Plot", "Cumulative BP", "Time")
+
+
