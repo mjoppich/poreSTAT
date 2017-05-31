@@ -12,14 +12,15 @@ class ChannelOccupancyFactory(PSToolInterfaceFactory):
 
 
     def _addParser(self, subparsers):
+        parser = subparsers.add_parser('occ', help='occ help')
+        parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan')
+        parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser.add_argument('-e', '--experiments', nargs='+', type=str, help='experiments to list')
+        parser.add_argument('-t', '--by_type', dest='byType', action='store_true', default=False)
 
-        parser_chocc = subparsers.add_parser('occ', help='occ help')
-        parser_chocc.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan')
-        parser_chocc.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser_chocc.add_argument('-e', '--experiments', nargs='+', type=str, help='experiments to list')
-        parser_chocc.set_defaults(func=self._prepObj)
+        parser.set_defaults(func=self._prepObj)
 
-        return parser_chocc
+        return parser
 
     def _prepObj(self, args):
 

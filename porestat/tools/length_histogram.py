@@ -28,9 +28,7 @@ class LengthHistogramFactory(PSToolInterfaceFactory):
         return parser
 
     def _prepObj(self, args):
-
         simArgs = self._makeArguments(args)
-
         return LengthHistogram(simArgs)
 
 class LengthHistogram(ParallelPSTInterface):
