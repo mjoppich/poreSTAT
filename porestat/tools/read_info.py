@@ -57,13 +57,13 @@ class ReadInfo(ParallelPSTInterface):
         dReadSummary = OrderedDict()
 
         dReadSummary['READ_ID'] = lambda file: file.readID()
-        dReadSummary['READ_NAME'] = lambda file: file.getFastQ().id
+        dReadSummary['READ_NAME'] = lambda file: file.sequenceName()
 
         dReadSummary['CHANNEL_ID'] = lambda file: file.channelID()
         dReadSummary['READ_NUMBER'] = lambda file: file.readNumber()
 
         dReadSummary['TYPE'] = lambda file: file.type
-        dReadSummary['READ_LENGTH'] = lambda file: file.readLength()
+        dReadSummary['READ_LENGTH'] = lambda file: file.sequenceLength()
         dReadSummary['AVG_QUALITY'] = lambda file: "0"
         dReadSummary['TIME'] = lambda file: file.readCreateTime()
 

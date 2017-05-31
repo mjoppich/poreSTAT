@@ -52,6 +52,14 @@ class PSToolInterface:
 
         return alldirs
 
+    def _makeArguments(self, args):
+
+        newArgs = ArgObj()
+
+        for x in vars(args):
+            newArgs.__dict__[x] = args.__dict__[x]
+
+        return newArgs
 
     def manage_folders_reads(self, args):
 

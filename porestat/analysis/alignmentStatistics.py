@@ -1,12 +1,13 @@
 import argparse
 
+from ..utils.DataFrame import DataFrame
 from ..tools.ParallelPTTInterface import ParallelPSTInterface
 from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
 from ..utils.Parallel import Parallel as ll
-from ..utils.Utils import mergeDicts
+from ..utils.Utils import mergeDicts, fileExists
 from ..utils.Stats import calcN50
 
 import HTSeq
@@ -22,8 +23,9 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
 
         parser = subparsers.add_parser('align_stats', help='Alignment statistics (amount aligned, indels, ...)')
         parser.add_argument('-s', '--sam', nargs='+', type=argparse.FileType('r'), help='alignment files', required=False)
-        parser.add_argument('-f', '--fastq', nargs='+', type=argparse.FileType('r'), help='read inputs for alignment', required=False)
-        parser.add_argument('-r', '--reads', nargs='+', type=argparse.FileType('r'), help='read summary file', required=False)
+        parser.add_argument('-f', '--fasta', nargs='+', type=argparse.FileType('r'), help='read inputs for alignment', required=False)
+        parser.add_argument('-r', '--read_info', nargs='+', type=str, help='read summary file', required=False)
+        parser.add_argument('-g', '--gff', nargs='+', type=str, help='genome annotation file', required=False)
 
         parser.set_defaults(func=self._prepObj)
 
@@ -43,57 +45,122 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
 
         super(AlignmentStatisticAnalysis, self).__init__(args)
 
+        self.readInfo = None
+        self.fasta = None
+        self.genome_annotation = None
+
+        self.cigar_ops = ['M', 'X', '=', 'D', 'I', 'S', 'X', 'H', 'N', 'P']
+
+
+    def readReadInfo(self, args):
+
+        if not fileExists(args.read_info):
+            PSToolException("Read info file does not exist: " + args.read_info)
+
+        allReadData = DataFrame.parseFromFile(args.read_info, cDelim='\t')
+
+        self.readInfo = {}
+
+        readNameIdx = allReadData.getColumnIndex("READ_NAME")
+        readTypeIdx = allReadData.getColumnIndex("TYPE")
+        readRunIdx = allReadData.getColumnIndex("RUN_NAME")
+
+        for elem in allReadData.vElements:
+
+            readName = elem[readNameIdx]
+            readType = elem[readTypeIdx]
+            readRun  = elem[readRunIdx]
+
+            self.readInfo[readName] = (readType, readRun)
+
+    def readSequences(self, args):
+
+        if not fileExists(args.fasta):
+            PSToolException("fasta file does not exist: " + args.fasta)
+
+        self.fasta = {}
+
+        for seq in HTSeq.FastaReader( args.fasta ):
+            self.fasta[ seq.name ] = seq
+
+    def readGenomeAnnotation(self, args):
+
+        if not fileExists(args.fasta):
+            PSToolException("fasta file does not exist: " + args.fasta)
+
+        self.genome_annotation = {}
+
+        for seq in HTSeq.FastaReader( args.fasta ):
+            self.fasta[ seq.name ] = seq
+
     def _makePropDict(self):
 
         props = {}
 
-        props['TYPE'] = {}
-
-        for ftype in self.fileType2Str:
-            props['TYPE'][ftype] = []
-
-        props['NAMES'] = {}
-        props['NAMES']['USER_RUN_NAME'] = set()
+        for cigarOp in self.cigar_ops:
+            props[cigarOp] = []
 
         return props
 
     def prepareInputs(self, args):
+
+        self.readReadInfo(args)
+        self.readSequences(args)
+
+
         return [x for x in args.sam]
 
     def execParallel(self, data, environment):
 
-        counterRunID = {}
 
-        f5folder = Fast5Directory(data)
 
-        iFilesInFolder = 0
+        for readAlignment in HTSeq.SAM_Reader( environment.sam ):
 
-        for file in f5folder.collect():
+            if readAlignment.aligned:
 
-            runid = file.runID()
+                readName = readAlignment.read.name
+                readSeq = readAlignment.read.seq
+                readInterval = readAlignment.iv
+                cigarOfRead = readAlignment.cigar
 
-            iFilesInFolder += 1
+                cigarOp2Length = self._makePropDict()
 
-            if not runid in counterRunID:
-                counterRunID[runid] = self._makePropDict()
+                for cigarOp in cigarOfRead:
 
-            propDict = counterRunID[runid]
+                    if cigarOp.type == 'M':
 
-            propDict['NAMES']['USER_RUN_NAME'].add(file.user_filename_input());
+                        fastaReq = self.fasta[ readInterval.chrom ]
+                        fastaSeq = fastaReq[ readInterval.start, readInterval.end ]
 
-            fastq = file.getFastQ()
+                        if readInterval.strand == '-':
+                            fastaSeq = fastaSeq.get_reverse_complement()
 
-            # if file.type == Fast5TYPE.UNKNOWN:
-            #    osignal = file._get_signal()
+                        editDistance = self.calculateEditDistance( readSeq, fastaSeq )
 
-            if fastq == None:
-                propDict['TYPE'][file.type].append(0)
-            else:
-                propDict['TYPE'][file.type].append(len(fastq))
+                        cigarOp2Length['M'].append(cigarOp.size)
+                        cigarOp2Length['X'].append(editDistance)
+                        cigarOp2Length['='].append(cigarOp.size - editDistance)
 
-        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
+                    else:
+                        cigarOp2Length[ cigarOp.type ].append(cigarOp.size)
 
-        return counterRunID
+
+
+
+        return None
+
+    def calculateEditDistance(self, htSeq1, htSeq2):
+
+        seq1 = htSeq1.seq
+        seq2 = htSeq2.seq
+
+        diff = 0
+        for i in range(0, min(len(seq1), len(seq2))):
+            if seq1[i] != seq2[i]:
+                diff += 1
+
+
+        return diff
 
 
     def joinParallel(self, existResult, newResult, oEnvironment):

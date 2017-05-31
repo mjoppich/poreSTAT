@@ -1,3 +1,4 @@
+import os
 import sys
 from itertools import chain
 from collections import defaultdict, Counter
@@ -51,6 +52,10 @@ def mergeDicts( dict1, dict2):
 
     return dict3
 
+def fileExists(sFileName):
+
+    return os.path.exists(sFileName)
+
 def mergeCounter( counter1, counter2):
 
     mergedCounter = Counter()
@@ -62,3 +67,22 @@ def mergeCounter( counter1, counter2):
         mergedCounter[x] += counter2[x]
 
     return mergedCounter
+
+def readFile(sFileName, sFunc, iSkip = 0, encoding = "utf-8", iMaxLines = -1):
+
+    oFile = open(sFileName, 'r', encoding=encoding)
+
+    iLineCount = 0
+
+    for sLine in oFile:
+
+        if iSkip > 0:
+            iSkip = iSkip - 1
+            continue
+
+        if iMaxLines >= 0:
+            if iLineCount >= iMaxLines:
+                break
+
+        sFunc(sLine, iLineCount)
+        iLineCount = iLineCount + 1

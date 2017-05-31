@@ -28,21 +28,16 @@ class Fast5TYPE(Enum):
 
     UNKNOWN=-1
 
+    def __str__(self):
+        return self.name
+
     @classproperty
     def type2str(cls):
-        return {
-
-            Fast5TYPE.BASECALL_2D: 'BASECALL_2D',
-            Fast5TYPE.BASECALL_1D_COMPL: 'BASECALL_1D_COMPL',
-            Fast5TYPE.BASECALL_1D: 'BASECALL_1D',
-            Fast5TYPE.BASECALL_RNN_1D: 'BASECALL_RNN_1D',
-            Fast5TYPE.PRE_BASECALL: 'PRE_BASECALL',
-            Fast5TYPE.UNKNOWN: 'UNKNOWN'
-        }
+        return {x: x.name for x in list(cls)}
 
     @classproperty
     def str2type(cls):
-        return {cls.type2str[x]: x for x in cls.type2str}
+        return {x.name: x for x in list(cls)}
 
 class Fast5PATH(Enum):
     PRE_BASECALL=0,
@@ -402,7 +397,7 @@ class Fast5File:
         print(self.type)
         self.hdf5file.visit(printName)
 
-    def readLength(self):
+    def sequenceLength(self):
 
         seq = self.getFastQ()
 
@@ -410,6 +405,15 @@ class Fast5File:
             return -1
 
         return len(seq)
+
+    def sequenceName(self):
+
+        seq = self.getFastQ()
+
+        if seq == None:
+            return ""
+
+        return seq.id
 
 class Fast5Directory:
 

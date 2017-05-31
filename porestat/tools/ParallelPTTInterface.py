@@ -28,7 +28,7 @@ class ParallelPSTInterface(PSToolInterface):
         eprint("Execution Time: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd-iStart))))
 
     def prepareEnvironment(self, args):
-        return None
+        return self._makeArguments(args)
 
     def prepareInputs(self, args):
         return self.manage_folders_reads(args)
