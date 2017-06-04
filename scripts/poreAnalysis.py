@@ -3,6 +3,7 @@ import sys
 #import porestat.utils.PickleArgparse as pickArg
 import argparse
 
+from porestat.analysis.alignmentStatistics import AlignmentStatisticAnalysisFactory
 from porestat.analysis.read_counts import ReadCountAnalysisFactory
 
 from porestat.tools.PTToolInterface import PSToolException
@@ -26,8 +27,7 @@ if __name__ == '__main__':
 
     cmd2tool = {}
     cmd2tool['read_counts'] = ReadCountAnalysisFactory(parser, subparsers)
-    cmd2tool['alignment_stat'] = AlignmentStatisticsFactory(parser, subparsers)
-
+    cmd2tool['alignment_stat'] = AlignmentStatisticAnalysisFactory(parser, subparsers)
 
     args = parser.parse_args()
 
@@ -37,7 +37,6 @@ if __name__ == '__main__':
 
         try:
             calcObj = args.func(args)
-
             calcObj.exec()
 
         except PSToolException as e:

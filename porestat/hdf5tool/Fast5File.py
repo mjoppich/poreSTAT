@@ -6,12 +6,13 @@ import shutil
 import h5py
 from enum import Enum
 from collections import OrderedDict, Counter
-
-import mjoppich.utils.FileUtils as fu
-
-from porestat.hdf5tool.SequenceFormats import FASTQ
+from .SequenceFormats import FASTQ
+from ..utils.Files import makePath
 
 class classproperty(object):
+    """
+    class to allow the usage of class properties (extension of class functions)
+    """
 
     def __init__(self, fget):
         self.fget = fget
@@ -23,27 +24,28 @@ class Fast5TYPE(Enum):
     PRE_BASECALL = 4,
     BASECALL_RNN_1D = 3,
     BASECALL_1D = 2,
-    BASECALL_1D_COMPL=1,
-    BASECALL_2D=0,
+    BASECALL_1D_COMPL = 1,
+    BASECALL_2D = 0,
 
-    UNKNOWN=-1
+    UNKNOWN = -1
+    BARCODING = -2
 
     def __str__(self):
         return self.name
 
     @classproperty
     def type2str(cls):
+        """
+        :return :dictionary of type to str for fast5 read types
+        """
         return {x: x.name for x in list(cls)}
 
     @classproperty
     def str2type(cls):
+        """
+        :return : dictionary of str to type for fast5 read types
+        """
         return {x.name: x for x in list(cls)}
-
-class Fast5PATH(Enum):
-    PRE_BASECALL=0,
-    TEMPLATE=1,
-    COMPLEMENT=2,
-    TEMPLATE_2D=3,
 
 class Fast5FileException(Exception):
     pass
@@ -69,6 +71,7 @@ class Fast5File:
             (Fast5TYPE.BASECALL_1D_COMPL, '/Analyses/Basecall_1D_%03d/'),
             (Fast5TYPE.BASECALL_1D, '/Analyses/Basecall_1D_%03d/'),
             (Fast5TYPE.BASECALL_RNN_1D, '/Analyses/Basecall_RNN_1D_%03d/'),
+            (Fast5TYPE.BARCODING, '/Analyses/Barcoding_%03d/'),
             (Fast5TYPE.PRE_BASECALL, '/Analyses/EventDetection_%03d/')
             #(Fast5TYPE.UNKNOWN, "")
         ])
@@ -81,23 +84,24 @@ class Fast5File:
             (Fast5TYPE.BASECALL_1D_COMPL, 'BaseCalled_complement'),
             (Fast5TYPE.BASECALL_1D, 'BaseCalled_template'),
             (Fast5TYPE.BASECALL_RNN_1D, 'BaseCalled_template'),
+            (Fast5TYPE.BARCODING, 'Barcoding'),
             (Fast5TYPE.PRE_BASECALL, ''),
             (Fast5TYPE.UNKNOWN, "")
 
         ])
 
-    def __init__(self, path, group = 0, keep_file_open = False):
+    def __init__(self, path, group=0, keep_file_open = False):
 
         self.filename = path
         self.type = None
 
         self.sequence_paths = {}
-        self.winner = Fast5PATH.TEMPLATE
+        self.winner = Fast5TYPE.BASECALL_1D
 
         self.hdf5file = None
         self.is_open = self._open(keep_file_open)
 
-        self.pore = (-1,-1)
+        self.pore = (-1, -1)
         self.timestamp = 0
         self.readnum = 0
         self.read_length = 0
@@ -158,49 +162,47 @@ class Fast5File:
 
                 basecall1dpath = '/Analyses/' + basecallAttrib
 
-                self.sequence_paths[Fast5PATH.TEMPLATE] = self.join_paths( basecall1dpath , "BaseCalled_template" )
-                self.sequence_paths[Fast5PATH.COMPLEMENT] = self.join_paths( basecall1dpath , "BaseCalled_complement" )
-                self.sequence_paths[Fast5PATH.TEMPLATE_2D] = seqpath
+                self.sequence_paths[Fast5TYPE.BASECALL_1D] = self.join_paths( basecall1dpath , "BaseCalled_template" )
+                self.sequence_paths[Fast5TYPE.BASECALL_1D_COMPL] = self.join_paths( basecall1dpath , "BaseCalled_complement" )
+                self.sequence_paths[Fast5TYPE.BASECALL_2D] = seqpath
 
                 eventpath = '/' + self._get_attribute(basecall1dpath, 'event_detection', "Analyses/EventDetection_000")
-                self.sequence_paths[Fast5PATH.PRE_BASECALL] = eventpath
+                self.sequence_paths[Fast5TYPE.PRE_BASECALL] = eventpath
 
-                self.winner = Fast5PATH.TEMPLATE_2D
+                self.winner = Fast5TYPE.BASECALL_2D
 
             elif filetype == Fast5TYPE.BASECALL_1D_COMPL:
 
-                self.sequence_paths[Fast5PATH.TEMPLATE] = self.join_paths(analyses_group, "BaseCalled_template")
-                self.sequence_paths[Fast5PATH.COMPLEMENT] = self.join_paths(analyses_group, "BaseCalled_complement")
+                self.sequence_paths[Fast5TYPE.BASECALL_1D] = self.join_paths(analyses_group, "BaseCalled_template")
+                self.sequence_paths[Fast5TYPE.BASECALL_1D_COMPL] = self.join_paths(analyses_group, "BaseCalled_complement")
 
                 eventpath = '/' + self._get_attribute(analyses_group, 'event_detection',"Analyses/EventDetection_000")
-                self.sequence_paths[Fast5PATH.PRE_BASECALL] = eventpath
+                self.sequence_paths[Fast5TYPE.PRE_BASECALL] = eventpath
 
-                self.winner = Fast5PATH.COMPLEMENT
+                self.winner = Fast5TYPE.BASECALL_1D_COMPL
 
             elif filetype == Fast5TYPE.BASECALL_1D:
 
-                self.sequence_paths[Fast5PATH.TEMPLATE] = self.join_paths(analyses_group, "BaseCalled_template")
+                self.sequence_paths[Fast5TYPE.BASECALL_1D] = self.join_paths(analyses_group, "BaseCalled_template")
 
                 eventpath = '/' + self._get_attribute(analyses_group, 'event_detection', "Analyses/EventDetection_000")
-                self.sequence_paths[Fast5PATH.PRE_BASECALL] = eventpath
+                self.sequence_paths[Fast5TYPE.PRE_BASECALL] = eventpath
 
-                self.winner = Fast5PATH.TEMPLATE
+                self.winner = Fast5TYPE.BASECALL_1D
 
 
             elif filetype == Fast5TYPE.BASECALL_RNN_1D:
 
-                self.sequence_paths[Fast5PATH.TEMPLATE] = self.join_paths(analyses_group, "BaseCalled_template")
+                self.sequence_paths[Fast5TYPE.BASECALL_RNN_1D] = self.join_paths(analyses_group, "BaseCalled_template")
 
                 eventpath = '/' + self._get_attribute(analyses_group, 'event_detection', "Analyses/EventDetection_000")
-                self.sequence_paths[Fast5PATH.PRE_BASECALL] = eventpath
-
-                self.winner = Fast5PATH.TEMPLATE
+                self.sequence_paths[Fast5TYPE.PRE_BASECALL] = eventpath
+                self.winner = Fast5TYPE.BASECALL_RNN_1D
 
 
             elif filetype == Fast5TYPE.PRE_BASECALL:
 
-                self.sequence_paths[Fast5PATH.PRE_BASECALL] = seqpath
-
+                self.sequence_paths[Fast5TYPE.PRE_BASECALL] = seqpath
                 self.winner = None
 
             # set up available sequences
@@ -219,14 +221,14 @@ class Fast5File:
 
         return Fast5TYPE.UNKNOWN
 
-    def getFastQ(self, readType = None):
+    def getFastQ(self, readType=None):
 
         if readType == None:
             readType = self.winner
 
         return self._read_fastq(readType)
 
-    def getFastA(self, readType = None):
+    def getFastA(self, readType=None):
 
         if readType == None:
             readType = self.winner
@@ -319,9 +321,9 @@ class Fast5File:
                 seqRead = self.hdf5file[path + read]
 
                 if singleRead:
-                    return seqRead.attrs[ attribname ]
+                    return seqRead.attrs[attribname]
                 else:
-                    readNum.add(seqRead.attrs[ attribname ])
+                    readNum.add(seqRead.attrs[attribname])
 
             return readNum
 
@@ -329,7 +331,7 @@ class Fast5File:
 
             return None
 
-    def _get_attribute(self, path, attrib, default = None):
+    def _get_attribute(self, path, attrib, default=None):
         try:
 
             if path in self.hdf5file:
@@ -384,14 +386,12 @@ class Fast5File:
 
     def analyses(self):
 
-        return ( [str(x) for x in self.hdf5file['Analyses']] )
+        return [str(x) for x in self.hdf5file['Analyses']]
 
     def printGroupsAttribs(self):
 
         def printName(name):
-            print(str(name) + " " + str([(k, v) for (k,v) in self.hdf5file[name].attrs.items()]))
-
-
+            print(str(name) + " " + str([(k, v) for (k, v) in self.hdf5file[name].attrs.items()]))
 
         print(self.filename)
         print(self.type)
@@ -422,7 +422,7 @@ class Fast5Directory:
         if not os.path.isdir(path):
             raise ValueError("Given path is not a directory: " + path)
 
-        self.path = fu.makePath(path)
+        self.path = makePath(path)
         self.filesIT = glob.iglob(self.path + "*.fast5")
 
     def collect(self):

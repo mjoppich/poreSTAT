@@ -1,15 +1,17 @@
 import argparse
+import HTSeq
 
+
+from ..utils.DataFrame import DataFrame
 from ..tools.ParallelPTTInterface import ParallelPSTInterface
 from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
 from ..utils.Parallel import Parallel as ll
-from ..utils.Utils import mergeDicts
+from ..utils.Utils import mergeDicts, fileExists
 from ..utils.Stats import calcN50
 
-import HTSeq
 
 class ReadCountAnalysisFactory(PSToolInterfaceFactory):
 
@@ -21,8 +23,10 @@ class ReadCountAnalysisFactory(PSToolInterfaceFactory):
     def _addParser(self, subparsers):
 
         parser = subparsers.add_parser('counts', help='expls help')
-        parser.add_argument('-s', '--sam', nargs='+', type=str, help='alignment files')
-        parser.add_argument('-g', '--gff', type=argparse.FileType("r"), help='gene annotation')
+        parser.add_argument('-s', '--sam', nargs='+', type=str, required=True, help='alignment files')
+        parser.add_argument('-g', '--gff', type=argparse.FileType("r"), required=True, help='gene annotation')
+        parser.add_argument('-r', '--read_info', nargs='+', type=str, help='read summary file', required=False)
+
         parser.set_defaults(func=self._prepObj)
 
         return parser
@@ -41,6 +45,9 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
         super(ReadCountAnalysis, self).__init__(args)
 
+        self.readInfo = None
+        self.genomeAnnotation = None
+
     def _makePropDict(self):
 
         props = {}
@@ -50,110 +57,125 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
         return props
 
+    def readGenomeAnnotation(self, args):
+
+        self.genomeAnnotation = HTSeq.GFF_Reader( args.gff, end_included=True )
+
+    def readReadInfo(self, args):
+
+        self.readInfo = {}
+
+        if args.read_info == None:
+            return
+
+        if not fileExists(args.read_info):
+            PSToolException("Read info file does not exist: " + args.read_info)
+
+        allReadData = DataFrame.parseFromFile(args.read_info, cDelim='\t')
+
+        readNameIdx = allReadData.getColumnIndex("READ_NAME")
+        readTypeIdx = allReadData.getColumnIndex("TYPE")
+        readRunIdx = allReadData.getColumnIndex("RUN_NAME")
+        readLengthIdx = allReadData.getColumnIndex("READ_LENGTH")
+
+        for elem in allReadData.vElements:
+
+            readName = elem[readNameIdx]
+            readType = elem[readTypeIdx]
+            readRun  = elem[readRunIdx]
+            readLength = int(elem[readLengthIdx])
+
+            self.readInfo[readName] = (readType, readRun, readLength)
+
     def prepareInputs(self, args):
-        return self.manage_folders_reads(args)
+        self.readReadInfo(args)
 
     def execParallel(self, data, environment):
 
-        counterRunID = {}
+        cvg = HTSeq.GenomicArray("auto", stranded=False, typecode='i')
+        alignment_file = HTSeq.SAM_Reader( environment.sam )
 
-        f5folder = Fast5Directory(data)
+        foundReadsAligned = set()
+        foundReadsNotAligned = set()
 
-        iFilesInFolder = 0
+        for alngt in alignment_file:
+            if alngt.aligned:
 
-        for file in f5folder.collect():
+                foundReadsAligned.add( alngt.read.name )
 
-            runid = file.runID()
+                cigars = alngt.cigar
 
-            iFilesInFolder += 1
+                for cigar in cigars:
 
-            if not runid in counterRunID:
-                counterRunID[runid] = self._makePropDict()
+                    if cigar.type == 'M':
+                        cvg[cigar.ref_iv] += 1
 
-            propDict = counterRunID[runid]
-
-            propDict['NAMES']['USER_RUN_NAME'].add(file.user_filename_input());
-
-            fastq = file.getFastQ()
-
-            # if file.type == Fast5TYPE.UNKNOWN:
-            #    osignal = file._get_signal()
-
-            if fastq == None:
-                propDict['TYPE'][file.type].append(0)
             else:
-                propDict['TYPE'][file.type].append(len(fastq))
+                foundReadsNotAligned.add( alngt.read.name )
 
-        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
+        featureLengths = {}
+        featureCoverage = {}
+        for feature in self.genomeAnnotation:
 
-        return counterRunID
+            if feature.type == "exon":
+
+                if not feature.name in featureLengths:
+                    featureLengths[feature.name] = []
+
+                featureLengths[feature.name].append(feature.iv.end - feature.iv.start)
+
+                if not feature.name in featureCoverage:
+                    featureCoverage[feature.name] = []
+
+                featureCoverage[feature.name].append(cvg[feature.iv])
+
+        allKeys = []
+
+        for x in featureCoverage:
+            allKeys.append(x)
+
+        coverages = Counter()
+        covlengths = Counter()
+
+        summedAverage = Counter()
+
+        for x in sorted(allKeys):
+            featureCount = 0
+
+            for y in featureCoverage[x]:
+
+                for iv, value in y.steps():
+                    featureCount += value * (iv.end - iv.start)
+
+            # print str(x) + " " + str(featureCount) + " " + str(sum(featureLengths[x]))
+
+            featureLength = sum(featureLengths[x])
+            cov = float(featureCount) / float(featureLength)
+            print(str(x) + " " + str(cov))
+
+            if x.split("_")[1].startswith("r"):
+                coverages["ribo"] += featureCount
+                covlengths["ribo"] += featureLength
+
+                summedAverage["ribo"] += cov
+            else:
+                coverages["nonribo"] += featureCount
+                covlengths["nonribo"] += featureLength
+
+                summedAverage["nonribo"] += cov
+
+        for x in coverages:
+            print(str(x) + " " + str(float(coverages[x]) / float(covlengths[x])))
+            print(str(x) + " " + str(summedAverage))
 
 
     def joinParallel(self, existResult, newResult, oEnvironment):
 
-        if existResult == None:
-            existResult = {}
-
-        existResult = mergeDicts(existResult, newResult)
-
-        return existResult
+        return None
 
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'AVG_LENGTH', 'N50', 'BASECALL_2D', 'BASECALL_1D_COMPL',
-                            'BASECALL_1D', 'BASECALL_RNN_1D', 'PRE_BASECALL', 'UNKNOWN']
-
-        if parallelResult == None:
-            raise PSToolException("No Files collected")
-
-        allobservations = {}
-        for runid in parallelResult:
-
-            allLengths = []
-            countByType = Counter()
-
-            for type in parallelResult[runid]['TYPE']:
-
-                lengths = parallelResult[runid]['TYPE'][type]
-
-                allLengths += lengths
-
-                countByType[type] += len(lengths)
-
-            fileCount = len(allLengths)
-            avgLength = sum(allLengths) / fileCount
-            (n50, l50) = calcN50(allLengths)
-            run_user_name = parallelResult[runid]['NAMES']['USER_RUN_NAME']
-
-            observations = {
-
-                'RUNID': runid,
-                'USER_RUN_NAME': ",".join(run_user_name),
-                'FILES': fileCount,
-                'AVG_LENGTH': avgLength,
-                'N50': n50,
-                'BASECALL_2D': countByType[self.str2fileType['BASECALL_2D']],
-                'BASECALL_1D_COMPL': countByType[self.str2fileType['BASECALL_1D_COMPL']],
-                'BASECALL_1D': countByType[self.str2fileType['BASECALL_1D']],
-                'BASECALL_RNN_1D': countByType[self.str2fileType['BASECALL_RNN_1D']],
-                'PRE_BASECALL': countByType[self.str2fileType['PRE_BASECALL']],
-                'UNKNOWN': countByType[self.str2fileType['UNKNOWN']]
-            }
-
-            allobservations[runid] = observations
-
-
-        sortedruns = sorted([x for x in allobservations])
-
-        print("\t".join(makeObservations))
-
-        for runid in sortedruns:
-
-            allobs = []
-            for x in makeObservations:
-                allobs.append(str(allobservations[runid][x]))
-
-            print("\t".join(allobs))
+        pass
 
 
