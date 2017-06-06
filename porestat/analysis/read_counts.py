@@ -89,22 +89,26 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
     def prepareInputs(self, args):
         self.readReadInfo(args)
+        self.readGenomeAnnotation(args)
+        return args.sam
 
     def execParallel(self, data, environment):
 
         cvg = HTSeq.GenomicArray("auto", stranded=False, typecode='i')
-        alignment_file = HTSeq.SAM_Reader( environment.sam )
+        alignment_file = HTSeq.SAM_Reader( data )
 
         foundReadsAligned = set()
         foundReadsNotAligned = set()
 
         for alngt in alignment_file:
+
+            if not alngt.read.name in self.readInfo:
+                self.readInfo[alngt.read.name] = (Fast5TYPE.UNKNOWN, None, len(alngt.read.seq))
+
+
             if alngt.aligned:
-
                 foundReadsAligned.add( alngt.read.name )
-
                 cigars = alngt.cigar
-
                 for cigar in cigars:
 
                     if cigar.type == 'M':
@@ -112,6 +116,15 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
             else:
                 foundReadsNotAligned.add( alngt.read.name )
+
+        print("Found aligned reads: " + str(len(foundReadsAligned)))
+        print("Found unaligned reads: " + str(len(foundReadsNotAligned)))
+        print("Total reads: " + str(len(foundReadsAligned) + len(foundReadsNotAligned)))
+
+        totalBaseCount = sum([ x[2] for x in self.readInfo  ])
+        print("Total bases in files: " + str(totalBaseCount))
+
+        return None
 
         featureLengths = {}
         featureCoverage = {}

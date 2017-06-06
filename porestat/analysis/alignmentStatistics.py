@@ -22,10 +22,9 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
     def _addParser(self, subparsers):
 
         parser = subparsers.add_parser('align_stats', help='Alignment statistics (amount aligned, indels, ...)')
-        parser.add_argument('-s', '--sam', nargs='+', type=argparse.FileType('r'), help='alignment files', required=False)
+        parser.add_argument('-s', '--sam', nargs='+', type=argparse.FileType('r'), help='alignment files', required=True)
         parser.add_argument('-f', '--fasta', nargs='+', type=argparse.FileType('r'), help='read inputs for alignment', required=False)
         parser.add_argument('-r', '--read_info', nargs='+', type=str, help='read summary file', required=False)
-        parser.add_argument('-g', '--gff', nargs='+', type=str, help='genome annotation file', required=False)
 
         parser.set_defaults(func=self._prepObj)
 
@@ -55,7 +54,7 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
     def readReadInfo(self, args):
 
         if not fileExists(args.read_info):
-            PSToolException("Read info file does not exist: " + args.read_info)
+            raise PSToolException("Read info file does not exist: " + str(args.read_info))
 
         allReadData = DataFrame.parseFromFile(args.read_info, cDelim='\t')
 

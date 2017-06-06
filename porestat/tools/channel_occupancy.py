@@ -4,16 +4,15 @@ import os
 import sys
 
 from numpy import genfromtxt
-from werkzeug.utils import environ_property
 
-from porestat.utils import mergeDicts
-from porestat.utils.Stats import calcN50
+from ..utils.Utils import mergeDicts
+from ..utils.Stats import calcN50
 
 from .ParallelPTTInterface import ParallelPSTInterface
 from .PTToolInterface import PSToolInterfaceFactory, PSToolException
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
-from porestat.plots.poreplot import PorePlot
+from ..plots.poreplot import PorePlot
 
 class ChannelOccupancyFactory(PSToolInterfaceFactory):
 

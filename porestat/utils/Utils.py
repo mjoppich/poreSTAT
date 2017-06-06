@@ -51,6 +51,9 @@ def mergeDicts( dict1, dict2):
 
 def fileExists(sFileName):
 
+    if sFileName == None:
+        return False
+        
     return os.path.exists(sFileName)
 
 def readLines(sFileName, encoding = 'utf-8'):
