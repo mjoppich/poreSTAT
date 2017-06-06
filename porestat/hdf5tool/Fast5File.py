@@ -113,8 +113,6 @@ class Fast5File:
 
         #self.printGroupsAttribs()
 
-
-
     def hdf_error(self, reason):
 
         msg = """hdf reading failure in file '%s': %s """ % (self.filename, reason)

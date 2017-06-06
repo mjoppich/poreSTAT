@@ -4,7 +4,8 @@ from .PTToolInterface import PSToolInterfaceFactory, PSToolException
 from ..hdf5tool.Fast5File import Fast5Directory, Fast5TYPE
 import argparse
 import sys, os
-from ..utils.Utils import eprint
+from porestat.utils import eprint
+
 
 class ExtractSequencesFactory(PSToolInterfaceFactory):
 

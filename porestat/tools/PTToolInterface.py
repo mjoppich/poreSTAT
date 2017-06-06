@@ -1,6 +1,7 @@
 import os
 
-from ..utils.Utils import eprint
+from porestat.utils import eprint
+
 
 class ArgObj(object):
     pass

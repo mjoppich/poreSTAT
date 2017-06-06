@@ -3,6 +3,7 @@ import sys
 #import porestat.utils.PickleArgparse as pickArg
 import argparse
 
+from porestat.tools.demangle_files import DemangleFilesFactory
 from porestat.tools.experiment_ls import ExperimentLsFactory
 from porestat.tools.channel_occupancy import ChannelOccupancyFactory
 from porestat.tools.nucleotide_distribution import NucleotideDistributionFactory
@@ -46,6 +47,7 @@ if __name__ == '__main__':
     cmd2tool['HIST'] = LengthHistogramFactory(parser, subparsers)
     cmd2tool['YIELD'] = YieldPlotFactory(parser, subparsers)
     cmd2tool['INFO'] = ReadInfoFactory(parser, subparsers)
+    cmd2tool['DEMANGLE'] = DemangleFilesFactory(parser, subparsers)
 
     args = parser.parse_args()
 

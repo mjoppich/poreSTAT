@@ -1,10 +1,7 @@
 import os
-import sys
+from collections import Counter
 from itertools import chain
-from collections import defaultdict, Counter
 
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
 
 def mergeDicts( dict1, dict2):
     dict3 = {}
@@ -49,12 +46,6 @@ def mergeDicts( dict1, dict2):
 
     return dict3
 
-def fileExists(sFileName):
-
-    if sFileName == None:
-        return False
-        
-    return os.path.exists(sFileName)
 
 def readLines(sFileName, encoding = 'utf-8'):
     oFile = open(sFileName, 'r', encoding=encoding)

@@ -1,2 +1,3 @@
 from .Parallel import Parallel
-from .Utils import eprint, mergeDicts
+from .Utils import mergeDicts
+from porestat.utils.Files import eprint

@@ -1,6 +1,6 @@
 from .PTToolInterface import PSToolInterface
 from ..utils.Parallel import MapReduce
-from ..utils.Utils import eprint
+from porestat.utils import eprint
 import time
 
 class ParallelPSTInterface(PSToolInterface):

@@ -1,6 +1,7 @@
 
 from ..plots.poreplot import PorePlot
-from ..utils.Utils import eprint, mergeCounter
+from ..utils.Utils import mergeCounter
+from porestat.utils import eprint
 from .ParallelPTTInterface import ParallelPSTInterface
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 

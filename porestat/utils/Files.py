@@ -1,4 +1,5 @@
 import os
+import sys
 
 
 def makePath(path):
@@ -112,3 +113,29 @@ def readLines(sFileName, vLines = None, encoding = "utf-8", iSkipLines = 0):
         iLineCount = iLineCount + 1
 
     return vReturn
+
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+
+def pathEmpty(sPathName):
+    isDir = os.path.isdir(sPathName)
+
+    isEmpty = False
+
+    if isDir:
+        isEmpty = len(os.listdir(sPathName)) == 0
+
+    return isDir and isEmpty
+
+
+def pathWritable(sPathName):
+
+    isDir = os.path.isdir(sPathName)
+    isWritable = False
+
+    if isDir:
+        isWritable = os.access(sPathName, os.W_OK)
+
+    return isDir and isWritable
