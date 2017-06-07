@@ -63,8 +63,8 @@ class DemangleFiles(ParallelPSTInterface):
     def prepareInputs(self, args):
         inputFolders =  self.manage_folders_reads(args)
 
-        args.output = os.path.abspath(args.output)
-        args.output = makePath(args.output)
+        outputPath = os.path.abspath(args.output)
+        args.output = makePath(outputPath)
 
         outputFolderExists = fileExists(args.output)
 
@@ -114,12 +114,15 @@ class DemangleFiles(ParallelPSTInterface):
             destPath = environment.output
 
             if environment.groupByUser == True:
-                destPath = destPath + fileUserRunName
+                destPath = makePath(destPath + fileUserRunName)
 
             else:
-                destPath = destPath + str(fileExperiment)
+                destPath = makePath(destPath + str(fileExperiment))
 
             moveStatistic[destPath] += 1
+
+            if destPath == None:
+                print(destPath)
 
             returnMoves[ srcPath ] = destPath
 
@@ -152,7 +155,7 @@ class DemangleFiles(ParallelPSTInterface):
             return
 
         if existResult is None:
-            existResult = Counter()
+            existResult = (Counter(), Counter())
 
         iChunkSize = -1
         if environment.chunk_size:
@@ -160,12 +163,15 @@ class DemangleFiles(ParallelPSTInterface):
 
         for source in newResult:
             destPath = newResult[source]
+            originalDestPath = destPath
 
             if environment.chunk_size != -1:
-                chunkID = existResult[destPath] % iChunkSize
-                destPath = destPath + str(chunkID) + '/'
+                chunkID = divmod(existResult[0][destPath], iChunkSize)
+                destPath = destPath + str(chunkID[0]) + '/'
 
-            
+            existResult[0][originalDestPath] += 1
+            existResult[1][destPath] += 1
+
             self.moveFile(source, destPath, environment.simulate)
 
         return existResult
@@ -180,6 +186,8 @@ class DemangleFiles(ParallelPSTInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        pass
+        chunkFolders = sorted([x for x in parallelResult[1]])
 
+        for x in chunkFolders:
+            print(str(x) + "\t" + str(parallelResult[1][x]))
 

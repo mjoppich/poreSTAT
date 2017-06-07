@@ -8,24 +8,19 @@ def makePath(path):
     :param path: path to be normalized
     :return: normalizes path by adding path sep to end if needed (/tmp/bla -> /tmp/bla/)
     """
-
-    if os.path.isdir(path):
-
-        if path[len(path)-1] == os.path.sep:
-            return path
-
-        return path + os.path.sep
-
-    elif os.path.isfile(path):
-
-        dirname = os.path.dirname(path)
+    if os.path.isfile(path):
 
         if path[len(path)-1] == os.path.sep:
             return path
 
         return path + os.path.sep
-    else:
-        ValueError("make path can not determine type of: " + str(path))
+
+    else: # this assumes everything is a path ... which is wrong in so many ways ...
+
+        if path[len(path)-1] == os.path.sep:
+            return path
+
+        return path + os.path.sep
 
 def printToFile(vVector, sFileName, cInElementSep = None, cElementSep = '\n'):
     """

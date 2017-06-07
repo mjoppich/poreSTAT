@@ -15,8 +15,8 @@ class ParallelPSTInterface(PSToolInterface):
     def exec(self):
 
         iStart = time.time()
-        environment = self.prepareEnvironment(self.args)
         inputs = self.prepareInputs(self.args)
+        environment = self.prepareEnvironment(self.args)
 
         ll = MapReduce(4)
 
