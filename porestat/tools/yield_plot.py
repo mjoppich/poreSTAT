@@ -20,8 +20,8 @@ class YieldPlotFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-p', '--plot', nargs='?', type=bool, const=True, default=False, help='issue plot?', required=False)
-        parser.add_argument('-u', '--user_run', dest='groupByRunName', action='store_true', default=False)
-        parser.add_argument('-q', '--read_type', dest='addTypeSubplot', action='store_true', default=False, help='add type subplots')
+        parser.add_argument('-u', '--user-run', dest='groupByRunName', action='store_true', default=False)
+        parser.add_argument('-q', '--read-type', dest='addTypeSubplot', action='store_true', default=False, help='add type subplots')
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
 
         parser.set_defaults(func=self._prepObj)
@@ -155,23 +155,21 @@ class YieldPlot(ParallelPSTInterface):
 
         for runid in data:
 
-            locTL = sorted(data[runid]['TIME_LENGTHS'], key=lambda tup: tup[0])
+            locTL = sorted(data[runid]['TIME_LENGTHS'])
 
             cumL = 0
-
             cumLocTL = []
             for tpl in locTL:
-
                 locT = tpl[0]
                 locL = tpl[1]
-                cumLocTL.append( (locT, locL+cumL) )
+
+                cumLocTL.append((locT, locL + cumL))
 
                 cumL += locL
 
-            locTL = cumLocTL
+            timeLengthData[runid] = cumLocTL
 
-            timeLengthData[runid] = locTL
-
+            # additional plots if wanted
             if args.addTypeSubplot:
 
                 cumLocTLbyType = {}
@@ -191,8 +189,8 @@ class YieldPlot(ParallelPSTInterface):
                     cumL = cumLByType[locType]
                     cumLocTL = cumLocTLbyType[locType]
 
-                    cumLocTL.append( (locT, locL+cumL) )
                     cumL += locL
+                    cumLocTL.append( (locT, cumL) )
 
                     cumLByType[locType] = cumL
                     cumLocTLbyType[locType] = cumLocTL

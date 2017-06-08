@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from porestat.plots.poreplot import PorePlot
 
 from .ParallelPTTInterface import ParallelPSTInterface
@@ -20,7 +22,9 @@ class LengthHistogramFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-p', '--plot', nargs='?', type=bool, const=True, default=False, help='issue plot?', required=False)
-        parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-u', '--user-run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-q', '--read-type', dest='addTypeSubplot', action='store_true', default=False, help='add type subplots')
+
 
         parser.add_argument('-c', '--combined', dest='combineRuns', action='store_true', default=False)
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
@@ -75,7 +79,7 @@ class LengthHistogram(ParallelPSTInterface):
             fastq = file.getFastQ()
 
             if fastq != None:
-                propDict['LENGTHS'].append(len(fastq))
+                propDict['LENGTHS'].append( (len(fastq), file.type) )
 
         print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
 
@@ -105,14 +109,19 @@ class LengthHistogram(ParallelPSTInterface):
             fileCount = props['READ_COUNT']
             lengthObversations = props['LENGTHS']
 
-            (n50, l50) = calcN50(lengthObversations)
+            onlyLengths = [x[0] for x in lengthObversations]
+
+            (n50, l50) = calcN50(onlyLengths)
+
+            if not args.read_type:
+                lengthObversations = onlyLengths
 
             observations = {
 
                 'RUNID': runid,
                 'USER_RUN_NAME': ",".join(run_user_name),
                 'FILES': fileCount,
-                'TOTAL_LENGTH': sum(lengthObversations),
+                'TOTAL_LENGTH': sum(onlyLengths),
                 'N50': n50,
                 'L50': l50,
                 'LENGTHS': lengthObversations
@@ -129,33 +138,52 @@ class LengthHistogram(ParallelPSTInterface):
 
         print("\t".join(makeObservations))
 
+        plotData = {}
+
         if args.combineRuns:
 
-            plotData = []
+            lengthData = []
             labels = []
 
             for runid in sortedruns:
-
-                plotData.append(allobservations[runid]['LENGTHS'])
+                lengthData += allobservations[runid]['LENGTHS']
                 labels.append(runid)
 
                 self.printObservation(makeObservations, allobservations[runid])
 
-            PorePlot.plotHistogram(plotData, labels, 'Length Histogram')
-
+            plotLabel = ",".join(labels)
+            plotData[ plotLabel ] = lengthData
 
         else:
 
             for runid in sortedruns:
 
                 self.printObservation(makeObservations, allobservations[runid])
+                plotData[runid] =  allobservations[runid]['LENGTHS']
 
-                plotData =  [ allobservations[runid]['LENGTHS'] ]
+        if args.read_type:
 
-                if args.violin:
-                    PorePlot.plotViolin(plotData, [runid], 'Length Histogram for ' + str(runid), xlabel="Read Length", ylabel="Read Count")
-                else:
-                    PorePlot.plotHistogram(plotData, [runid], 'Length Histogram for ' + str(runid), xlabel="Read Length", ylabel="Read Count")
+            newPlotData = {}
+
+            for runid in plotData:
+                lengthsByType = defaultdict(list)
+
+                for x in plotData[runid]:
+                    lengthsByType[x[1]].append(x[0])
+
+                for readtype in lengthsByType:
+                    newid = runid + "_" + readtype
+                    newPlotData[newid] = lengthsByType[readtype]
+
+            plotData = newPlotData
+
+        if args.violin:
+            PorePlot.plotViolin(plotData, None, 'Length Histogram for ', xlabel="Read Length",
+                                ylabel="Read Count")
+        else:
+            PorePlot.plotHistogram(plotData, None, 'Length Histogram for ', xlabel="Read Length",
+                                   ylabel="Read Count")
+
 
     def printObservation(self, makeObservations, thisObservation):
 

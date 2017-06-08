@@ -27,9 +27,10 @@ class TimestampTimeFormatter(Formatter):
     def __call__(self, x, pos=0):
         'Return the label for time x at position pos'
 
-        date = dt.datetime.fromtimestamp(x)
+        m, s = divmod(x, 60)
+        h, m = divmod(m, 60)
 
-        return date.strftime(self.fmt)
+        return "%d:%02d:%02d" % (h, m, s)
 
 class PorePlot:
 
@@ -264,25 +265,9 @@ class PorePlot:
     @classmethod
     def plotViolin(cls, someData, labels, title, bins = 100, xlabel=None, ylabel=None):
 
-        fig, ax = plt.subplots()
-        ax.violinplot(someData, showmeans=True, showextrema=True, showmedians=True)
-
-        ax.axes.get_xaxis().set_ticks( [i for i in range(1, len(labels)+1)] )
-        ax.axes.get_xaxis().set_ticklabels( labels, rotation=90 )
-
-        ax.axes.get_yaxis().set_ticks([i for i in range(minQual, maxQual+1)])
-        ax.axes.get_yaxis().set_ticklabels([str(chr(i)) for i in range(minQual, maxQual+1)])
-
-        plt.tight_layout()
-
-        plt.show()
-
-
-
-
 
         fig, ax = plt.subplots()
-        linebc, bins, patches = ax.hist( someData , bins, histtype='bar', stacked=False, label=labels)
+        ax.violinplot( someData , showmeans=True, showextrema=True, showmedians=True, points=500)
         ax.set_title( title )
 
         if xlabel != None:
@@ -294,7 +279,7 @@ class PorePlot:
 #        ax.axes.get_xaxis().set_ticks( [i for i in range(1, len(stepLabels)+1)] )
 #        ax.axes.get_xaxis().set_ticklabels( stepLabels, rotation=90 )
 
-        if len(someData)>1:
+        if len(someData) > 1:
             ax.legend()
 
         plt.tight_layout()
@@ -309,11 +294,19 @@ class PorePlot:
         formatter = TimestampTimeFormatter()
         ax.xaxis.set_major_formatter(formatter)
 
+        labels = sorted([x for x in dataDict])
+        vDataSeries = []
 
-        colors = PorePlot.getColorVector(len(timeAndLength))
+        for series in labels:
+            vDataSeries.append( sorted(dataDict[series], key=lambda tup: tup[0]) )
 
-        for i in range(0, len(timeAndLength)):
-            ax.plot(timeAndLength[i], color=colors[i])
+        colors = PorePlot.getColorVector(len(labels))
+
+        for i in range(0, len(labels)):
+            xes = [x[0] for x in vDataSeries[i]]
+            yes = [x[1] for x in vDataSeries[i]]
+
+            ax.plot(xes, yes, color=colors[i])
 
         plt.legend( labels, loc='upper left')
 
