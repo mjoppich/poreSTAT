@@ -79,6 +79,9 @@ def readFile(sFileName, sFunc, iSkip = 0, encoding = "utf-8", iMaxLines = -1):
 
 def fileExists(sFileName):
 
+    if sFileName == None:
+        return False
+
     return os.path.exists(sFileName)
 
 

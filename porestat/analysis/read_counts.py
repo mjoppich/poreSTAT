@@ -8,9 +8,7 @@ from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
-from ..utils.Parallel import Parallel as ll
-from ..utils.Utils import mergeDicts, fileExists
-from ..utils.Stats import calcN50
+from ..utils.Files import fileExists
 
 
 class ReadCountAnalysisFactory(PSToolInterfaceFactory):

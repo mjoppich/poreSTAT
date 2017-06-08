@@ -1,16 +1,24 @@
 import argparse
 
+import pickle
+
+from ..utils.Files import fileExists
 from ..utils.DataFrame import DataFrame
 from ..tools.ParallelPTTInterface import ParallelPSTInterface
 from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
-
-from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
-from collections import Counter
-from ..utils.Parallel import Parallel as ll
-from ..utils.Utils import mergeDicts, fileExists
+from ..utils.Utils import mergeDicts
 from ..utils.Stats import calcN50
 
+from collections import Counter
 import HTSeq
+
+class MinimalSeq:
+
+    def __init__(self, seq, name, desc):
+
+        self.seq = seq
+        self.name = name
+        self.desc = desc
 
 class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
 
@@ -22,9 +30,9 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
     def _addParser(self, subparsers):
 
         parser = subparsers.add_parser('align_stats', help='Alignment statistics (amount aligned, indels, ...)')
-        parser.add_argument('-s', '--sam', nargs='+', type=argparse.FileType('r'), help='alignment files', required=True)
-        parser.add_argument('-f', '--fasta', nargs='+', type=argparse.FileType('r'), help='read inputs for alignment', required=False)
-        parser.add_argument('-r', '--read_info', nargs='+', type=str, help='read summary file', required=False)
+        parser.add_argument('-s', '--sam', nargs='+', type=str, help='alignment files', required=True)
+        parser.add_argument('-f', '--fasta', nargs='+', type=str, help='read inputs for alignment', required=True)
+        parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
 
         parser.set_defaults(func=self._prepObj)
 
@@ -53,44 +61,41 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
 
     def readReadInfo(self, args):
 
-        if not fileExists(args.read_info):
-            raise PSToolException("Read info file does not exist: " + str(args.read_info))
+        for readInfoFile in args.read_info:
 
-        allReadData = DataFrame.parseFromFile(args.read_info, cDelim='\t')
+            if not fileExists(readInfoFile):
+                raise PSToolException("Read info file does not exist: " + str(readInfoFile))
 
         self.readInfo = {}
 
-        readNameIdx = allReadData.getColumnIndex("READ_NAME")
-        readTypeIdx = allReadData.getColumnIndex("TYPE")
-        readRunIdx = allReadData.getColumnIndex("RUN_NAME")
+        for readInfoFile in args.read_info:
+            allReadData = DataFrame.parseFromFile(readInfoFile, cDelim='\t')
 
-        for elem in allReadData.vElements:
+            readNameIdx = allReadData.getColumnIndex("READ_NAME")
+            readTypeIdx = allReadData.getColumnIndex("TYPE")
+            readRunIdx = allReadData.getColumnIndex("USER_RUN_NAME")
 
-            readName = elem[readNameIdx]
-            readType = elem[readTypeIdx]
-            readRun  = elem[readRunIdx]
+            for elem in allReadData.vElements:
 
-            self.readInfo[readName] = (readType, readRun)
+                readName = elem[readNameIdx]
+                readType = elem[readTypeIdx]
+                readRun  = elem[readRunIdx]
+
+                self.readInfo[readName] = (readType, readRun)
 
     def readSequences(self, args):
 
-        if not fileExists(args.fasta):
-            PSToolException("fasta file does not exist: " + args.fasta)
+        for fastaFile in args.fasta:
+
+            if not fileExists(fastaFile):
+                raise PSToolException("Fasta file does not exist: " + str(fastaFile))
 
         self.fasta = {}
 
-        for seq in HTSeq.FastaReader( args.fasta ):
-            self.fasta[ seq.name ] = seq
+        for fastaFile in args.fasta:
 
-    def readGenomeAnnotation(self, args):
-
-        if not fileExists(args.fasta):
-            PSToolException("fasta file does not exist: " + args.fasta)
-
-        self.genome_annotation = {}
-
-        for seq in HTSeq.FastaReader( args.fasta ):
-            self.fasta[ seq.name ] = seq
+            for seq in HTSeq.FastaReader( fastaFile ):
+                self.fasta[seq.name] = MinimalSeq(seq.seq, seq.name, seq.descr)
 
     def _makePropDict(self):
 
@@ -106,19 +111,34 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
         self.readReadInfo(args)
         self.readSequences(args)
 
+        for x in args.sam:
+            if not fileExists(x):
+                PSToolException("sam file does not exist: " + str(x))
 
         return [x for x in args.sam]
 
-    def execParallel(self, data, environment):
+    def prepareEnvironment(self, args):
 
+        env = self._makeArguments(args)
+        env.fasta = self.fasta
 
+        copy = pickle.dump(self.fasta, open("/tmp/bla", 'wb'))
 
-        for readAlignment in HTSeq.SAM_Reader( environment.sam ):
+        return env
+
+    def execParallel(self, data, env):
+
+        if data.endswith(".bam"):
+            opener = HTSeq.BAM_Reader
+        else:
+            opener = HTSeq.SAM_Reader
+
+        for readAlignment in opener( data ):
 
             if readAlignment.aligned:
 
                 readName = readAlignment.read.name
-                readSeq = readAlignment.read.seq
+
                 readInterval = readAlignment.iv
                 cigarOfRead = readAlignment.cigar
 
@@ -128,13 +148,15 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
 
                     if cigarOp.type == 'M':
 
-                        fastaReq = self.fasta[ readInterval.chrom ]
-                        fastaSeq = fastaReq[ readInterval.start, readInterval.end ]
+                        fastaReq = env.fasta[ readInterval.chrom ]
+
+                        fastaReq = HTSeq.Sequence(fastaReq.seq, fastaReq.name)
+                        fastaSeq = fastaReq[ cigarOp.ref_iv.start:cigarOp.ref_iv.end ]
 
                         if readInterval.strand == '-':
                             fastaSeq = fastaSeq.get_reverse_complement()
 
-                        editDistance = self.calculateEditDistance( readSeq, fastaSeq )
+                        editDistance = self.calculateEditDistance( readAlignment.read[cigarOp.query_from:cigarOp.query_to], fastaSeq )
 
                         cigarOp2Length['M'].append(cigarOp.size)
                         cigarOp2Length['X'].append(editDistance)
@@ -142,9 +164,6 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
 
                     else:
                         cigarOp2Length[ cigarOp.type ].append(cigarOp.size)
-
-
-
 
         return None
 

@@ -42,4 +42,19 @@ class ParallelPSTInterface(PSToolInterface):
     def makeResults(self, parallelResult, environment, args):
         pass
 
+    def writeLinesToOutput(self, outFile, lines, mode='a'):
 
+        if type(outFile) == str:
+            file = open(outFile, mode)
+            file.writelines(lines)
+            file.flush()
+            file.close()
+
+        else:
+            outFile.writelines(lines)
+            outFile.flush()
+
+    def closeOutput(self, outFile):
+
+        if type(outFile) != str:
+            outFile.close()

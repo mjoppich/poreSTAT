@@ -31,7 +31,13 @@ class ReadInfoFactory(PSToolInterfaceFactory):
                             help='run ids of experiments to be extracted. if --user_run, give user_run_name s',
                             required=False)
 
-        parser.add_argument('-o', '--output', type=argparse.FileType('w'), help='output location, default: std out', default=sys.stdout)
+        def fileOpener( filename ):
+
+            open(filename, 'w').close()
+
+            return filename
+
+        parser.add_argument('-o', '--output', type=fileOpener, help='output location, default: std out', default=sys.stdout)
         parser.set_defaults(func=self._prepObj)
 
         return parser
@@ -116,7 +122,9 @@ class ReadInfo(ParallelPSTInterface):
         env = Environment()
         env.output = args.output
 
-        env.output.write("\t".join(self.dObservations) + self.endl)
+        header = "\t".join(self.dObservations) + self.endl
+
+        self.writeLinesToOutput(env.output, [header], mode='w')
 
         return env
 
@@ -126,16 +134,23 @@ class ReadInfo(ParallelPSTInterface):
         if newResult == None:
             return None
 
+        allLines = []
+
         for readEntry in newResult:
 
             readinfo = [ readEntry[x] for x in self.dObservations ]
-            environment.output.write("\t".join(readinfo) + self.endl)
+            toWrite = "\t".join(readinfo) + self.endl
+            allLines.append(toWrite)
+
+        if not allLines is None and len(allLines) > 0:
+            self.writeLinesToOutput(environment.output, allLines)
 
         return None
 
 
-    def makeResults(self, parallelResult, oEnvironment, args):
 
-        pass
+    def makeResults(self, parallelResult, env, args):
+
+        self.closeOutput(env.output)
 
 
