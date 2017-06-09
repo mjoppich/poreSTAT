@@ -1,7 +1,7 @@
 import argparse
 import HTSeq
 
-
+from porestat.plots.plotconfig import PlotConfig
 from ..utils.DataFrame import DataFrame
 from ..tools.ParallelPTTInterface import ParallelPSTInterface
 from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
@@ -23,7 +23,9 @@ class ReadCountAnalysisFactory(PSToolInterfaceFactory):
         parser = subparsers.add_parser('counts', help='expls help')
         parser.add_argument('-s', '--sam', nargs='+', type=str, required=True, help='alignment files')
         parser.add_argument('-g', '--gff', type=argparse.FileType("r"), required=True, help='gene annotation')
-        parser.add_argument('-r', '--read_info', nargs='+', type=str, help='read summary file', required=False)
+        parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
+
+        parser = PlotConfig.addParserArgs(parser)
 
         parser.set_defaults(func=self._prepObj)
 
@@ -32,6 +34,7 @@ class ReadCountAnalysisFactory(PSToolInterfaceFactory):
     def _prepObj(self, args):
 
         simArgs = self._makeArguments(args)
+        simArgs.plotConfig = PlotConfig.fromParserArgs(simArgs)
 
         return ReadCountAnalysis(simArgs)
 
@@ -61,33 +64,37 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
     def readReadInfo(self, args):
 
+        for readInfoFile in args.read_info:
+
+            if not fileExists(readInfoFile):
+                raise PSToolException("Read info file does not exist: " + str(readInfoFile))
+
         self.readInfo = {}
 
-        if args.read_info == None:
-            return
+        for readInfoFile in args.read_info:
+            allReadData = DataFrame.parseFromFile(readInfoFile, cDelim='\t')
 
-        if not fileExists(args.read_info):
-            PSToolException("Read info file does not exist: " + args.read_info)
+            readNameIdx = allReadData.getColumnIndex("READ_NAME")
+            readTypeIdx = allReadData.getColumnIndex("TYPE")
+            readRunIdx = allReadData.getColumnIndex("USER_RUN_NAME")
+            readLengthIdx = allReadData.getColumnIndex("READ_LENGTH")
 
-        allReadData = DataFrame.parseFromFile(args.read_info, cDelim='\t')
+            for elem in allReadData.vElements:
+                readName = elem[readNameIdx]
+                readType = elem[readTypeIdx]
+                readRun = elem[readRunIdx]
+                readLength = int(elem[readLengthIdx])
 
-        readNameIdx = allReadData.getColumnIndex("READ_NAME")
-        readTypeIdx = allReadData.getColumnIndex("TYPE")
-        readRunIdx = allReadData.getColumnIndex("RUN_NAME")
-        readLengthIdx = allReadData.getColumnIndex("READ_LENGTH")
-
-        for elem in allReadData.vElements:
-
-            readName = elem[readNameIdx]
-            readType = elem[readTypeIdx]
-            readRun  = elem[readRunIdx]
-            readLength = int(elem[readLengthIdx])
-
-            self.readInfo[readName] = (readType, readRun, readLength)
+                self.readInfo[readName] = (readType, readRun, readLength)
 
     def prepareInputs(self, args):
         self.readReadInfo(args)
         self.readGenomeAnnotation(args)
+
+        for x in args.sam:
+            if not fileExists(x):
+                PSToolException("sam file does not exist: " + str(x))
+
         return args.sam
 
     def execParallel(self, data, environment):
@@ -119,26 +126,26 @@ class ReadCountAnalysis(ParallelPSTInterface):
         print("Found unaligned reads: " + str(len(foundReadsNotAligned)))
         print("Total reads: " + str(len(foundReadsAligned) + len(foundReadsNotAligned)))
 
-        totalBaseCount = sum([ x[2] for x in self.readInfo  ])
+        totalBaseCount = sum([ self.readInfo[x][2] for x in self.readInfo  ])
         print("Total bases in files: " + str(totalBaseCount))
-
-        return None
 
         featureLengths = {}
         featureCoverage = {}
         for feature in self.genomeAnnotation:
 
-            if feature.type == "exon":
+            if feature.type == "exon" or feature.type == "operon":
 
-                if not feature.name in featureLengths:
-                    featureLengths[feature.name] = []
+                featureLocusName = feature.attr['gene_id'] if 'gene_id' in feature.attr else feature.name
 
-                featureLengths[feature.name].append(feature.iv.end - feature.iv.start)
+                if not featureLocusName in featureLengths:
+                    featureLengths[ featureLocusName ] = []
+
+                featureLengths[ featureLocusName ].append(feature.iv.end - feature.iv.start)
 
                 if not feature.name in featureCoverage:
-                    featureCoverage[feature.name] = []
+                    featureCoverage[ featureLocusName ] = []
 
-                featureCoverage[feature.name].append(cvg[feature.iv])
+                featureCoverage[ featureLocusName ].append(cvg[feature.iv])
 
         allKeys = []
 
@@ -164,7 +171,8 @@ class ReadCountAnalysis(ParallelPSTInterface):
             cov = float(featureCount) / float(featureLength)
             print(str(x) + " " + str(cov))
 
-            if x.split("_")[1].startswith("r"):
+            xa = x.split("_")
+            if len(xa) > 1 and xa[1].startswith("r"):
                 coverages["ribo"] += featureCount
                 covlengths["ribo"] += featureLength
 

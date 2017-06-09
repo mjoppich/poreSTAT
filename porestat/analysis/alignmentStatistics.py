@@ -1,6 +1,10 @@
 import argparse
 
 import pickle
+from collections import defaultdict
+
+from porestat.hdf5tool import Fast5TYPE
+from porestat.plots.poreplot import PorePlot
 
 from ..utils.Files import fileExists
 from ..utils.DataFrame import DataFrame
@@ -20,6 +24,19 @@ class MinimalSeq:
         self.name = name
         self.desc = desc
 
+        self.htseq = None
+
+    def toHTSeq(self):
+
+        if self.htseq == None:
+
+            htseq = HTSeq.Sequence(self.seq, self.name)
+            htseq.descr = self.desc
+
+            self.htseq = htseq
+
+        return self.htseq
+
 class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
 
     def __init__(self, parser, subparsers):
@@ -33,6 +50,10 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
         parser.add_argument('-s', '--sam', nargs='+', type=str, help='alignment files', required=True)
         parser.add_argument('-f', '--fasta', nargs='+', type=str, help='read inputs for alignment', required=True)
         parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
+
+        parser.add_argument('-q', '--read-type', nargs='+', type=str, choices=[x for x in Fast5TYPE.str2type], help='read types ('+ ",".join([x for x in Fast5TYPE.str2type]) +')')
+        parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
+
 
         parser.set_defaults(func=self._prepObj)
 
@@ -77,7 +98,7 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
 
             for elem in allReadData.vElements:
 
-                readName = elem[readNameIdx]
+                readName = elem[readNameIdx].split(" ")[0]
                 readType = elem[readTypeIdx]
                 readRun  = elem[readRunIdx]
 
@@ -99,11 +120,7 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
 
     def _makePropDict(self):
 
-        props = {}
-
-        for cigarOp in self.cigar_ops:
-            props[cigarOp] = []
-
+        props = defaultdict(list)
         return props
 
     def prepareInputs(self, args):
@@ -122,8 +139,6 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
         env = self._makeArguments(args)
         env.fasta = self.fasta
 
-        copy = pickle.dump(self.fasta, open("/tmp/bla", 'wb'))
-
         return env
 
     def execParallel(self, data, env):
@@ -133,11 +148,17 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
         else:
             opener = HTSeq.SAM_Reader
 
+        allReadStats = []
+
         for readAlignment in opener( data ):
 
             if readAlignment.aligned:
 
                 readName = readAlignment.read.name
+
+                readType = Fast5TYPE.UNKNOWN
+                if readName in self.readInfo:
+                    readType = self.readInfo[readName][0]
 
                 readInterval = readAlignment.iv
                 cigarOfRead = readAlignment.cigar
@@ -150,13 +171,12 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
 
                         fastaReq = env.fasta[ readInterval.chrom ]
 
-                        fastaReq = HTSeq.Sequence(fastaReq.seq, fastaReq.name)
+                        fastaReq = fastaReq.toHTSeq()
+
                         fastaSeq = fastaReq[ cigarOp.ref_iv.start:cigarOp.ref_iv.end ]
+                        readSeq = readAlignment.read_as_aligned[cigarOp.query_from:cigarOp.query_to]
 
-                        if readInterval.strand == '-':
-                            fastaSeq = fastaSeq.get_reverse_complement()
-
-                        editDistance = self.calculateEditDistance( readAlignment.read[cigarOp.query_from:cigarOp.query_to], fastaSeq )
+                        editDistance = self.calculateEditDistance( readSeq, fastaSeq )
 
                         cigarOp2Length['M'].append(cigarOp.size)
                         cigarOp2Length['X'].append(editDistance)
@@ -165,7 +185,10 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
                     else:
                         cigarOp2Length[ cigarOp.type ].append(cigarOp.size)
 
-        return None
+                print("done read: " + readName)
+                allReadStats.append( (readType, cigarOp2Length) )
+
+        return allReadStats
 
     def calculateEditDistance(self, htSeq1, htSeq2):
 
@@ -184,68 +207,50 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
     def joinParallel(self, existResult, newResult, oEnvironment):
 
         if existResult == None:
-            existResult = {}
+            existResult = []
 
-        existResult = mergeDicts(existResult, newResult)
+        existResult += newResult
 
         return existResult
 
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'AVG_LENGTH', 'N50', 'BASECALL_2D', 'BASECALL_1D_COMPL',
-                            'BASECALL_1D', 'BASECALL_RNN_1D', 'PRE_BASECALL', 'UNKNOWN']
 
-        if parallelResult == None:
-            raise PSToolException("No Files collected")
+        if not args.read_type:
 
-        allobservations = {}
-        for runid in parallelResult:
+            totalCounter = defaultdict(list)
 
-            allLengths = []
-            countByType = Counter()
+            for counterPair in parallelResult:
 
-            for type in parallelResult[runid]['TYPE']:
+                for x in counterPair[1]:
+                    totalCounter[x] += counterPair[1][x]
 
-                lengths = parallelResult[runid]['TYPE'][type]
+            if args.violin:
+                PorePlot.plotViolin(totalCounter, [x for x in totalCounter], "CIGARs")
+            else:
+                PorePlot.plotBoxplot(totalCounter, [x for x in totalCounter], "CIGARs")
 
-                allLengths += lengths
+        else:
+            totalCounter = defaultdict( defaultdict(list) )
 
-                countByType[type] += len(lengths)
+            for counterPair in parallelResult:
 
-            fileCount = len(allLengths)
-            avgLength = sum(allLengths) / fileCount
-            (n50, l50) = calcN50(allLengths)
-            run_user_name = parallelResult[runid]['NAMES']['USER_RUN_NAME']
+                readType = counterPair[0]
+                readCounter = counterPair[1]
 
-            observations = {
+                for x in readCounter:
+                    totalCounter[readType][x] += readCounter
 
-                'RUNID': runid,
-                'USER_RUN_NAME': ",".join(run_user_name),
-                'FILES': fileCount,
-                'AVG_LENGTH': avgLength,
-                'N50': n50,
-                'BASECALL_2D': countByType[self.str2fileType['BASECALL_2D']],
-                'BASECALL_1D_COMPL': countByType[self.str2fileType['BASECALL_1D_COMPL']],
-                'BASECALL_1D': countByType[self.str2fileType['BASECALL_1D']],
-                'BASECALL_RNN_1D': countByType[self.str2fileType['BASECALL_RNN_1D']],
-                'PRE_BASECALL': countByType[self.str2fileType['PRE_BASECALL']],
-                'UNKNOWN': countByType[self.str2fileType['UNKNOWN']]
-            }
-
-            allobservations[runid] = observations
+            for readType in totalCounter:
+                if args.violin:
+                    PorePlot.plotViolin(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs")
+                else:
+                    PorePlot.plotBoxplot(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs")
 
 
-        sortedruns = sorted([x for x in allobservations])
 
-        print("\t".join(makeObservations))
 
-        for runid in sortedruns:
 
-            allobs = []
-            for x in makeObservations:
-                allobs.append(str(allobservations[runid][x]))
-
-            print("\t".join(allobs))
 
 

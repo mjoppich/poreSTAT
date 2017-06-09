@@ -13,6 +13,9 @@ class DataFrameException(Exception):
 
         self.msg = msg
 
+    def __str__(self):
+        return self.msg
+
 class DataRowException(Exception):
 
     def __init__(self, msg):
@@ -192,7 +195,7 @@ class DataFrame:
             try:
                 return int(oColumn)
             except:
-                raise DataFrameException("Invalid column: " + oColumn)
+                raise DataFrameException("Invalid column: " + str(oColumn) + "\n\n Available columns: " + str([x for x in self.dHeader]))
 
     def applyByRow(self, oColumn, oFunc):
 

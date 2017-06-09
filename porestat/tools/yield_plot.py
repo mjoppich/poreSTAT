@@ -24,6 +24,8 @@ class YieldPlotFactory(PSToolInterfaceFactory):
         parser.add_argument('-q', '--read-type', dest='addTypeSubplot', action='store_true', default=False, help='add type subplots')
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
 
+        parser = self.addPlotParser(parser)
+
         parser.set_defaults(func=self._prepObj)
 
         return parser

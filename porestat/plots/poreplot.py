@@ -263,27 +263,63 @@ class PorePlot:
         plt.show()
 
     @classmethod
-    def plotViolin(cls, someData, labels, title, bins = 100, xlabel=None, ylabel=None):
+    def plotSingleViolin(cls, data, title, ax):
 
+        ax.violinplot(data, showmeans=True, showextrema=True, showmedians=True, points=500)
+        ax.set_title(title)
 
-        fig, ax = plt.subplots()
-        ax.violinplot( someData , showmeans=True, showextrema=True, showmedians=True, points=500)
-        ax.set_title( title )
+    @classmethod
+    def plotViolin(cls, someData, labels, title):
 
-        if xlabel != None:
-            ax.set_xlabel( xlabel )
+        if type(someData) == list:
+            shape = (1, 1)
+            someData = { title: someData }
+        else:
+            elems = len(someData)
 
-        if ylabel != None:
-            ax.set_ylabel( ylabel )
+            shape = (1, elems)
 
-#        ax.axes.get_xaxis().set_ticks( [i for i in range(1, len(stepLabels)+1)] )
-#        ax.axes.get_xaxis().set_ticklabels( stepLabels, rotation=90 )
+        fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1])
 
-        if len(someData) > 1:
-            ax.legend()
+        if labels == None:
+            labels = [x for x in someData]
+
+        for i in range(0, len(labels)):
+
+            x = labels[i]
+            pos = divmod(i, shape[1])
+
+            cls.plotSingleViolin( someData[x], labels[i], ax[i] )
 
         plt.tight_layout()
+        plt.show()
 
+
+    @classmethod
+    def plotBoxplot(cls, someData, labels, title):
+
+        if type(someData) == list:
+            shape = (1, 1)
+            someData = { title: someData }
+        else:
+            elems = len(someData)
+
+            shape = (1, elems)
+
+        fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1])
+
+        if labels == None:
+            labels = [x for x in someData]
+
+        for i in range(0, len(labels)):
+
+            x = labels[i]
+            pos = divmod(i, shape[1])
+
+            ax[i].boxplot(someData[x], notch=True, patch_artist=True)
+            ax[i].set_title(x)
+
+        plt.tight_layout()
         plt.show()
 
     @classmethod
