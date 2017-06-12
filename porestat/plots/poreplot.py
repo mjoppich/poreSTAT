@@ -7,6 +7,7 @@ import os
 from collections import Counter
 import datetime as dt
 from matplotlib.ticker import Formatter
+from .plotconfig import PlotConfig
 
 
 class TimestampDateFormatter(Formatter):
@@ -62,7 +63,7 @@ class PorePlot:
         return cls.getColor(colormap=colormap, value=value)
 
     @classmethod
-    def plotLoadOut(cls, pore2length, title='Title', xlabel='channels', ylabel='flowcell inlet'):
+    def plotLoadOut(cls, pore2length, title='Title', xlabel='channels', ylabel='flowcell inlet', pltcfg = PlotConfig()):
         """
 
         :param pore2length: dictionary channelID -> read-length
@@ -160,6 +161,8 @@ class PorePlot:
                     frac = p2l[channelID] / (maxAvgLength - minAvgLength)
                     color.append(cls.getColor(colormap=scolormap, value=frac))
 
+        pltcfg.startPlot()
+
         fig, axarr = plt.subplots(2, figsize=(10, 10), gridspec_kw = {'height_ratios':[10, 1]})
         fig.set_dpi(100)
 
@@ -186,14 +189,12 @@ class PorePlot:
 
         axarr[1].set_title('Legend (Avg Read Length)')
 
-        fig.tight_layout()
-
-        plt.show()
+        pltcfg.makePlot()
 
 
 
     @classmethod
-    def plotTimeLine(cls, readsPerTime, labels, title, colors = None, bins = 100):
+    def plotTimeLine(cls, readsPerTime, labels, title, colors = None, bins = 100, pltcfg = PlotConfig()):
 
         """
 
@@ -225,7 +226,7 @@ class PorePlot:
                 color = cls.getColorLin(0, len(histInput)-1, i)
                 colors.append(color)
 
-
+        pltcfg.startPlot()
         fig, ax = plt.subplots()
 
         formatter = TimestampDateFormatter()
@@ -237,11 +238,11 @@ class PorePlot:
         plt.legend()
 
         fig.autofmt_xdate()
-        plt.show()
+        pltcfg.makePlot()
 
     @classmethod
-    def plotHistogram(cls, someData, labels, title, bins = 100, xlabel=None, ylabel=None):
-
+    def plotHistogram(cls, someData, labels, title, bins = 100, xlabel=None, ylabel=None, pltcfg = PlotConfig()):
+        pltcfg.startPlot()
         fig, ax = plt.subplots()
         linebc, bins, patches = ax.hist( someData , bins, histtype='bar', stacked=False, label=labels)
         ax.set_title( title )
@@ -258,9 +259,7 @@ class PorePlot:
         if len(someData)>1:
             ax.legend()
 
-        plt.tight_layout()
-
-        plt.show()
+        pltcfg.makePlot()
 
     @classmethod
     def plotSingleViolin(cls, data, title, ax):
@@ -269,7 +268,7 @@ class PorePlot:
         ax.set_title(title)
 
     @classmethod
-    def plotViolin(cls, someData, labels, title):
+    def plotViolin(cls, someData, labels, title, pltcfg = PlotConfig()):
 
         if type(someData) == list:
             shape = (1, 1)
@@ -279,6 +278,7 @@ class PorePlot:
 
             shape = (1, elems)
 
+        pltcfg.startPlot()
         fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1])
 
         if labels == None:
@@ -292,11 +292,11 @@ class PorePlot:
             cls.plotSingleViolin( someData[x], labels[i], ax[i] )
 
         plt.tight_layout()
-        plt.show()
+        pltcfg.makePlot()
 
 
     @classmethod
-    def plotBoxplot(cls, someData, labels, title):
+    def plotBoxplot(cls, someData, labels, title, pltcfg = PlotConfig()):
 
         if type(someData) == list:
             shape = (1, 1)
@@ -306,6 +306,7 @@ class PorePlot:
 
             shape = (1, elems)
 
+        pltcfg.startPlot()
         fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1])
 
         if labels == None:
@@ -320,11 +321,12 @@ class PorePlot:
             ax[i].set_title(x)
 
         plt.tight_layout()
-        plt.show()
+        pltcfg.makePlot()
 
     @classmethod
-    def yieldPlot(cls, dataDict, title, xlabel, ylabel):
+    def yieldPlot(cls, dataDict, title, xlabel, ylabel, pltcfg = PlotConfig()):
 
+        pltcfg.startPlot()
         fig, ax = plt.subplots()
 
         formatter = TimestampTimeFormatter()
@@ -347,5 +349,5 @@ class PorePlot:
         plt.legend( labels, loc='upper left')
 
         fig.autofmt_xdate()
-        plt.tight_layout()
-        plt.show()
+
+        pltcfg.makePlot()

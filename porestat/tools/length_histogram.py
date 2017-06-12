@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from porestat.plots.plotconfig import PlotConfig
+
 from porestat.plots.poreplot import PorePlot
 
 from .ParallelPTTInterface import ParallelPSTInterface
@@ -29,12 +31,15 @@ class LengthHistogramFactory(PSToolInterfaceFactory):
         parser.add_argument('-c', '--combined', dest='combineRuns', action='store_true', default=False)
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
 
+        parser = PlotConfig.addParserArgs(parser)
+
         parser.set_defaults(func=self._prepObj)
 
         return parser
 
     def _prepObj(self, args):
         simArgs = self._makeArguments(args)
+
         return LengthHistogram(simArgs)
 
 class LengthHistogram(ParallelPSTInterface):

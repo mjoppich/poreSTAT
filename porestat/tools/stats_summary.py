@@ -1,3 +1,4 @@
+from ..plots.plotconfig import PlotConfig
 from .ParallelPTTInterface import ParallelPSTInterface
 from .PTToolInterface import PSToolInterfaceFactory
 
@@ -13,16 +14,18 @@ class StatsSummaryFactory(PSToolInterfaceFactory):
 
 
     def _addParser(self, subparsers):
+        parser = subparsers.add_parser('summary', help='read performance summary')
+        parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
+        parser.add_argument('-r', '--reads', type=str, help='minion read folder', required=False)
+        parser.set_defaults(func=self._prepObj)
 
-        parser_expls = subparsers.add_parser('summary', help='read performance summary')
-        parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
-        parser_expls.add_argument('-r', '--reads', type=str, help='minion read folder', required=False)
-        parser_expls.set_defaults(func=self._prepObj)
+        parser = PlotConfig.addParserArgs(parser)
 
-        return parser_expls
+        parser.set_defaults(func=self._prepObj)
+
+        return parser
 
     def _prepObj(self, args):
-
         simArgs = self._makeArguments(args)
 
         return StatsSummary(simArgs)

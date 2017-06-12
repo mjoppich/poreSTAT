@@ -1,4 +1,5 @@
-from ..plots.poreplot import PorePlot, TimestampTimeFormatter
+from ..plots.poreplot import PorePlot
+from ..plots.plotconfig import PlotConfig
 
 from .ParallelPTTInterface import ParallelPSTInterface
 from .PTToolInterface import PSToolInterfaceFactory
@@ -24,7 +25,7 @@ class YieldPlotFactory(PSToolInterfaceFactory):
         parser.add_argument('-q', '--read-type', dest='addTypeSubplot', action='store_true', default=False, help='add type subplots')
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
 
-        parser = self.addPlotParser(parser)
+        parser = PlotConfig.addParserArgs(parser)
 
         parser.set_defaults(func=self._prepObj)
 
@@ -33,6 +34,7 @@ class YieldPlotFactory(PSToolInterfaceFactory):
     def _prepObj(self, args):
 
         simArgs = self._makeArguments(args)
+        simArgs.pltCfg = PlotConfig.fromParserArgs(simArgs)
 
         return YieldPlot(simArgs)
 
@@ -203,6 +205,6 @@ class YieldPlot(ParallelPSTInterface):
 
                     timeLengthData[ label ] = cumLocTLbyType[dataType]
 
-        PorePlot.yieldPlot(timeLengthData, "Yield Plot", "Cumulative BP", "Time")
+        PorePlot.yieldPlot(timeLengthData, "Yield Plot", "Cumulative BP", "Time", pltcfg=args.pltCfg)
 
 

@@ -4,6 +4,7 @@ import os
 import sys
 
 from numpy import genfromtxt
+from porestat.plots.plotconfig import PlotConfig
 
 from ..utils.Utils import mergeDicts
 from ..utils.Stats import calcN50
@@ -32,12 +33,13 @@ class ChannelOccupancyFactory(PSToolInterfaceFactory):
 
         parser.add_argument('-q', '--read_type', nargs='+', type=str, choices=[x for x in Fast5TYPE.str2type], help='read types ('+ ",".join([x for x in Fast5TYPE.str2type]) +')')
 
+        parser = PlotConfig.addParserArgs(parser)
+
         parser.set_defaults(func=self._prepObj)
 
         return parser
 
     def _prepObj(self, args):
-
         simArgs = self._makeArguments(args)
 
         return ChannelOccupancy(simArgs)

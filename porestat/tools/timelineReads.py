@@ -1,3 +1,4 @@
+from porestat.plots.plotconfig import PlotConfig
 
 from ..plots.poreplot import PorePlot
 from ..utils.Utils import mergeCounter
@@ -26,17 +27,18 @@ class TimelineReadsFactory(PSToolInterfaceFactory):
         super(TimelineReadsFactory, self).__init__(parser, self._addParser(subparsers))
 
     def _addParser(self, subparsers):
-        parser_expls = subparsers.add_parser('time', help='timeline help')
-        parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
-        parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser_expls.add_argument('-o', '--out', action='store', type=argparse.FileType('w'), default=None)
+        parser = subparsers.add_parser('time', help='timeline help')
+        parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
+        parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser.add_argument('-o', '--out', action='store', type=argparse.FileType('w'), default=None)
 
-        parser_expls.set_defaults(func=self._prepObj)
+        parser = PlotConfig.addParserArgs(parser)
 
-        return parser_expls
+        parser.set_defaults(func=self._prepObj)
+
+        return parser
 
     def _prepObj(self, args):
-
         simArgs = self._makeArguments(args)
 
         return TimelineReads(simArgs)

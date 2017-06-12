@@ -1,29 +1,33 @@
+import argparse
 from enum import Enum
 import matplotlib.pyplot as plt
 
-
 class PlotStyle(Enum):
+    DEFAULT='default',
+    XKCD='xkcd',
+    FIVETHIRTYEIGHT='fivethirtyeight',
+    CLASSIC='classic',
+    BMH='bmh',
+    DARK='dark_background'
 
 
+class PlotStyleAction(argparse.Action):
+    def __call__(self, parser, args, values, option_string=None):
 
-class PlotStyle(Enum):
-    DEFAULT=0,
-    XKCD=1,
-    FIVETHIRTYEIGHT=2,
-    CLASSIC=3
+        try:
+            eVal = PlotStyle[values]
 
-    def __call__(self, string):
-        if not name in VALID_BAR_NAMES:
-            raise argparse.ArgumentError(None,'Bar can not be {n}, '
-                               'it must be one of {m}'.format(
-                                    n=name, m=', '.join(VALID_BAR_NAMES)))
-        self.name = string
+            self.style = eVal
+            args.__dict__['plot_style'] = self.style
 
-    def __init__(self):
-        pass
+        except:
+
+            raise argparse.ArgumentError(None, 'PlotStyle can not be {n}, '
+                                               'it must be one of {m}'.format(n=values,
+                                                                              m=', '.join([str(x.name) for x in PlotStyle])))
 
     def __repr__(self):
-        return name
+        return self.style
 
 class PlotConfig:
 
@@ -38,6 +42,8 @@ class PlotConfig:
         if simArgs.plot_style != None:
             pltCfg.setStyle( simArgs.plot_style )
 
+        return pltCfg
+
 
 
     @classmethod
@@ -46,8 +52,8 @@ class PlotConfig:
         def toPlotStyle(input):
             return PlotStyle[input]
 
-        parser.add_argument('-sp', '--save-plot', type=str, help='path to file where plots are saved')
-        parser.add_argument('-ps', '--plot-style', type=toPlotStyle, choices=[x for x in PlotStyle], help='read types ('+ ",".join([str(x) for x in PlotStyle]) +')')
+        parser.add_argument('-sp', '--save-plot', type=str, help='path-prefix to file where plots are saved. pltnum+ext are appended to name')
+        parser.add_argument('-ps', '--plot-style', action=PlotStyleAction)
 
         return parser
 
@@ -57,26 +63,30 @@ class PlotConfig:
         self.save_file = None
         self.saved_plot = 0
 
-        self.style = None
+        self.style = PlotStyle.DEFAULT
         self.transparent_bg = True
 
     def saveToFile(self, filePath):
 
         self.save_to_file = True
-        self.save_file = filePath
+        self.save_file = filePath + ".%02d.png"
+
+        plt.ioff()
+
 
     def setStyle(self, style):
 
         self.style = style
 
-    def makePlot(self):
+    def startPlot(self):
 
         if self.style == PlotStyle.XKCD:
             plt.xkcd()
-        elif self.style == PlotStyle.FIVETHIRTYEIGHT:
-            plt.style.use('fivethirtyeight')
-        elif self.style== PlotStyle.CLASSIC:
-            plt.style.use('classic')
+        else:
+            plt.style.use( self.style.value )
+
+
+    def makePlot(self):
 
         plt.tight_layout()
 
@@ -84,6 +94,7 @@ class PlotConfig:
 
             exactFilename = self.save_file % self.saved_plot
 
-            plt.savefig( exactFilename, transparent=self.transparent_bg)
+            plt.savefig( exactFilename, transparent=self.transparent_bg, bbox_inches='tight')
         else:
+
             plt.show()

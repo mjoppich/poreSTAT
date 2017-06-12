@@ -9,6 +9,9 @@ from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
 from ..utils.Files import fileExists
+from scipy import stats
+import sys
+import numpy as np
 
 
 class ReadCountAnalysisFactory(PSToolInterfaceFactory):
@@ -24,6 +27,14 @@ class ReadCountAnalysisFactory(PSToolInterfaceFactory):
         parser.add_argument('-s', '--sam', nargs='+', type=str, required=True, help='alignment files')
         parser.add_argument('-g', '--gff', type=argparse.FileType("r"), required=True, help='gene annotation')
         parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
+
+        def fileOpener( filename ):
+
+            open(filename, 'w').close()
+
+            return filename
+
+        parser.add_argument('-o', '--output', type=fileOpener, help='output location, default: std out', default=sys.stdout)
 
         parser = PlotConfig.addParserArgs(parser)
 
@@ -95,6 +106,9 @@ class ReadCountAnalysis(ParallelPSTInterface):
             if not fileExists(x):
                 PSToolException("sam file does not exist: " + str(x))
 
+        self.writeLinesToOutput(args.output, "\t".join(['gene', 'coverage', 'rank']) + "\n", mode='w')
+
+
         return args.sam
 
     def execParallel(self, data, environment):
@@ -157,6 +171,8 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
         summedAverage = Counter()
 
+        allCovs = []
+
         for x in sorted(allKeys):
             featureCount = 0
 
@@ -169,7 +185,10 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
             featureLength = sum(featureLengths[x])
             cov = float(featureCount) / float(featureLength)
-            print(str(x) + " " + str(cov))
+            #print(str(x) + " " + str(cov))
+
+            if not x.startswith("operon"):
+                allCovs.append( (x, cov) )
 
             xa = x.split("_")
             if len(xa) > 1 and xa[1].startswith("r"):
@@ -186,6 +205,21 @@ class ReadCountAnalysis(ParallelPSTInterface):
         for x in coverages:
             print(str(x) + " " + str(float(coverages[x]) / float(covlengths[x])))
             print(str(x) + " " + str(summedAverage))
+
+        ranked = stats.rankdata( [x[1] for x in allCovs] )
+
+        allRankedCovs = []
+        for i in range(0, len(allCovs)):
+            allRankedCovs.append( (allCovs[i][0], allCovs[i][1], ranked[i]) )
+
+
+        allLines = []
+        for x in sorted(allRankedCovs, key=lambda x: x[2]):
+            allLines.append( str(x[0]) + "\t" + str(x[1]) + "\t" + str(x[2]) + "\n" )
+
+        self.writeLinesToOutput(environment.output, allLines)
+
+        return None
 
 
     def joinParallel(self, existResult, newResult, oEnvironment):

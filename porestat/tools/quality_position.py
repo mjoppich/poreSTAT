@@ -1,3 +1,5 @@
+from porestat.plots.plotconfig import PlotConfig
+
 from .ParallelPTTInterface import ParallelPSTInterface
 from .PTToolInterface import PSToolInterfaceFactory
 
@@ -21,12 +23,13 @@ class QualityPositionFactory(PSToolInterfaceFactory):
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-p', '--plot', '--out', nargs='?', action='store', type=argparse.FileType('w'), default=None)
         parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
+        parser = PlotConfig.addParserArgs(parser)
+
         parser.set_defaults(func=self._prepObj)
 
         return parser
 
     def _prepObj(self, args):
-
         simArgs = self._makeArguments(args)
 
         return QualityPosition(simArgs)

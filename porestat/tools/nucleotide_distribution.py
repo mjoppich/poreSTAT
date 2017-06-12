@@ -1,3 +1,5 @@
+from porestat.plots.plotconfig import PlotConfig
+
 from .ParallelPTTInterface import ParallelPSTInterface
 from .PTToolInterface import PSToolInterfaceFactory
 
@@ -13,17 +15,16 @@ class NucleotideDistributionFactory(PSToolInterfaceFactory):
 
 
     def _addParser(self, subparsers):
+        parser = subparsers.add_parser('nuc_dist', help='expls help')
+        parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
+        parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser = PlotConfig.addParserArgs(parser)
 
-        parser_expls = subparsers.add_parser('nuc_dist', help='expls help')
-        parser_expls.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
-        parser_expls.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser_expls.set_defaults(func=self._prepObj)
+        parser.set_defaults(func=self._prepObj)
 
-        return parser_expls
-
+        return parser
 
     def _prepObj(self, args):
-
         simArgs = self._makeArguments(args)
 
         return NucleotideDistribution(simArgs)

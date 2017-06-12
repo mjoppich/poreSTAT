@@ -3,6 +3,7 @@ import argparse
 import pickle
 from collections import defaultdict
 
+from ..plots.plotconfig import PlotConfig
 from porestat.hdf5tool import Fast5TYPE
 from porestat.plots.poreplot import PorePlot
 
@@ -54,6 +55,7 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
         parser.add_argument('-q', '--read-type', nargs='+', type=str, choices=[x for x in Fast5TYPE.str2type], help='read types ('+ ",".join([x for x in Fast5TYPE.str2type]) +')')
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
 
+        parser = PlotConfig.addParserArgs(parser)
 
         parser.set_defaults(func=self._prepObj)
 
@@ -62,6 +64,7 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
     def _prepObj(self, args):
 
         simArgs = self._makeArguments(args)
+        simArgs.pltcfg = PlotConfig.fromParserArgs(simArgs)
 
         return AlignmentStatisticAnalysis(simArgs)
 
@@ -227,9 +230,9 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
                     totalCounter[x] += counterPair[1][x]
 
             if args.violin:
-                PorePlot.plotViolin(totalCounter, [x for x in totalCounter], "CIGARs")
+                PorePlot.plotViolin(totalCounter, [x for x in totalCounter], "CIGARs", pltcfg=args.pltcfg)
             else:
-                PorePlot.plotBoxplot(totalCounter, [x for x in totalCounter], "CIGARs")
+                PorePlot.plotBoxplot(totalCounter, [x for x in totalCounter], "CIGARs", pltcfg=args.pltcfg)
 
         else:
             totalCounter = defaultdict( defaultdict(list) )
@@ -244,9 +247,9 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
 
             for readType in totalCounter:
                 if args.violin:
-                    PorePlot.plotViolin(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs")
+                    PorePlot.plotViolin(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs", pltcfg=args.pltcfg)
                 else:
-                    PorePlot.plotBoxplot(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs")
+                    PorePlot.plotBoxplot(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs", pltcfg=args.pltcfg)
 
 
 
