@@ -8,6 +8,7 @@ from collections import Counter
 import datetime as dt
 from matplotlib.ticker import Formatter
 from .plotconfig import PlotConfig
+from matplotlib import gridspec
 
 
 class TimestampDateFormatter(Formatter):
@@ -163,8 +164,15 @@ class PorePlot:
 
         pltcfg.startPlot()
 
-        fig, axarr = plt.subplots(2, figsize=(10, 10), gridspec_kw = {'height_ratios':[10, 1]})
+        fig = plt.figure(figsize=(10,10))
         fig.set_dpi(100)
+
+        gs = gridspec.GridSpec(2,1, height_ratios=[10, 1])
+
+        ax0 = plt.subplot(gs[0])
+        ax1 = plt.subplot(gs[1])
+
+        axarr = [ ax0, ax1 ]
 
         axarr[0].set_title( title )
         axarr[0].set_xlabel( xlabel , fontsize=18)
@@ -181,6 +189,18 @@ class PorePlot:
 
         #axarr[0].Axes(fig, [1, pores[0], 1, pores[1]])
         axarr[0].scatter(xvec, yvec, s=area, c=color, alpha=0.5)
+
+        sizeSteps = 5
+        sizes = [ x for x in range(int(min(area)), int(max(area)), int((max(area)-min(area))/sizeSteps)) ]
+
+        legendPlts = []
+        for size in sizes:
+            obj =axarr[0].scatter([], [], s=size, marker='o', color='#555555')
+            legendPlts.append(obj)
+
+        sizeLabels = [str(x) for x in sizes]
+        sizeLabels[0] += " reads"
+        plt.legend(tuple(legendPlts), tuple(sizeLabels), scatterpoints=1, ncol=sizeSteps, loc='upper center', bbox_to_anchor=(0.5, -0.2), fancybox=True)
 
         #ax1 = fig.add_axes([0.05, 0.80, 0.9, 0.15])
         cb1 = mpl.colorbar.ColorbarBase(axarr[1], cmap=cls.getColorMap(scolormap),
@@ -258,6 +278,35 @@ class PorePlot:
 
         if len(someData)>1:
             ax.legend()
+
+        pltcfg.makePlot()
+
+    @classmethod
+    def plotCumHistogram(cls, someData, labels, title, bins=100, xlabel=None, ylabel=None, pltcfg=PlotConfig()):
+
+        pltcfg.startPlot()
+        fig, ax = plt.subplots()
+
+        dataVec = []
+        for x in labels:
+            dataVec.append( someData[x] )
+
+        linebc, bins, patches = ax.hist(dataVec, bins, histtype='step', cumulative=1, normed=1, stacked=False, label=labels)
+        ax.set_title(title)
+
+        if xlabel != None:
+            ax.set_xlabel(xlabel)
+
+        if ylabel != None:
+            ax.set_ylabel(ylabel)
+
+            #        ax.axes.get_xaxis().set_ticks( [i for i in range(1, len(stepLabels)+1)] )
+            #        ax.axes.get_xaxis().set_ticklabels( stepLabels, rotation=90 )
+
+        if len(someData) > 1:
+            ax.legend()
+
+        plt.xscale('log')
 
         pltcfg.makePlot()
 
@@ -346,7 +395,13 @@ class PorePlot:
 
             ax.plot(xes, yes, color=colors[i])
 
-        plt.legend( labels, loc='upper left')
+        ax.set_xlabel( xlabel )
+        ax.set_ylabel( ylabel )
+        ax.set_title(title)
+
+        # Put a legend below current axis
+        ax.legend(labels, loc='upper center', bbox_to_anchor=(0.5, -0.2),
+                  fancybox=True, shadow=True, ncol=1)
 
         fig.autofmt_xdate()
 

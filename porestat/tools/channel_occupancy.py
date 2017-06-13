@@ -9,7 +9,7 @@ from porestat.plots.plotconfig import PlotConfig
 from ..utils.Utils import mergeDicts
 from ..utils.Stats import calcN50
 
-from .ParallelPTTInterface import ParallelPSTInterface
+from .ParallelPTTInterface import ParallelPSTReportableInterface
 from .PTToolInterface import PSToolInterfaceFactory, PSToolException
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
@@ -41,12 +41,13 @@ class ChannelOccupancyFactory(PSToolInterfaceFactory):
 
     def _prepObj(self, args):
         simArgs = self._makeArguments(args)
+        simArgs.pltcfg = PlotConfig.fromParserArgs(simArgs)
 
         return ChannelOccupancy(simArgs)
 
 
 
-class ChannelOccupancy(ParallelPSTInterface):
+class ChannelOccupancy(ParallelPSTReportableInterface):
 
     def __init__(self, args):
         super(ChannelOccupancy, self).__init__(args)
@@ -69,50 +70,37 @@ class ChannelOccupancy(ParallelPSTInterface):
     def prepareInputs(self, args):
         return self.manage_folders_reads(args)
 
-    def execParallel(self, data, environment):
+    def handleEntity(self, fileObj, localEnv, globalEnv):
 
-        dataByRunID = {}
+        runid = fileObj.runID()
 
-        f5folder = Fast5Directory(data)
 
-        iFilesInFolder = 0
+        if not runid in localEnv:
+            localEnv[runid] = self._makePropDict()
 
-        for file in f5folder.collect():
+        propDict = localEnv[runid]
+        propDict['READ_COUNT'] += 1
+        propDict['USER_RUN_NAME'].add(fileObj.user_filename_input())
 
-            runid = file.runID()
+        channelID = fileObj.channelID()
+        channelDict = propDict['CHANNELS']
+        timeOfCreation = fileObj.readCreateTime() - fileObj.getExperimentStartTime()
 
-            iFilesInFolder += 1
+        fastq = fileObj.getFastQ()
 
-            if not runid in dataByRunID:
-                dataByRunID[runid] = self._makePropDict()
+        readLength = 0
+        if fastq != None:
+            readLength = len(fastq)
 
-            propDict = dataByRunID[runid]
-            propDict['READ_COUNT'] += 1
-            propDict['USER_RUN_NAME'].add(file.user_filename_input())
+        readType = str(fileObj.type)
 
-            channelID = file.channelID()
-            channelDict = propDict['CHANNELS']
-            timeOfCreation = file.readCreateTime() - file.getExperimentStartTime()
+        if globalEnv.read_type != None and not readType in globalEnv.read_type:
+            return localEnv
 
-            fastq = file.getFastQ()
-
-            readLength = 0
-            if fastq != None:
-                readLength = len(fastq)
-
-            readType = str(file.type)
-
-            if environment.read_type != None and not readType in environment.read_type:
-                continue
-
-            if channelID in channelDict:
-                channelDict[ channelID ].append((timeOfCreation, readLength))
-            else:
-                channelDict[channelID] = [(timeOfCreation, readLength)]
-
-        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
-
-        return dataByRunID
+        if channelID in channelDict:
+            channelDict[channelID].append((timeOfCreation, readLength))
+        else:
+            channelDict[channelID] = [(timeOfCreation, readLength)]
 
     def joinParallel(self, existResult, newResult, oEnvironment):
 
@@ -125,7 +113,7 @@ class ChannelOccupancy(ParallelPSTInterface):
 
     def prepareEnvironment(self, args):
 
-        return args;
+        return args
 
 
     def makeResults(self, parallelResult, oEnvironment, args):
@@ -160,7 +148,7 @@ class ChannelOccupancy(ParallelPSTInterface):
                 'CHANNELS': props['CHANNELS']
             }
 
-            key = ",".join(run_user_name) if args.groupByRunName else runid
+            key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
 
             if key in allobservations:
                 allobservations[key] = mergeDicts(allobservations[key], observations)
@@ -179,8 +167,9 @@ class ChannelOccupancy(ParallelPSTInterface):
 
             print("\t".join(allobs))
 
+        printTsv = self.hasArgument('tsv', args) and args.tsv
 
-        if args.tsv:
+        if printTsv:
             # print header
 
             vChannels = [ x for x in range(1, self.channelCount+1) ]
@@ -188,12 +177,12 @@ class ChannelOccupancy(ParallelPSTInterface):
 
         for runid in sortedruns:
 
-            if args.tsv:
+            if printTsv:
                 self.printChannelHistogram(args.tsv, runid, vChannels, allobservations[runid]['CHANNELS'])
             else:
-                self.makePlot(runid, allobservations[runid]['CHANNELS'])
+                self.makePlot(runid, allobservations[runid]['CHANNELS'], args)
 
-        if args.tsv:
+        if printTsv:
             args.tsv.flush()
             args.tsv.close()
 
@@ -217,11 +206,11 @@ class ChannelOccupancy(ParallelPSTInterface):
         file.write("\t".join(channelVec) + "\n")
 
 
-    def makePlot(self, runKey, channelDict):
+    def makePlot(self, runKey, channelDict, args):
 
         channel2rl = {}
 
         for channelID in channelDict:
             channel2rl[channelID] = [x[1] for x in channelDict[channelID]]
 
-        PorePlot.plotLoadOut(channel2rl, runKey)
+        PorePlot.plotLoadOut(channel2rl, runKey, pltcfg=args.pltcfg)

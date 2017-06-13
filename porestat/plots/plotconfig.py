@@ -66,6 +66,8 @@ class PlotConfig:
         self.style = PlotStyle.DEFAULT
         self.transparent_bg = True
 
+        self.createdPlots = []
+
     def saveToFile(self, filePath):
 
         self.save_to_file = True
@@ -85,6 +87,12 @@ class PlotConfig:
         else:
             plt.style.use( self.style.value )
 
+    def getCreatedPlots(self):
+
+        return self.createdPlots
+
+    def resetCreatedPlots(self):
+        self.createdPlots = []
 
     def makePlot(self):
 
@@ -94,7 +102,11 @@ class PlotConfig:
 
             exactFilename = self.save_file % self.saved_plot
 
+            self.saved_plot += 1
+
             plt.savefig( exactFilename, transparent=self.transparent_bg, bbox_inches='tight')
+
+            self.createdPlots.append(exactFilename)
         else:
 
             plt.show()

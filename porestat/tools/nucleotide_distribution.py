@@ -1,6 +1,6 @@
 from porestat.plots.plotconfig import PlotConfig
 
-from .ParallelPTTInterface import ParallelPSTInterface
+from .ParallelPTTInterface import ParallelPSTReportableInterface
 from .PTToolInterface import PSToolInterfaceFactory
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
@@ -29,7 +29,7 @@ class NucleotideDistributionFactory(PSToolInterfaceFactory):
 
         return NucleotideDistribution(simArgs)
 
-class NucleotideDistribution(ParallelPSTInterface):
+class NucleotideDistribution(ParallelPSTReportableInterface):
 
     def __init__(self, args):
 
@@ -53,38 +53,25 @@ class NucleotideDistribution(ParallelPSTInterface):
     def prepareInputs(self, args):
         return self.manage_folders_reads(args)
 
-    def execParallel(self, data, environment):
+    def handleEntity(self, fileObj, localEnv, globalEnv):
 
-        counterRunID = {}
+        runid = fileObj.runID()
 
-        f5folder = Fast5Directory(data)
+        if not runid in localEnv:
+            localEnv[runid] = self._makePropDict()
 
-        iFilesInFolder = 0
+        propDict = localEnv[runid]
+        propDict['READ_COUNT'] += 1
+        propDict['USER_RUN_NAME'].add(fileObj.user_filename_input())
 
-        for file in f5folder.collect():
+        fastq = fileObj.getFastQ()
 
-            runid = file.runID()
+        if fastq != None:
 
-            iFilesInFolder += 1
+            for x in fastq.seq:
+                propDict['NUCS'][x] += 1
 
-            if not runid in counterRunID:
-                counterRunID[runid] = self._makePropDict()
-
-            propDict = counterRunID[runid]
-            propDict['READ_COUNT'] += 1
-            propDict['USER_RUN_NAME'].add( file.user_filename_input() )
-
-            fastq = file.getFastQ()
-
-            if fastq != None:
-
-                for x in fastq.seq:
-                    propDict['NUCS'][x] += 1
-
-
-        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
-
-        return counterRunID
+        return localEnv
 
 
     def joinParallel(self, existResult, newResult, oEnvironment):

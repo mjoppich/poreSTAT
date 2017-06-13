@@ -63,6 +63,10 @@ class PSToolInterface:
 
         return newArgs
 
+    def hasArgument( self, argName, args ):
+
+        return argName in args.__dict__
+
     def manage_folders_reads(self, args):
 
         if (args.folders == None and args.reads == None):

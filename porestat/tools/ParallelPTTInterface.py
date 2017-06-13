@@ -1,7 +1,9 @@
+from porestat.hdf5tool import Fast5Directory
 from .PTToolInterface import PSToolInterface
 from ..utils.Parallel import MapReduce
 from porestat.utils import eprint
 import time
+
 
 class ParallelPSTInterface(PSToolInterface):
 
@@ -58,3 +60,31 @@ class ParallelPSTInterface(PSToolInterface):
 
         if type(outFile) != str:
             outFile.close()
+
+
+class ParallelPSTReportableInterface(ParallelPSTInterface):
+
+    def __init__(self, args):
+
+        super(ParallelPSTReportableInterface, self).__init__(args)
+
+    def _createLocalEnvironment(self):
+        return {}
+
+    def handleEntity(self, fileObj, localEnv, globalEnv):
+        pass
+
+    def execParallel(self, data, environment):
+        iFilesInFolder = 0
+
+        localEnv = self._createLocalEnvironment()
+
+        f5folder = Fast5Directory(data)
+
+        for file in f5folder.collect():
+            localEnv = self.handleEntity(file, localEnv, environment)
+            iFilesInFolder += 1
+
+        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
+
+        return localEnv

@@ -1,6 +1,6 @@
 from porestat.plots.plotconfig import PlotConfig
 
-from .ParallelPTTInterface import ParallelPSTInterface
+from .ParallelPTTInterface import ParallelPSTReportableInterface
 from .PTToolInterface import PSToolInterfaceFactory
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
@@ -21,7 +21,7 @@ class QualityPositionFactory(PSToolInterfaceFactory):
         parser = subparsers.add_parser('qual_pos', help='expls help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser.add_argument('-p', '--plot', '--out', nargs='?', action='store', type=argparse.FileType('w'), default=None)
+        parser.add_argument('-p', '--no-plot', nargs='?', action='store_true', default=False)
         parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
         parser = PlotConfig.addParserArgs(parser)
 
@@ -31,10 +31,11 @@ class QualityPositionFactory(PSToolInterfaceFactory):
 
     def _prepObj(self, args):
         simArgs = self._makeArguments(args)
+        simArgs.pltcfg = PlotConfig.fromParserArgs(simArgs)
 
         return QualityPosition(simArgs)
 
-class QualityPosition(ParallelPSTInterface):
+class QualityPosition(ParallelPSTReportableInterface):
 
     def __init__(self, args):
 
@@ -54,52 +55,37 @@ class QualityPosition(ParallelPSTInterface):
     def prepareInputs(self, args):
         return self.manage_folders_reads(args)
 
-    def execParallel(self, data, environment):
+    def handleEntity(self, fileObj, localEnv, globalEnv):
 
-        counterRunID = {}
+        runid = fileObj.runID()
 
-        f5folder = Fast5Directory(data)
+        if not runid in localEnv:
+            localEnv[runid] = self._makePropDict()
 
-        iFilesInFolder = 0
+        propDict = localEnv[runid]
+        propDict['READ_COUNT'] += 1
+        propDict['USER_RUN_NAME'].add(fileObj.user_filename_input())
 
-        print("Folder started: " + f5folder.path)
+        fastq = fileObj.getFastQ()
 
-        for file in f5folder.collect():
+        if fastq != None:
 
-            runid = file.runID()
+            qualDict = propDict['QUALS']
 
-            iFilesInFolder += 1
+            for i in range(0, len(fastq.qual)):
 
-            if not runid in counterRunID:
-                counterRunID[runid] = self._makePropDict()
+                found_qual = fastq.qual[i]
 
-            propDict = counterRunID[runid]
-            propDict['READ_COUNT'] += 1
-            propDict['USER_RUN_NAME'].add( file.user_filename_input() )
+                if not i in qualDict:
+                    qualDict[i] = Counter()
 
-            fastq = file.getFastQ()
+                qualDict[i][found_qual] += 1
 
-            if fastq != None:
+                propDict['QUAL_SIMPLE'][found_qual] += 1
 
-                qualDict = propDict['QUALS']
+            propDict['QUALS'] = qualDict
 
-                for i in range(0, len(fastq.qual)):
-
-                    found_qual = fastq.qual[i]
-
-                    if not i in qualDict:
-                        qualDict[i] = Counter()
-
-                    qualDict[i][ found_qual] += 1
-
-                    propDict['QUAL_SIMPLE'][found_qual] += 1
-
-                propDict['QUALS'] = qualDict
-
-
-        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
-
-        return counterRunID
+        return localEnv
 
 
     def joinParallel(self, existResult, newResult, oEnvironment):
@@ -180,15 +166,13 @@ class QualityPosition(ParallelPSTInterface):
 
             # make plot for runid
 
-            # pos -> qual -> count
-            qualCounter = observations['QUALPOS']
-
-            self.plotQualCounter(qualCounter)
-
-
+            if self.hasArgument('no_plot', args) and args.no_plot == False:
+                # pos -> qual -> count
+                qualCounter = observations['QUALPOS']
+                self.plotQualCounter(qualCounter, args)
 
 
-    def plotQualCounter(self, qualCounter):
+    def plotQualCounter(self, qualCounter, args):
 
 
         foundLengths = set()
@@ -244,9 +228,7 @@ class QualityPosition(ParallelPSTInterface):
         ax.axes.get_yaxis().set_ticks([i for i in range(minQual, maxQual+1)])
         ax.axes.get_yaxis().set_ticklabels([str(chr(i)) for i in range(minQual, maxQual+1)])
 
-        plt.tight_layout()
-
-        plt.show()
+        args.pltcfg.makePlot()
 
 
 

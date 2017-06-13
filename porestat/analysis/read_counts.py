@@ -1,5 +1,6 @@
 import argparse
 import HTSeq
+from porestat.plots.poreplot import PorePlot
 
 from porestat.plots.plotconfig import PlotConfig
 from ..utils.DataFrame import DataFrame
@@ -27,6 +28,7 @@ class ReadCountAnalysisFactory(PSToolInterfaceFactory):
         parser.add_argument('-s', '--sam', nargs='+', type=str, required=True, help='alignment files')
         parser.add_argument('-g', '--gff', type=argparse.FileType("r"), required=True, help='gene annotation')
         parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
+        parser.add_argument('--plot', dest='plot', action='store_true', default=False)
 
         def fileOpener( filename ):
 
@@ -45,7 +47,7 @@ class ReadCountAnalysisFactory(PSToolInterfaceFactory):
     def _prepObj(self, args):
 
         simArgs = self._makeArguments(args)
-        simArgs.plotConfig = PlotConfig.fromParserArgs(simArgs)
+        simArgs.pltcfg = PlotConfig.fromParserArgs(simArgs)
 
         return ReadCountAnalysis(simArgs)
 
@@ -219,16 +221,27 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
         self.writeLinesToOutput(environment.output, allLines)
 
-        return None
+        return allRankedCovs
 
 
     def joinParallel(self, existResult, newResult, oEnvironment):
 
-        return None
+        if existResult == None:
+            existResult = []
+
+        return existResult + newResult
 
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        pass
+        if args.plot:
+
+            plotData = {}
+            plotData['coverage'] = [x[1] for x in parallelResult]
+
+            PorePlot.plotCumHistogram( plotData, [x for x in plotData], 'Coverage Plot', bins=len(parallelResult), pltcfg=args.pltcfg )
+
+
+
 
 

@@ -1,7 +1,7 @@
 from ..plots.poreplot import PorePlot
 from ..plots.plotconfig import PlotConfig
 
-from .ParallelPTTInterface import ParallelPSTInterface
+from .ParallelPTTInterface import ParallelPSTReportableInterface
 from .PTToolInterface import PSToolInterfaceFactory
 from ..utils.Stats import calcN50
 
@@ -22,8 +22,9 @@ class YieldPlotFactory(PSToolInterfaceFactory):
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-p', '--plot', nargs='?', type=bool, const=True, default=False, help='issue plot?', required=False)
         parser.add_argument('-u', '--user-run', dest='groupByRunName', action='store_true', default=False)
-        parser.add_argument('-q', '--read-type', dest='addTypeSubplot', action='store_true', default=False, help='add type subplots')
+        parser.add_argument('--no-read-type-subplot', dest='addTypeSubplot', action='store_false', default=True, help='do not add type subplots')
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
+        parser.add_argument('-rc', '--read-count', dest='read_count', action='store_true', default=False)
 
         parser = PlotConfig.addParserArgs(parser)
 
@@ -34,11 +35,11 @@ class YieldPlotFactory(PSToolInterfaceFactory):
     def _prepObj(self, args):
 
         simArgs = self._makeArguments(args)
-        simArgs.pltCfg = PlotConfig.fromParserArgs(simArgs)
+        simArgs.pltcfg = PlotConfig.fromParserArgs(simArgs)
 
         return YieldPlot(simArgs)
 
-class YieldPlot(ParallelPSTInterface):
+class YieldPlot(ParallelPSTReportableInterface):
 
     def __init__(self, args):
 
@@ -56,41 +57,27 @@ class YieldPlot(ParallelPSTInterface):
     def prepareInputs(self, args):
         return self.manage_folders_reads(args)
 
-    def execParallel(self, data, environment):
 
-        counterRunID = {}
+    def handleEntity(self, entity, localEnv, globalEnv):
+        runid = entity.runID()
 
-        f5folder = Fast5Directory(data)
+        if not runid in localEnv:
+            localEnv[runid] = self._makePropDict()
 
-        iFilesInFolder = 0
+        propDict = localEnv[runid]
+        propDict['READ_COUNT'] += 1
+        propDict['USER_RUN_NAME'].add(entity.user_filename_input())
 
-        for file in f5folder.collect():
+        fastq = entity.getFastQ()
 
-            runid = file.runID()
+        if fastq != None:
+            timeOfCreation = entity.readCreateTime() - entity.getExperimentStartTime()
+            readLength = len(fastq)
+            readType = entity.type
 
-            iFilesInFolder += 1
+            propDict['TIME_LENGTHS'].append((timeOfCreation, readLength, readType))
 
-            if not runid in counterRunID:
-                counterRunID[runid] = self._makePropDict()
-
-            propDict = counterRunID[runid]
-            propDict['READ_COUNT'] += 1
-            propDict['USER_RUN_NAME'].add( file.user_filename_input() )
-
-            fastq = file.getFastQ()
-
-            if fastq != None:
-
-                timeOfCreation = file.readCreateTime() - file.getExperimentStartTime()
-                readLength = len(fastq)
-                readType = file.type
-
-                propDict['TIME_LENGTHS'].append( (timeOfCreation, readLength, readType) )
-
-        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
-
-        return counterRunID
-
+        return localEnv
 
     def joinParallel(self, existResult, newResult, oEnvironment):
 
@@ -113,7 +100,11 @@ class YieldPlot(ParallelPSTInterface):
 
             run_user_name = props['USER_RUN_NAME']
             fileCount = props['READ_COUNT']
-            lengthObversations = [x[1] for x in props['TIME_LENGTHS']]
+
+            if self.hasArgument('read_count', args) and args.read_count:
+                lengthObversations = [1 for x in props['TIME_LENGTHS']] # sums number of reads up
+            else:
+                lengthObversations = [x[1] for x in props['TIME_LENGTHS']]
 
             (n50, l50) = calcN50(lengthObversations)
 
@@ -128,7 +119,7 @@ class YieldPlot(ParallelPSTInterface):
                 'TIME_LENGTHS': props['TIME_LENGTHS']
             }
 
-            key = ",".join(run_user_name) if args.groupByRunName else runid
+            key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
 
             if key in allobservations:
                 allobservations[key] = mergeDicts(allobservations[key], observations)
@@ -152,9 +143,6 @@ class YieldPlot(ParallelPSTInterface):
 
     def makePlot(self, data, args):
 
-        timeAndLength = []
-        labels = []
-
         timeLengthData = {}
 
         for runid in data:
@@ -174,7 +162,7 @@ class YieldPlot(ParallelPSTInterface):
             timeLengthData[runid] = cumLocTL
 
             # additional plots if wanted
-            if args.addTypeSubplot:
+            if not (self.hasArgument('no_read_type_subplot', args) and args.no_read_type_subplot):
 
                 cumLocTLbyType = {}
                 cumLByType = {}
@@ -205,6 +193,11 @@ class YieldPlot(ParallelPSTInterface):
 
                     timeLengthData[ label ] = cumLocTLbyType[dataType]
 
-        PorePlot.yieldPlot(timeLengthData, "Yield Plot", "Cumulative BP", "Time", pltcfg=args.pltCfg)
+        if self.hasArgument('read_count', args) and args.read_count:
+            yDescription = "Cumulative Read Count"
+        else:
+            yDescription = "Cumulative BP"
+
+        PorePlot.yieldPlot(timeLengthData, "Yield Plot", "Time since exp. start", yDescription, pltcfg=args.pltcfg)
 
 
