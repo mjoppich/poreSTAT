@@ -21,7 +21,7 @@ class QualityPositionFactory(PSToolInterfaceFactory):
         parser = subparsers.add_parser('qual_pos', help='expls help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser.add_argument('-p', '--no-plot', nargs='?', action='store_true', default=False)
+        parser.add_argument('-p', '--no-plot', action='store_true', default=False)
         parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
         parser = PlotConfig.addParserArgs(parser)
 

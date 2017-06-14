@@ -3,8 +3,9 @@ from collections import Counter
 from itertools import chain
 
 
-def mergeDicts( dict1, dict2):
-    dict3 = {}
+def mergeDicts( dict1, dict2, resultType=dict):
+    dict3 = resultType()
+
     for k, v in chain(dict1.items(), dict2.items()):
 
         if k in dict3:

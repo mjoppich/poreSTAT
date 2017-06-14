@@ -1,6 +1,9 @@
 import argparse
+from collections import OrderedDict
 
-from .ParallelPTTInterface import ParallelPSTInterface
+from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
+
+from .ParallelPTTInterface import ParallelPSTReportableInterface
 from .PTToolInterface import PSToolInterfaceFactory,PSToolException
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
@@ -21,6 +24,9 @@ class ExperimentLsFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
 
+        parser.add_argument('-x', '--xlsx', type=str, default=None, help='Save output to excel file (xlsx)')
+
+
         parser.set_defaults(func=self._prepObj)
 
         return parser
@@ -33,23 +39,15 @@ class ExperimentLsFactory(PSToolInterfaceFactory):
 
 
 
-class ExperimentLs(ParallelPSTInterface):
+class ExperimentLs(ParallelPSTReportableInterface):
 
     def __init__(self, args):
 
         super(ExperimentLs, self).__init__(args)
 
-        self.fileType2Str = {
+        self.fileTypes = OrderedDict([(x, x.value) for x in Fast5TYPE])
 
-            Fast5TYPE.BASECALL_2D: 'BASECALL_2D',
-            Fast5TYPE.BASECALL_1D_COMPL: 'BASECALL_1D_COMPL',
-            Fast5TYPE.BASECALL_1D: 'BASECALL_1D',
-            Fast5TYPE.BASECALL_RNN_1D: 'BASECALL_RNN_1D',
-            Fast5TYPE.PRE_BASECALL: 'PRE_BASECALL',
-            Fast5TYPE.UNKNOWN: 'UNKNOWN'
-         }
-
-        self.str2fileType = {self.fileType2Str[x]: x for x in self.fileType2Str}
+        #self.str2fileType = {self.fileType2Str[x]: x for x in self.fileType2Str}
 
     def _makePropDict(self):
 
@@ -57,7 +55,7 @@ class ExperimentLs(ParallelPSTInterface):
 
         props['TYPE'] = {}
 
-        for ftype in self.fileType2Str:
+        for ftype in self.fileTypes:
             props['TYPE'][ftype] = []
 
         props['NAMES'] = {}
@@ -68,40 +66,28 @@ class ExperimentLs(ParallelPSTInterface):
     def prepareInputs(self, args):
         return self.manage_folders_reads(args)
 
-    def execParallel(self, data, environment):
+    def handleEntity(self, fileObj, localEnv, globalEnv):
 
-        counterRunID = {}
+        runid = fileObj.runID()
 
-        f5folder = Fast5Directory(data)
+        if not runid in localEnv:
+            localEnv[runid] = self._makePropDict()
 
-        iFilesInFolder = 0
+        propDict = localEnv[runid]
 
-        for file in f5folder.collect():
+        propDict['NAMES']['USER_RUN_NAME'].add(fileObj.user_filename_input());
 
-            runid = file.runID()
+        fastq = fileObj.getFastQ()
 
-            iFilesInFolder += 1
+        # if file.type == Fast5TYPE.UNKNOWN:
+        #    osignal = file._get_signal()
 
-            if not runid in counterRunID:
-                counterRunID[runid] = self._makePropDict()
+        if fastq == None:
+            propDict['TYPE'][fileObj.type].append(0)
+        else:
+            propDict['TYPE'][fileObj.type].append(len(fastq))
 
-            propDict = counterRunID[runid]
-
-            propDict['NAMES']['USER_RUN_NAME'].add(file.user_filename_input());
-
-            fastq = file.getFastQ()
-
-            # if file.type == Fast5TYPE.UNKNOWN:
-            #    osignal = file._get_signal()
-
-            if fastq == None:
-                propDict['TYPE'][file.type].append(0)
-            else:
-                propDict['TYPE'][file.type].append(len(fastq))
-
-        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
-
-        return counterRunID
+        return localEnv
 
 
     def joinParallel(self, existResult, newResult, oEnvironment):
@@ -115,9 +101,6 @@ class ExperimentLs(ParallelPSTInterface):
 
 
     def makeResults(self, parallelResult, oEnvironment, args):
-
-        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'AVG_LENGTH', 'N50', 'BASECALL_2D', 'BASECALL_1D_COMPL',
-                            'BASECALL_1D', 'BASECALL_RNN_1D', 'PRE_BASECALL', 'UNKNOWN']
 
         if parallelResult == None:
             raise PSToolException("No Files collected")
@@ -141,34 +124,42 @@ class ExperimentLs(ParallelPSTInterface):
             (n50, l50) = calcN50(allLengths)
             run_user_name = parallelResult[runid]['NAMES']['USER_RUN_NAME']
 
-            observations = {
-
-                'RUNID': runid,
-                'USER_RUN_NAME': ",".join(run_user_name),
-                'FILES': fileCount,
-                'AVG_LENGTH': avgLength,
-                'N50': n50,
-                'BASECALL_2D': countByType[self.str2fileType['BASECALL_2D']],
-                'BASECALL_1D_COMPL': countByType[self.str2fileType['BASECALL_1D_COMPL']],
-                'BASECALL_1D': countByType[self.str2fileType['BASECALL_1D']],
-                'BASECALL_RNN_1D': countByType[self.str2fileType['BASECALL_RNN_1D']],
-                'PRE_BASECALL': countByType[self.str2fileType['PRE_BASECALL']],
-                'UNKNOWN': countByType[self.str2fileType['UNKNOWN']]
-            }
+            observations = OrderedDict([
+                ('RUNID', runid),
+                ('USER_RUN_NAME', ",".join(run_user_name)),
+                ('FILES', fileCount),
+                ('AVG_LENGTH', avgLength),
+                ('N50', n50),
+            ])
+            observations = mergeDicts(observations, OrderedDict( [ (s, countByType[ t ]) for (t, s) in self.fileTypes.items() ] ), OrderedDict)
 
             allobservations[runid] = observations
 
 
-        sortedruns = sorted([x for x in allobservations])
+        if len(allobservations) > 0:
 
-        print("\t".join(makeObservations))
+            exobs = list(allobservations.items())[0][1]
+            headerNames = [x for x in exobs]
 
-        for runid in sortedruns:
+            sortedruns = sorted([x for x in allobservations])
 
-            allobs = []
-            for x in makeObservations:
-                allobs.append(str(allobservations[runid][x]))
+            print("\t".join(headerNames))
 
-            print("\t".join(allobs))
+            for runid in sortedruns:
 
+                allobs = []
+                for x in allobservations[runid]:
+                    allobs.append(str(allobservations[runid][x]))
+
+                print("\t".join(allobs))
+
+            if args.xlsx:
+                outFrame = DataFrame()
+                outFrame.addColumns(headerNames)
+
+                for runid in sortedruns:
+                    row = DataRow.fromDict( allobservations[runid] )
+                    outFrame.addRow( row )
+
+                outFrame.export(args.xlsx, ExportTYPE.XLSX)
 

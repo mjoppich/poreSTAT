@@ -1,3 +1,6 @@
+from enum import Enum
+from openpyxl import Workbook
+
 __author__ = 'joppich'
 
 from .Files import readLines, fileExists
@@ -46,6 +49,25 @@ class DataRow:
 
             return self.elements[ self.dHeader[item] ]
 
+    @classmethod
+    def fromDict(cls, dictionary):
+
+        allitems = list(dictionary.items())
+
+        dHeader = {}
+        velements = []
+
+        for i in range(0, len(allitems)):
+            dHeader[ allitems[i][0] ] = i
+            velements.append(allitems[i][1])
+
+        return DataRow(tuple(velements), dHeader)
+
+
+class ExportTYPE(Enum):
+    CSV=0,
+    TSV=1,
+    XLSX=1
 
 class DataFrame:
     def __init__(self, oDefaultEmptyValue=None):
@@ -240,6 +262,23 @@ class DataFrame:
         for i in range(0, len(self.vElements)):
             self.vElements[i, iColumnIndex] = vNewValues[i]
 
+    def addRow(self, row):
+
+        if not (type(row) == DataRow):
+            raise DataFrameException( 'Trying to insert invalid row type: ' + str(type(row)))
+
+        rowheaders = set([x for x in row.dHeader])
+        selfheaders = set([x for x in self.dHeader])
+        setDifference = rowheaders.difference(selfheaders)
+
+        if len(setDifference) > 0:
+            raise DataFrameException( 'Row does not contain all needed headers: ' + str(selfheaders))
+
+        newrow = [None] * len(self.dHeader)
+        for x in self.dHeader:
+            newrow[ self.dHeader[x] ] = row[x]
+
+        self.vElements.append(tuple(newrow))
 
     def getRow(self, oColumn, oValue, oDefaultValue = None):
 
@@ -302,6 +341,53 @@ class DataFrame:
             sStr += "\t".join([str(x) for x in oLine])
 
         return sStr
+
+    def _makeStr(self, sep='\t'):
+
+        sortedHeader = sorted(self.dHeader.items(), key=operator.itemgetter(1))
+
+        vHeader = [str(x[0]) for x in sortedHeader]
+
+        sStr = sep.join(vHeader)
+
+        for oLine in self.vElements:
+            sStr += "\n"
+            sStr += sep.join([str(x) for x in oLine])
+
+    def _writeToFile(self, content, filename):
+
+        with open(filename, 'w') as file:
+            file.write(content)
+
+    def _makeXLSX(self, outFile):
+        wb = Workbook()
+        # grab the active worksheet
+        ws = wb.active
+
+        # Data can be assigned directly to cells
+        sortedHeader = sorted(self.dHeader.items(), key=operator.itemgetter(1))
+        vHeader = [str(x[0]) for x in sortedHeader]
+
+        ws.append(vHeader)
+
+        for oLine in self.vElements:
+            ws.append([str(x) for x in oLine])
+
+        # Save the file
+        wb.save( outFile )
+
+
+    def export(self, outFile, type=ExportTYPE.TSV):
+
+        if type == ExportTYPE.TSV:
+            self._writeToFile(outFile, self._makeStr('\t'))
+        elif type == ExportTYPE.CSV:
+            self._writeToFile(outFile, self._makeStr(';'))
+        elif type == ExportTYPE.XLSX:
+            self._makeXLSX(outFile)
+        else:
+            raise DataFrameException('Invalid export type: ' + str(type))
+
 
     @classmethod
     def createHeader(cls, oHeaderFrom, cDelim):

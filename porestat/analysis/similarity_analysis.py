@@ -25,21 +25,16 @@ class SimilarityAnalysisFactory(PSToolInterfaceFactory):
     def _addParser(self, subparsers):
 
         parser = subparsers.add_parser('counts', help='expls help')
-        parser.add_argument('-s', '--sam', nargs='+', type=str, required=True, help='alignment files')
-        parser.add_argument('-g', '--gff', type=argparse.FileType("r"), required=True, help='gene annotation')
         parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
         parser.add_argument('--no-plot', dest='plot', action='store_true', default=False)
 
         def fileOpener( filename ):
-
             open(filename, 'w').close()
-
             return filename
 
         parser.add_argument('-o', '--output', type=fileOpener, help='output location, default: std out', default=sys.stdout)
 
         parser = PlotConfig.addParserArgs(parser)
-
         parser.set_defaults(func=self._prepObj)
 
         return parser
@@ -58,18 +53,11 @@ class SimilarityAnalysis(ParallelPSTInterface):
     def __init__(self, args):
 
         super(SimilarityAnalysis, self).__init__(args)
-
         self.readInfo = None
-        self.genomeAnnotation = None
 
     def _makePropDict(self):
 
-        props = {}
-
-        props['COUNTS'] = {}
-        props['COUNTS']['ALL'] = 0
-
-        return props
+        return None
 
     def readGenomeAnnotation(self, args):
 

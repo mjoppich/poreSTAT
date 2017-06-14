@@ -31,7 +31,7 @@ class ChannelOccupancyFactory(PSToolInterfaceFactory):
         parser.add_argument('-u', '--user_run', dest='groupByRunName', action='store_true', default=False)
         parser.add_argument('-t', '--tsv', nargs='?', action='store', type=argparse.FileType('w'), const=sys.stdout, default=None)
 
-        parser.add_argument('-q', '--read_type', nargs='+', type=str, choices=[x for x in Fast5TYPE.str2type], help='read types ('+ ",".join([x for x in Fast5TYPE.str2type]) +')')
+        parser.add_argument('-q', '--read_type', nargs='+', type=str, choices=[x.value for x in Fast5TYPE], help='read types ('+ ",".join([x.value for x in Fast5TYPE]) +')')
 
         parser = PlotConfig.addParserArgs(parser)
 

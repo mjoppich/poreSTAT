@@ -1,3 +1,4 @@
+import argparse
 import sys
 import os
 import glob
@@ -20,32 +21,50 @@ class classproperty(object):
     def __get__(self, owner_self, owner_cls):
         return self.fget(owner_cls)
 
-class Fast5TYPE(Enum):
-    PRE_BASECALL = 4,
-    BASECALL_RNN_1D = 3,
-    BASECALL_1D = 2,
-    BASECALL_1D_COMPL = 1,
-    BASECALL_2D = 0,
 
-    UNKNOWN = -1
-    BARCODING = -2
+class Fast5TYPEAction(argparse.Action):
+    def __call__(self, parser, args, values, option_string=None):
+
+        try:
+            eVal = Fast5TYPE[values]
+
+            self.style = eVal
+            args.__dict__[ self.dest ] = self.style
+
+        except:
+
+            raise argparse.ArgumentError(None, 'PlotStyle can not be {n}, '
+                                               'it must be one of {m}'.format(n=values,
+                                                                              m=', '.join([str(x.value) for x in Fast5TYPE])))
+
+    def __repr__(self):
+        return self.style
+
+class Fast5TYPE(Enum):
+    PRE_BASECALL = 'PRE_BASECALL'
+    BASECALL_RNN_1D = 'BASECALL_RNN_1D'
+    BASECALL_1D = 'BASECALL_1D'
+    BASECALL_1D_COMPL = 'BASECALL_1D_COMPL'
+    BASECALL_2D = 'BASECALL_2D'
+    BARCODING = 'BARCODING'
+    UNKNOWN = 'UNKNOWN'
 
     def __str__(self):
         return self.name
 
-    @classproperty
-    def type2str(cls):
-        """
-        :return :dictionary of type to str for fast5 read types
-        """
-        return {x: x.name for x in list(cls)}
-
-    @classproperty
-    def str2type(cls):
-        """
-        :return : dictionary of str to type for fast5 read types
-        """
-        return {x.name: x for x in list(cls)}
+    # @classproperty
+    # def type2str(cls):
+    #     """
+    #     :return :dictionary of type to str for fast5 read types
+    #     """
+    #     return {x: x.name for x in list(cls)}
+    #
+    # @classproperty
+    # def str2type(cls):
+    #     """
+    #     :return : dictionary of str to type for fast5 read types
+    #     """
+    #     return {x.name: x for x in list(cls)}
 
 class Fast5FileException(Exception):
     pass

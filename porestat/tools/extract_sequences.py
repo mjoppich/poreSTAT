@@ -25,7 +25,7 @@ class ExtractSequencesFactory(PSToolInterfaceFactory):
         parser.add_argument('-e', '--experiments', nargs='+', type=str, help='run ids of experiments to be extracted. if --user_run, give user_run_name s', required=False)
         parser.add_argument('-o', '--out', action='store', type=argparse.FileType('w'), default=sys.stdout)
 
-        parser.add_argument('-q', '--read_type', nargs='+', type=str, choices=[x for x in Fast5TYPE.str2type], help='read types ('+ ",".join([x for x in Fast5TYPE.str2type]) +')')
+        parser.add_argument('-q', '--read_type', nargs='+', type=str, choices=[x.value for x in Fast5TYPE], help='read types ('+ ",".join([x.value for x in Fast5TYPE]) +')')
 
         parser.set_defaults(func=self._prepObj)
 

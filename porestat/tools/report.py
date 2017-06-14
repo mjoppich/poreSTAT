@@ -35,7 +35,7 @@ class ReportFactory(PSToolInterfaceFactory):
         parser.add_argument('-n', '--output-name', type=str, help='output name', required=False)
 
         parser.add_argument('--no-read-type-subplot', dest='addTypeSubplot', action='store_false', default=True, help='do not add type subplots')
-        parser.add_argument('-q', '--read-type', nargs='+', type=str, choices=[x for x in Fast5TYPE.str2type], help='read types ('+ ",".join([x for x in Fast5TYPE.str2type]) +')')
+        parser.add_argument('-q', '--read-type', nargs='+', type=str, choices=[x.value for x in Fast5TYPE], help='read types ('+ ",".join([x.value for x in Fast5TYPE]) +')')
         parser.add_argument('-u', '--user-run', dest='groupByRunName', action='store_true', default=False)
 
 
