@@ -1,8 +1,7 @@
 from collections import defaultdict
 
-from porestat.plots.plotconfig import PlotConfig
-
-from porestat.plots.poreplot import PorePlot
+from ..plots.plotconfig import PlotConfig
+from ..plots.poreplot import PorePlot
 
 from .ParallelPTTInterface import ParallelPSTReportableInterface
 from .PTToolInterface import PSToolInterfaceFactory

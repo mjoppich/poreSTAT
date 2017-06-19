@@ -4,7 +4,7 @@ from .PTToolInterface import PSToolInterfaceFactory, PSToolException
 from ..hdf5tool.Fast5File import Fast5Directory, Fast5TYPE
 import argparse
 import sys, os
-from porestat.utils import eprint
+from ..utils.Files import eprint
 
 
 class ExtractSequencesFactory(PSToolInterfaceFactory):
@@ -25,7 +25,7 @@ class ExtractSequencesFactory(PSToolInterfaceFactory):
         parser.add_argument('-e', '--experiments', nargs='+', type=str, help='run ids of experiments to be extracted. if --user_run, give user_run_name s', required=False)
         parser.add_argument('-o', '--out', action='store', type=argparse.FileType('w'), default=sys.stdout)
 
-        parser.add_argument('-q', '--read_type', nargs='+', type=str, choices=[x.value for x in Fast5TYPE], help='read types ('+ ",".join([x.value for x in Fast5TYPE]) +')')
+        parser.add_argument('-q', '--read-type', nargs='+', dest='read_type', action=Fast5TYPEAction, default=None)
 
         parser.set_defaults(func=self._prepObj)
 

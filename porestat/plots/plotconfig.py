@@ -18,7 +18,7 @@ class PlotStyleAction(argparse.Action):
             eVal = PlotStyle[values]
 
             self.style = eVal
-            args.__dict__['plot_style'] = self.style
+            args.__dict__[ self.dest ] = self.style
 
         except:
 
@@ -52,7 +52,7 @@ class PlotConfig:
         def toPlotStyle(input):
             return PlotStyle[input]
 
-        parser.add_argument('-sp', '--save-plot', type=str, help='path-prefix to file where plots are saved. pltnum+ext are appended to name')
+        parser.add_argument('-sp', '--save-plot', type=str, help='path-prefix to file where plots are saved. Final file will be save-plot.xxx.png')
         parser.add_argument('-ps', '--plot-style', action=PlotStyleAction)
 
         return parser

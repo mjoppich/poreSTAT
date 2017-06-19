@@ -199,5 +199,3 @@ class YieldPlot(ParallelPSTReportableInterface):
             yDescription = "Cumulative BP"
 
         PorePlot.yieldPlot(timeLengthData, "Yield Plot", "Time since exp. start", yDescription, pltcfg=args.pltcfg)
-
-

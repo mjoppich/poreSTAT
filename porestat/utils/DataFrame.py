@@ -6,6 +6,8 @@ __author__ = 'joppich'
 from .Files import readLines, fileExists
 from .Numbers import toNumber, isNumber
 
+import argparse
+
 import operator
 from copy import deepcopy
 
@@ -63,11 +65,29 @@ class DataRow:
 
         return DataRow(tuple(velements), dHeader)
 
+class ExportTYPEAction(argparse.Action):
+    def __call__(self, parser, args, values, option_string=None):
+
+        try:
+            eVal = ExportTYPE[values]
+
+            self.style = eVal
+            args.__dict__[ self.dest ] = self.style
+
+        except:
+
+            raise argparse.ArgumentError(None, 'ExportTYPE can not be {n}, '
+                                               'it must be one of {m}'.format(n=values,
+                                                                              m=', '.join([str(x.value) for x in ExporTYPE])))
+
+    def __repr__(self):
+        return self.style
 
 class ExportTYPE(Enum):
-    CSV=0,
-    TSV=1,
-    XLSX=1
+    CSV=0
+    TSV=1
+    XLSX=2
+
 
 class DataFrame:
     def __init__(self, oDefaultEmptyValue=None):
@@ -377,14 +397,16 @@ class DataFrame:
         wb.save( outFile )
 
 
-    def export(self, outFile, type=ExportTYPE.TSV):
+    def export(self, outFile, exType=ExportTYPE.TSV):
 
-        if type == ExportTYPE.TSV:
+        if exType == ExportTYPE.TSV:
             self._writeToFile(outFile, self._makeStr('\t'))
-        elif type == ExportTYPE.CSV:
+        elif exType == ExportTYPE.CSV:
             self._writeToFile(outFile, self._makeStr(';'))
-        elif type == ExportTYPE.XLSX:
+        elif exType == ExportTYPE.XLSX:
             self._makeXLSX(outFile)
+        elif exType == None:
+            print(self._makeStr('\t'))
         else:
             raise DataFrameException('Invalid export type: ' + str(type))
 

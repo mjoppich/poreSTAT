@@ -4,7 +4,7 @@ import os
 import sys
 
 from numpy import genfromtxt
-from porestat.plots.plotconfig import PlotConfig
+from ..plots.plotconfig import PlotConfig
 
 from ..utils.Utils import mergeDicts
 from ..utils.Stats import calcN50
@@ -12,8 +12,9 @@ from ..utils.Stats import calcN50
 from .ParallelPTTInterface import ParallelPSTReportableInterface
 from .PTToolInterface import PSToolInterfaceFactory, PSToolException
 
-from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
+from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE, Fast5TYPEAction
 from ..plots.poreplot import PorePlot
+from ..utils.DataFrame import DataFrame, ExportTYPEAction, ExportTYPE
 
 class ChannelOccupancyFactory(PSToolInterfaceFactory):
 
@@ -29,9 +30,11 @@ class ChannelOccupancyFactory(PSToolInterfaceFactory):
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-e', '--experiments', nargs='+', type=str, help='experiments to list')
         parser.add_argument('-u', '--user_run', dest='groupByRunName', action='store_true', default=False)
-        parser.add_argument('-t', '--tsv', nargs='?', action='store', type=argparse.FileType('w'), const=sys.stdout, default=None)
+        
+        parser.add_argument('-o', '--output', nargs='?', type=str, default=None, const=None)
+        parser.add_argument('-ot', '--output-type', nargs='?', action=ExportTYPEAction, defualt=ExportTYPE.CSV)
 
-        parser.add_argument('-q', '--read_type', nargs='+', type=str, choices=[x.value for x in Fast5TYPE], help='read types ('+ ",".join([x.value for x in Fast5TYPE]) +')')
+        parser.add_argument('-q', '--read-type', dest='read_type', action=Fast5TYPEAction)
 
         parser = PlotConfig.addParserArgs(parser)
 
@@ -157,6 +160,16 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
 
         sortedruns = sorted([x for x in allobservations])
 
+        self.printStats(makeObservations, allobservations)
+
+        for runid in sortedruns:
+            self.makePlot(runid, allobservations[runid]['CHANNELS'], args)
+
+        self.printChannelHistogram(args, vChannels, allobservations[runid]['CHANNELS'])
+
+
+
+    def printStats(self, makeObservations, allobservations):
         print("\t".join(makeObservations))
 
         for runid in sortedruns:
@@ -167,43 +180,36 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
 
             print("\t".join(allobs))
 
-        printTsv = self.hasArgument('tsv', args) and args.tsv
+    def printChannelHistogram(self, args, allObservations):
 
-        if printTsv:
-            # print header
+        vChannels = [ x for x in range(1, self.channelCount+1) ]
+        vHeaders = ['run_name'] + vChannels
 
-            vChannels = [ x for x in range(1, self.channelCount+1) ]
-            args.tsv.write( 'run_name' + "\t" + "\t".join([str(x) for x in vChannels]) + "\n" )
+        outputFrame = DataFrame()
+        outputFrame.addColumns(vHeaders)
 
-        for runid in sortedruns:
+        for runID in allObservations:
 
-            if printTsv:
-                self.printChannelHistogram(args.tsv, runid, vChannels, allobservations[runid]['CHANNELS'])
-            else:
-                self.makePlot(runid, allobservations[runid]['CHANNELS'], args)
+            channelDict = allObservations[runID]
 
-        if printTsv:
-            args.tsv.flush()
-            args.tsv.close()
+            channel2rl = {'run_name': runID}
 
-    def printChannelHistogram(self, file, runid, vChannels, channelDict):
+            for channelID in channelDict:
+                channel2rl[ channelID ] = [str(x[1]) for x in channelDict[channelID]]
 
-        channel2rl = {}
+                channelVec = []
+                for channelID in vChannels:
 
-        for channelID in channelDict:
-            channel2rl[ channelID ] = [str(x[1]) for x in channelDict[channelID]]
+                    if not channelID in channel2rl:
+                        channelVec.append( "" )
+                    else:
+                        channelVec.append( ",".join(channel2rl[channelID]) )
 
-        file.write(runid + "\t")
+            runData = DataRow.fromDict(channel2rl)
 
-        channelVec = []
-        for channelID in vChannels:
+            outputFrame.addRow(runData)
 
-            if not channelID in channel2rl:
-                channelVec.append( "" )
-            else:
-                channelVec.append( ",".join(channel2rl[channelID]) )
-
-        file.write("\t".join(channelVec) + "\n")
+        outputFrame.export(args.output, args.output_type)
 
 
     def makePlot(self, runKey, channelDict, args):

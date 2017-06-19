@@ -1,14 +1,16 @@
 import os
 
-from porestat.tools.length_histogram import LengthHistogram
-from porestat.tools.nucleotide_distribution import NucleotideDistribution
-from porestat.tools.quality_distribution import QualityDistribution
-from porestat.utils.Files import makePath
+from .length_histogram import LengthHistogram
+from .nucleotide_distribution import NucleotideDistribution
+from .quality_distribution import QualityDistribution
+from ..utils.Files import makePath
 from .channel_occupancy import ChannelOccupancy
 from .yield_plot import YieldPlot
 
 
 from ..plots.plotconfig import PlotConfig
+from ..hdf5tool.Fast5File import Fast5TYPEAction
+
 from .ParallelPTTInterface import ParallelPSTInterface
 from .PTToolInterface import PSToolInterfaceFactory
 
@@ -35,7 +37,7 @@ class ReportFactory(PSToolInterfaceFactory):
         parser.add_argument('-n', '--output-name', type=str, help='output name', required=False)
 
         parser.add_argument('--no-read-type-subplot', dest='addTypeSubplot', action='store_false', default=True, help='do not add type subplots')
-        parser.add_argument('-q', '--read-type', nargs='+', type=str, choices=[x.value for x in Fast5TYPE], help='read types ('+ ",".join([x.value for x in Fast5TYPE]) +')')
+        parser.add_argument('-q', '--read-type', nargs='+', dest='read_type', action=Fast5TYPEAction, default=None)
         parser.add_argument('-u', '--user-run', dest='groupByRunName', action='store_true', default=False)
 
 

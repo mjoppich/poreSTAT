@@ -1,4 +1,5 @@
-from porestat.plots.plotconfig import PlotConfig
+from ..plots.plotconfig import PlotConfig
+from ..plots.poreplot import PorePlot
 
 from .ParallelPTTInterface import ParallelPSTReportableInterface
 from .PTToolInterface import PSToolInterfaceFactory
@@ -124,11 +125,19 @@ class QualityDistribution(ParallelPSTReportableInterface):
 
         print("\t".join(makeObservations))
 
+        plotData = {}
+
         for runid in sortedruns:
 
             allobs = []
+            obsCounts = []
+
             for x in makeObservations:
                 allobs.append(str(allobservations[runid][x]))
+                obsCounts.append(allobservations[runid][x])
+
+            plotData[runid] = obsCounts
 
             print("\t".join(allobs))
-
+        
+        PorePlot.plotBarplot( plotData, None, "Quality Distribution", pltcfg=args.pltcfg )

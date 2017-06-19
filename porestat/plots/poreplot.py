@@ -34,6 +34,10 @@ class TimestampTimeFormatter(Formatter):
 
         return "%d:%02d:%02d" % (h, m, s)
 
+class PlotDirectionTYPE(Enum):
+    VERTICAL='vertical'
+    HORIZONTAL='horizontal'
+
 class PorePlot:
 
     @classmethod
@@ -317,15 +321,18 @@ class PorePlot:
         ax.set_title(title)
 
     @classmethod
-    def plotViolin(cls, someData, labels, title, pltcfg = PlotConfig()):
+    def plotViolin(cls, someData, labels, title, pltcfg = PlotConfig(), axisManipulation = None, plotDirection=PlotDirectionTYPE.VERTICAL):
 
         if type(someData) == list:
             shape = (1, 1)
             someData = { title: someData }
         else:
             elems = len(someData)
-
-            shape = (1, elems)
+            
+            if plotDirection == PlotDirectionTYPE.VERTICAL:
+                shape = (1, elems)
+            else:
+                shape = (elems, 1)
 
         pltcfg.startPlot()
         fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1])
@@ -338,14 +345,23 @@ class PorePlot:
             x = labels[i]
             pos = divmod(i, shape[1])
 
+            axisManipulator = axisManipulation[labels[i]] if not axisManipulation is None and labels[i] in axisManipulation else None
+
             cls.plotSingleViolin( someData[x], labels[i], ax[i] )
+            
+            if axisManipulator != None:
+                axisManipulator(ax[i])
 
         plt.tight_layout()
         pltcfg.makePlot()
 
+    @classmethod
+    def plotSingleBoxplot(cls, data, title, ax):
+        ax.boxplot(data, notch=True, patch_artist=True)
+        ax.set_title(title)
 
     @classmethod
-    def plotBoxplot(cls, someData, labels, title, pltcfg = PlotConfig()):
+    def plotBoxplot(cls, someData, labels, title, pltcfg = PlotConfig(),  axisManipulation = None, plotDirection=PlotDirectionTYPE.VERTICAL):
 
         if type(someData) == list:
             shape = (1, 1)
@@ -353,7 +369,10 @@ class PorePlot:
         else:
             elems = len(someData)
 
-            shape = (1, elems)
+            if plotDirection == PlotDirectionTYPE.VERTICAL:
+                shape = (1, elems)
+            else:
+                shape = (elems, 1)
 
         pltcfg.startPlot()
         fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1])
@@ -366,8 +385,55 @@ class PorePlot:
             x = labels[i]
             pos = divmod(i, shape[1])
 
-            ax[i].boxplot(someData[x], notch=True, patch_artist=True)
-            ax[i].set_title(x)
+            axisManipulator = axisManipulation[labels[i]] if not axisManipulation is None and labels[i] in axisManipulation else None
+
+            cls.plotSingleBoxplot( someData[x], labels[i], ax[i] )
+            
+            if axisManipulator != None:
+                axisManipulator(ax[i])
+
+        plt.tight_layout()
+        pltcfg.makePlot()
+
+    @classmethod
+    def plotSingleBarplot(cls, barx, bary, title, ax):
+        ax.boxplot( barx, bary )
+        ax.set_title(title)
+
+    @classmethod
+    def plotBarplot(cls, someData, labels, title, pltcfg = PlotConfig(),  axisManipulation = None, plotDirection=PlotDirectionTYPE.VERTICAL):
+
+        if type(someData) == list:
+            shape = (1, 1)
+            someData = { title: someData }
+        else:
+            elems = len(someData)
+
+            if plotDirection == PlotDirectionTYPE.VERTICAL:
+                shape = (1, elems)
+            else:
+                shape = (elems, 1)
+
+        pltcfg.startPlot()
+        fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1])
+
+        if labels == None:
+            labels = [x for x in someData]
+
+        for i in range(0, len(labels)):
+
+            x = labels[i]
+            pos = divmod(i, shape[1])
+
+            axisManipulator = axisManipulation[labels[i]] if not axisManipulation is None and labels[i] in axisManipulation else None
+
+            xvals = [key for key in someData[x]]
+            yvals = [someData[x][key] for key in someData[x]]
+
+            cls.plotSingleBarplot( xvals, yvals, labels[i], ax[i] )
+            
+            if axisManipulator != None:
+                axisManipulator(ax[i])
 
         plt.tight_layout()
         pltcfg.makePlot()

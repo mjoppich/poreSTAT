@@ -2,7 +2,7 @@ import os
 
 from .ParallelPTTInterface import ParallelPSTInterface
 from .PTToolInterface import PSToolInterfaceFactory,PSToolException
-from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
+from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE, Fast5TYPEAction
 
 from ..utils.Files import makePath, fileExists, pathWritable, pathEmpty
 
@@ -22,7 +22,7 @@ class DemangleFilesFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
 
-        parser.add_argument('-q', '--read_type', nargs='+', type=str, choices=[x.value for x in Fast5TYPE], help='read types ('+ ",".join([x.value for x in Fast5TYPE]) +')')
+        parser.add_argument('-q', '--read_type', action=Fast5TYPEAction, default=None)
         parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
         parser.add_argument('-e', '--experiments', nargs='+', type=str,
                             help='run ids of experiments to be extracted. if --user_run, give user_run_name s',

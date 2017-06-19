@@ -26,19 +26,25 @@ class Fast5TYPEAction(argparse.Action):
     def __call__(self, parser, args, values, option_string=None):
 
         try:
-            eVal = Fast5TYPE[values]
 
-            self.style = eVal
-            args.__dict__[ self.dest ] = self.style
+            if len(values) == 0:
+                style = None
+
+            else:
+
+                style = []
+                if type(values) == list:
+
+                    for elem in values:
+                        style.append(Fast5TYPE[elem])
+                else:
+                    style = [Fast5TYPE[values]]
+
+            args.__dict__[self.dest] = style
 
         except:
 
-            raise argparse.ArgumentError(None, 'PlotStyle can not be {n}, '
-                                               'it must be one of {m}'.format(n=values,
-                                                                              m=', '.join([str(x.value) for x in Fast5TYPE])))
-
-    def __repr__(self):
-        return self.style
+            raise argparse.ArgumentError(None, 'Fast5TYPE can not be {n}, it must be one of {m}'.format(n=values, m=', '.join([str(x.value) for x in Fast5TYPE])))
 
 class Fast5TYPE(Enum):
     PRE_BASECALL = 'PRE_BASECALL'

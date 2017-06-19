@@ -142,6 +142,8 @@ class QualityPosition(ParallelPSTReportableInterface):
 
         print("\t".join(makeObservations + qualObservations))
 
+        plotData = OrderedDict()
+
         for runid in sortedruns:
 
             allobs = []
@@ -166,69 +168,86 @@ class QualityPosition(ParallelPSTReportableInterface):
 
             # make plot for runid
 
-            if self.hasArgument('no_plot', args) and args.no_plot == False:
+            if not self.hasArgument('no_plot', args) or args.no_plot == False:
                 # pos -> qual -> count
                 qualCounter = observations['QUALPOS']
-                self.plotQualCounter(qualCounter, args)
+                plotData[runid] = qualCounter
+
+        if not self.hasArgument('no_plot', args) or args.no_plot == False:
+            self.plotQualCounter(plotData, args)
 
 
-    def plotQualCounter(self, qualCounter, args):
+    def plotQualCounter(self, qualCounters, args):
 
 
         foundLengths = set()
-        for length in qualCounter:
-            foundLengths.add(length)
+
+        for runid in qualCounters:
+            for length in qualCounters[runid]:
+                foundLengths.add(length)
+
+
+        steps = 10
 
         foundLengths = sorted(foundLengths)
         maxLength = max(foundLengths)
-        step = maxLength / 10;
+        step = maxLength / steps;
 
-        allDataPlot = []
+        allPlotData = {}
         stepLabels = []
 
         minQual = None
         maxQual = None
 
-        for i in range(0, 10):
+        for runid in qualCounters:
 
-            stepMin = i*step
-            stepMax = stepMin + step
+            allDataPlot = []
 
-            stepLabels.append( "{0:.0f}-{1:.0f}".format(stepMin, stepMax) )
+            for i in range(0, steps):
 
-            allData = Counter()
-            for pos in qualCounter:
+                stepMin = i*step
+                stepMax = stepMin + step
 
-                if stepMin <= pos and pos < stepMax:
+                stepLabels.append( "{0:.0f}-{1:.0f}".format(stepMin, stepMax) )
 
-                    for k in qualCounter[pos]:
-                        allData[k] += qualCounter[pos][k]
+                allData = Counter()
+                for pos in qualCounter:
 
-            dataVal = []
-            dataPos = []
+                    if stepMin <= pos and pos < stepMax:
 
-            for x in allData:
-                dataVal = dataVal + [ord(x)] * allData[x]
+                        for k in qualCounter[pos]:
+                            allData[k] += qualCounter[pos][k]
 
-                minQual = ord(x) if (minQual == None) or (minQual > ord(x)) else minQual
-                maxQual = ord(x) if (maxQual == None) or (maxQual < ord(x)) else maxQual
+                dataVal = []
+                dataPos = []
+
+                for x in allData:
+                    dataVal = dataVal + [ord(x)] * allData[x]
+
+                    minQual = ord(x) if (minQual == None) or (minQual > ord(x)) else minQual
+                    maxQual = ord(x) if (maxQual == None) or (maxQual < ord(x)) else maxQual
 
 
-            allDataPlot.append(dataVal)
+                allDataPlot.append(dataVal)
+            
+            allPlotData[runid] = allDataPlot
 
         minQual = 32
         maxQual = 127
 
-        fig, ax = plt.subplots()
-        ax.violinplot(allDataPlot, showmeans=True, showextrema=True, showmedians=True)
+        def axManipulation(axis):
+            axis.axes.get_xaxis().set_ticks( [i for i in range(1, len(stepLabels)+1)] )
+            axis.axes.get_xaxis().set_ticklabels( stepLabels, rotation=90 )
 
-        ax.axes.get_xaxis().set_ticks( [i for i in range(1, len(stepLabels)+1)] )
-        ax.axes.get_xaxis().set_ticklabels( stepLabels, rotation=90 )
+            axis.axes.get_yaxis().set_ticks([i for i in range(minQual, maxQual+1)])
+            axis.axes.get_yaxis().set_ticklabels([str(chr(i)) for i in range(minQual, maxQual+1)])
 
-        ax.axes.get_yaxis().set_ticks([i for i in range(minQual, maxQual+1)])
-        ax.axes.get_yaxis().set_ticklabels([str(chr(i)) for i in range(minQual, maxQual+1)])
 
-        args.pltcfg.makePlot()
+        allAxisManip = []
+        for x in allPlotData:
+            allAxisManip.append(axManipulation)
+
+        PorePlot.plotViolin( allPlotData, None, "Quality Position Distribution", axisManipulation=allAxisManip, pltcfg=args.pltcfg )
 
 
 

@@ -1,7 +1,7 @@
 import argparse
 from collections import OrderedDict
 
-from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
+from ..utils.DataFrame import DataFrame, DataRow, ExportTYPE, ExportTYPEAction
 
 from .ParallelPTTInterface import ParallelPSTReportableInterface
 from .PTToolInterface import PSToolInterfaceFactory,PSToolException
@@ -23,8 +23,7 @@ class ExperimentLsFactory(PSToolInterfaceFactory):
         parser = subparsers.add_parser('expls', help='expls help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-
-        parser.add_argument('-x', '--xlsx', type=str, default=None, help='Save output to excel file (xlsx)')
+        parser.add_argument('-e', '--export', default=ExportTYPE.CSV, action=ExportTYPEAction)
 
 
         parser.set_defaults(func=self._prepObj)
@@ -143,23 +142,13 @@ class ExperimentLs(ParallelPSTReportableInterface):
 
             sortedruns = sorted([x for x in allobservations])
 
-            print("\t".join(headerNames))
+            outFrame = DataFrame()
+            outFrame.addColumns(headerNames)
 
             for runid in sortedruns:
+                row = DataRow.fromDict( allobservations[runid] )
+                outFrame.addRow( row )
 
-                allobs = []
-                for x in allobservations[runid]:
-                    allobs.append(str(allobservations[runid][x]))
+            outFrame.export(args.output, args.output_type)
 
-                print("\t".join(allobs))
-
-            if args.xlsx:
-                outFrame = DataFrame()
-                outFrame.addColumns(headerNames)
-
-                for runid in sortedruns:
-                    row = DataRow.fromDict( allobservations[runid] )
-                    outFrame.addRow( row )
-
-                outFrame.export(args.xlsx, ExportTYPE.XLSX)
 
