@@ -1,7 +1,7 @@
 from .ParallelPTTInterface import ParallelPSTInterface
 from .PTToolInterface import PSToolInterfaceFactory, PSToolException
 
-from ..hdf5tool.Fast5File import Fast5Directory, Fast5TYPE
+from ..hdf5tool.Fast5File import Fast5Directory, Fast5TYPE, Fast5TYPEAction
 import argparse
 import sys, os
 from ..utils.Files import eprint

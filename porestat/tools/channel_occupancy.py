@@ -2,6 +2,8 @@ import argparse
 import os
 
 import sys
+from collections import Counter
+from collections import defaultdict
 
 from numpy import genfromtxt
 from ..plots.plotconfig import PlotConfig
@@ -14,7 +16,7 @@ from .PTToolInterface import PSToolInterfaceFactory, PSToolException
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE, Fast5TYPEAction
 from ..plots.poreplot import PorePlot
-from ..utils.DataFrame import DataFrame, ExportTYPEAction, ExportTYPE
+from ..utils.DataFrame import DataFrame, ExportTYPEAction, ExportTYPE, DataRow
 
 class ChannelOccupancyFactory(PSToolInterfaceFactory):
 
@@ -23,7 +25,6 @@ class ChannelOccupancyFactory(PSToolInterfaceFactory):
         super(ChannelOccupancyFactory, self).__init__(parser, self._addParser(subparsers))
 
     def _addParser(self, subparsers):
-        parser = subparsers.add_parser('occ', help='occ help')
 
         parser = subparsers.add_parser('occ', help='occ help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan')
@@ -32,7 +33,7 @@ class ChannelOccupancyFactory(PSToolInterfaceFactory):
         parser.add_argument('-u', '--user_run', dest='groupByRunName', action='store_true', default=False)
         
         parser.add_argument('-o', '--output', nargs='?', type=str, default=None, const=None)
-        parser.add_argument('-ot', '--output-type', nargs='?', action=ExportTYPEAction, defualt=ExportTYPE.CSV)
+        parser.add_argument('-ot', '--output-type', nargs='?', action=ExportTYPEAction, default=ExportTYPE.CSV)
 
         parser.add_argument('-q', '--read-type', dest='read_type', action=Fast5TYPEAction)
 
@@ -59,14 +60,14 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
         chipLayout = genfromtxt(this_dir + '/../data/chip_layout.csv', delimiter=',', dtype=int)
 
         self.channelCount = chipLayout.shape[0] * chipLayout.shape[1]
-
+        self.allChannels = [i for i in range(1, self.channelCount+1)]
 
     def _makePropDict(self):
 
         propDict = {}
         propDict['USER_RUN_NAME'] = set()
         propDict['READ_COUNT'] = 0
-        propDict['CHANNELS'] = {}
+        propDict['CHANNELS'] = defaultdict(list)
 
         return propDict
 
@@ -115,7 +116,6 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
         return existResult
 
     def prepareEnvironment(self, args):
-
         return args
 
 
@@ -165,14 +165,14 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
         for runid in sortedruns:
             self.makePlot(runid, allobservations[runid]['CHANNELS'], args)
 
-        self.printChannelHistogram(args, vChannels, allobservations[runid]['CHANNELS'])
+        self.printChannelHistogram(args, allobservations)
 
 
 
     def printStats(self, makeObservations, allobservations):
         print("\t".join(makeObservations))
 
-        for runid in sortedruns:
+        for runid in sorted([x for x in allobservations]):
 
             allobs = []
             for x in makeObservations:
@@ -182,8 +182,7 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
 
     def printChannelHistogram(self, args, allObservations):
 
-        vChannels = [ x for x in range(1, self.channelCount+1) ]
-        vHeaders = ['run_name'] + vChannels
+        vHeaders = ['run_name'] + self.allChannels
 
         outputFrame = DataFrame()
         outputFrame.addColumns(vHeaders)
@@ -192,21 +191,15 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
 
             channelDict = allObservations[runID]
 
-            channel2rl = {'run_name': runID}
+            channel2rl = defaultdict(list)
+            channel2rl['run_name'] = runID
 
-            for channelID in channelDict:
-                channel2rl[ channelID ] = [str(x[1]) for x in channelDict[channelID]]
+            allChannels = channelDict['CHANNELS']
 
-                channelVec = []
-                for channelID in vChannels:
-
-                    if not channelID in channel2rl:
-                        channelVec.append( "" )
-                    else:
-                        channelVec.append( ",".join(channel2rl[channelID]) )
+            for channelID in self.allChannels:
+                channel2rl[ channelID ] = [x[1] for x in allChannels[channelID]]
 
             runData = DataRow.fromDict(channel2rl)
-
             outputFrame.addRow(runData)
 
         outputFrame.export(args.output, args.output_type)
@@ -214,7 +207,7 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
 
     def makePlot(self, runKey, channelDict, args):
 
-        channel2rl = {}
+        channel2rl = defaultdict(list)
 
         for channelID in channelDict:
             channel2rl[channelID] = [x[1] for x in channelDict[channelID]]

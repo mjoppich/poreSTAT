@@ -1,6 +1,9 @@
 import argparse
 from collections import OrderedDict
 
+from ..plots.plotconfig import PlotConfig
+from ..plots.poreplot import PorePlot
+
 from ..utils.DataFrame import DataFrame, DataRow, ExportTYPE, ExportTYPEAction
 
 from .ParallelPTTInterface import ParallelPSTReportableInterface
@@ -23,8 +26,13 @@ class ExperimentLsFactory(PSToolInterfaceFactory):
         parser = subparsers.add_parser('expls', help='expls help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser.add_argument('-e', '--export', default=ExportTYPE.CSV, action=ExportTYPEAction)
+        parser.add_argument('-u', '--user-run', dest='groupByUser', action='store_true', default=False)
 
+        parser.add_argument('-ot', '--output-type', default=ExportTYPE.TSV, action=ExportTYPEAction)
+        parser.add_argument('-o', '--output', type=str, default=None, help='filename to export to as --export-type')
+
+        parser.add_argument('-np', '--no-plot', default=False, action='store_true', help='If no plot should be created')
+        parser = PlotConfig.addParserArgs(parser)
 
         parser.set_defaults(func=self._prepObj)
 
@@ -33,6 +41,7 @@ class ExperimentLsFactory(PSToolInterfaceFactory):
     def _prepObj(self, args):
 
         simArgs = self._makeArguments(args)
+        simArgs.pltcfg = PlotConfig.fromParserArgs(simArgs)
 
         return ExperimentLs(simArgs)
 
@@ -73,8 +82,9 @@ class ExperimentLs(ParallelPSTReportableInterface):
             localEnv[runid] = self._makePropDict()
 
         propDict = localEnv[runid]
+        userRun = fileObj.user_filename_input()
 
-        propDict['NAMES']['USER_RUN_NAME'].add(fileObj.user_filename_input());
+        propDict['NAMES']['USER_RUN_NAME'].add(userRun);
 
         fastq = fileObj.getFastQ()
 
@@ -132,7 +142,12 @@ class ExperimentLs(ParallelPSTReportableInterface):
             ])
             observations = mergeDicts(observations, OrderedDict( [ (s, countByType[ t ]) for (t, s) in self.fileTypes.items() ] ), OrderedDict)
 
-            allobservations[runid] = observations
+            key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
+
+            if key in allobservations:
+                allobservations[key] = mergeDicts(allobservations[key], observations)
+            else:
+                allobservations[key] = observations
 
 
         if len(allobservations) > 0:
@@ -150,5 +165,20 @@ class ExperimentLs(ParallelPSTReportableInterface):
                 outFrame.addRow( row )
 
             outFrame.export(args.output, args.output_type)
+
+        if not args.no_plot:
+
+            plotDict = {}
+
+            for runid in allobservations:
+
+                runData = OrderedDict()
+
+                for (readType, typeName) in self.fileTypes.items():
+                    runData[ typeName ] = allobservations[runid][typeName]
+
+                plotDict[runid] = runData
+
+            PorePlot.plotBars(plotDict, "Read-Types by Experiment", "Read-Type", "Count", args.pltcfg)
 
 

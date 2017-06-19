@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from ..plots.plotconfig import PlotConfig
 from ..plots.poreplot import PorePlot
 
@@ -85,12 +87,11 @@ class QualityDistribution(ParallelPSTReportableInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'TOTAL_BASES']
-        for x in self.qualTypes:
-            makeObservations.append(x)
+        statObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'TOTAL_BASES']
+        absQualities = [x for x in self.qualTypes]
+        relQualitites = [str(x) + "%" for x in self.qualTypes]
 
-        for x in self.qualTypes:
-            makeObservations.append(x + "%")
+        makeObservations = statObservations + absQualities + relQualitites
 
         allobservations = {}
         for runid in parallelResult:
@@ -110,34 +111,49 @@ class QualityDistribution(ParallelPSTReportableInterface):
             }
 
             allNucl = 0
-            for x in self.qualTypes:
+            for x in absQualities:
                 observations[x] = nuclCounts[x]
                 allNucl += nuclCounts[x]
 
             observations['TOTAL_BASES'] = allNucl
 
-            for x in self.qualTypes:
-                observations[x + "%"] = nuclCounts[x] / allNucl
+            for x in absQualities:
+                observations[x+'%'] = nuclCounts[x] / allNucl
 
-            allobservations[runid] = observations
+            key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
+
+            if key in allobservations:
+                allobservations[key] = mergeDicts(allobservations[key], observations)
+            else:
+                allobservations[key] = observations
+
 
         sortedruns = sorted([x for x in allobservations])
 
         print("\t".join(makeObservations))
 
-        plotData = {}
+        absPlotData = {}
+        relPlotData = {}
 
         for runid in sortedruns:
 
             allobs = []
-            obsCounts = []
+            absCounts = OrderedDict()
+            relCounts = OrderedDict()
 
-            for x in makeObservations:
+            for x in statObservations:
                 allobs.append(str(allobservations[runid][x]))
-                obsCounts.append(allobservations[runid][x])
 
-            plotData[runid] = obsCounts
+            for x in absQualities:
+                allobs.append(str(allobservations[runid][x]))
+
+                absCounts[x] = allobservations[runid][x]
+                relCounts[x] = allobservations[runid][str(x)+'%']
+
+            absPlotData[runid] = absCounts
+            relPlotData[runid] = relCounts
 
             print("\t".join(allobs))
         
-        PorePlot.plotBarplot( plotData, None, "Quality Distribution", pltcfg=args.pltcfg )
+        PorePlot.plotBars(absPlotData, "Quality Distribution (abs. values)", "Qualities", "Count (nucl.)", pltcfg=args.pltcfg)
+        PorePlot.plotBars(relPlotData, "Quality Distribution (perc)", "Qualities", "percentage", pltcfg=args.pltcfg)

@@ -38,6 +38,7 @@ class LengthHistogramFactory(PSToolInterfaceFactory):
 
     def _prepObj(self, args):
         simArgs = self._makeArguments(args)
+        simArgs.pltcfg = PlotConfig.fromParserArgs(simArgs)
 
         return LengthHistogram(simArgs)
 
@@ -118,7 +119,7 @@ class LengthHistogram(ParallelPSTReportableInterface):
                 'LENGTHS': lengthObversations
             }
 
-            key = ",".join(run_user_name) if args.groupByUser else runid
+            key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
 
             if key in allobservations:
                 allobservations[key] = mergeDicts(allobservations[key], observations)
@@ -131,7 +132,7 @@ class LengthHistogram(ParallelPSTReportableInterface):
 
         plotData = {}
 
-        if args.combineRuns:
+        if self.hasArgument('combineRuns', args) and args.combineRuns:
 
             lengthData = []
             labels = []
@@ -152,7 +153,7 @@ class LengthHistogram(ParallelPSTReportableInterface):
                 self.printObservation(makeObservations, allobservations[runid])
                 plotData[runid] =  allobservations[runid]['LENGTHS']
 
-        if args.read_type:
+        if self.hasArgument('read_type', args) and args.read_type:
 
             newPlotData = {}
 
@@ -168,12 +169,11 @@ class LengthHistogram(ParallelPSTReportableInterface):
 
             plotData = newPlotData
 
-        if args.violin:
-            PorePlot.plotViolin(plotData, None, 'Length Histogram for ', xlabel="Read Length",
-                                ylabel="Read Count")
+        if self.hasArgument('violin', args) and not args.violin:
+            PorePlot.plotHistogram(plotData, None, 'Length Histogram for ', xlabel="Read Length", ylabel="Read Count", pltcfg=args.pltcfg)
         else:
-            PorePlot.plotHistogram(plotData, None, 'Length Histogram for ', xlabel="Read Length",
-                                   ylabel="Read Count")
+            PorePlot.plotViolin(plotData, None, 'Length Histogram', pltcfg=args.pltcfg)
+
 
 
     def printObservation(self, makeObservations, thisObservation):

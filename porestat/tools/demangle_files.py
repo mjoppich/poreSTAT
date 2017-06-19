@@ -1,4 +1,5 @@
 import os
+from enum import Enum
 
 from .ParallelPTTInterface import ParallelPSTInterface
 from .PTToolInterface import PSToolInterfaceFactory,PSToolException
@@ -9,6 +10,24 @@ from ..utils.Files import makePath, fileExists, pathWritable, pathEmpty
 from collections import OrderedDict, Counter
 import argparse, sys, shutil
 
+class FileHandleTypeAction(argparse.Action):
+    def __init__(self, option_strings, dest, nargs=None, const=None, default=None, type=None, choices=None, required=False, help=None, metavar=None):
+        super(FileHandleTypeAction, self).__init__(option_strings, dest, nargs, const, default, type, choices, required, help, metavar)
+
+        self.help = 'Sets whether file gets moved or copied and must be one of {m}'.format(m=', '.join([str(x.value) for x in FileHandleType]))
+
+    def __call__(self, parser, args, values, option_string=None):
+
+        try:
+
+            handleType = FileHandleType[values.upper()]
+            args.__dict__[self.dest] = handleType
+        except:
+            raise argparse.ArgumentError(None, '{o} can not be {n}, it must be one of {m}'.format(o=str(self.option_strings), n=values, m=', '.join([str(x.name) for x in FileHandleType])))
+
+class FileHandleType(Enum):
+    MOVE='mv'
+    COPY='cp'
 
 class DemangleFilesFactory(PSToolInterfaceFactory):
 
@@ -31,6 +50,7 @@ class DemangleFilesFactory(PSToolInterfaceFactory):
         parser.add_argument('--force', action='store_true', default=False, help='Allows to choose a non-empty output folder')
         parser.add_argument('--simulate', action='store_true', default=False,
                             help='Instead of moving files, move command is printed to console')
+        parser.add_argument('--method', action=FileHandleTypeAction, default=FileHandleType.MOVE, help='')
 
         parser.add_argument('-c', '--chunk-size', type=int, help="how many files per subfolder. -1 for no subfolders", default=1000)
 
@@ -143,6 +163,7 @@ class DemangleFiles(ParallelPSTInterface):
         env.groupByUser = args.groupByUser
         env.experiments = args.experiments
         env.simulate = args.simulate
+        env.method = args.method
 
         env.chunk_size = args.chunk_size
 
@@ -172,16 +193,22 @@ class DemangleFiles(ParallelPSTInterface):
             existResult[0][originalDestPath] += 1
             existResult[1][destPath] += 1
 
-            self.moveFile(source, destPath, environment.simulate)
+            self.moveFile(source, destPath, environment.simulate, environment.method)
 
         return existResult
 
-    def moveFile(self, src, dst, sim):
+    def moveFile(self, src, dst, sim, method):
 
         if sim:
-            print("mv " + str(src) + " " + str(dst))
+            print( method.value + " " + str(src) + " " + str(dst))
         else:
-            shutil.move(src, dst)
+
+            if method == FileHandleType.MOVE:
+                shutil.move(src, dst)
+            elif method == FileHandleType.COPY:
+                shutil.copy(src, dst)
+            else:
+                raise PSToolException('Invalid move file method: ' + str(method))
 
 
     def makeResults(self, parallelResult, oEnvironment, args):

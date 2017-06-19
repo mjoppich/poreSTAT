@@ -1,3 +1,7 @@
+from collections import OrderedDict
+
+from porestat.plots.poreplot import PorePlot
+
 from porestat.plots.plotconfig import PlotConfig
 
 from .ParallelPTTInterface import ParallelPSTReportableInterface
@@ -131,7 +135,7 @@ class QualityPosition(ParallelPSTReportableInterface):
                 'QUAL_SIMPLE': simpleQualCounter
             }
 
-            key = ",".join(run_user_name) if args.groupByUser else runid
+            key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
 
             if key in allobservations:
                 allobservations[key] = mergeDicts(allobservations[key], observations)
@@ -170,7 +174,7 @@ class QualityPosition(ParallelPSTReportableInterface):
 
             if not self.hasArgument('no_plot', args) or args.no_plot == False:
                 # pos -> qual -> count
-                qualCounter = observations['QUALPOS']
+                qualCounter = allobservations[runid]['QUALPOS']
                 plotData[runid] = qualCounter
 
         if not self.hasArgument('no_plot', args) or args.no_plot == False:
@@ -202,6 +206,7 @@ class QualityPosition(ParallelPSTReportableInterface):
         for runid in qualCounters:
 
             allDataPlot = []
+            qualCounter = qualCounters[runid]
 
             for i in range(0, steps):
 
@@ -215,17 +220,17 @@ class QualityPosition(ParallelPSTReportableInterface):
 
                     if stepMin <= pos and pos < stepMax:
 
-                        for k in qualCounter[pos]:
-                            allData[k] += qualCounter[pos][k]
+                        for q in qualCounter[pos]:
+                            allData[q] += qualCounter[pos][q]
 
                 dataVal = []
                 dataPos = []
 
-                for x in allData:
-                    dataVal = dataVal + [ord(x)] * allData[x]
+                for q in allData:
+                    dataVal = dataVal + [ord(q)] * allData[q]
 
-                    minQual = ord(x) if (minQual == None) or (minQual > ord(x)) else minQual
-                    maxQual = ord(x) if (maxQual == None) or (maxQual < ord(x)) else maxQual
+                    minQual = ord(q) if (minQual == None) or (minQual > ord(q)) else minQual
+                    maxQual = ord(q) if (maxQual == None) or (maxQual < ord(q)) else maxQual
 
 
                 allDataPlot.append(dataVal)

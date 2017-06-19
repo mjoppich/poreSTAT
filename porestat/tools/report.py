@@ -1,5 +1,6 @@
 import os
 
+from .quality_position import QualityPosition
 from .length_histogram import LengthHistogram
 from .nucleotide_distribution import NucleotideDistribution
 from .quality_distribution import QualityDistribution
@@ -65,7 +66,7 @@ class ReportAnalysis(ParallelPSTInterface):
             ('LENGTH', LengthHistogram(args)),
             ('NUCLEOTIDES', NucleotideDistribution(args)),
             ('QUALITY DISTRIBUTION', QualityDistribution(args)),
-            ('QUALITY BY POSITION', QualityDistribution(args)),
+            ('QUALITY BY POSITION', QualityPosition(args)),
         ])
 
         print("Output folder: " + str(args.output))
@@ -143,11 +144,18 @@ class ReportAnalysis(ParallelPSTInterface):
 
             for report in self.dReporters:
 
+                reporterArgs = self.prepareEnvironment(args)
+                reporterArgs.output = None
+                reporterArgs.output_type = None
+
+                reporterArgs.pltcfg = args.pltcfg
+
                 htmlFile.write("<h1>" + str(report) + "</h1>\n")
 
                 reportObj = self.dReporters[report]
 
-                reportObj.makeResults(parallelResult[report], oEnvironment, args)
+                reportObj.makeResults(parallelResult[report], oEnvironment, reporterArgs)
+                args.pltcfg = reporterArgs.pltcfg
 
                 createdPlots = args.pltcfg.getCreatedPlots()
                 args.pltcfg.resetCreatedPlots()
@@ -158,6 +166,8 @@ class ReportAnalysis(ParallelPSTInterface):
 
                     htmlFile.write("<p><img src=\"" + str(relPath) + "\"/></p>\n")
                     print(str(report) + "\t" + str(relPath))
+
+                htmlFile.flush()
 
             htmlFile.write("</body></html>\n")
 

@@ -1,3 +1,7 @@
+from collections import OrderedDict
+
+from porestat.plots.poreplot import PorePlot
+
 from porestat.plots.plotconfig import PlotConfig
 
 from .ParallelPTTInterface import ParallelPSTReportableInterface
@@ -26,6 +30,7 @@ class NucleotideDistributionFactory(PSToolInterfaceFactory):
 
     def _prepObj(self, args):
         simArgs = self._makeArguments(args)
+        simArgs.pltcfg = PlotConfig.fromParserArgs(simArgs)
 
         return NucleotideDistribution(simArgs)
 
@@ -86,13 +91,11 @@ class NucleotideDistribution(ParallelPSTReportableInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'TOTAL_BASES']
+        statObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'TOTAL_BASES']
+        absQualities = [x for x in self.nucTypes]
+        relQualitites = [str(x) + "%" for x in self.nucTypes]
 
-        for x in self.nucTypes:
-            makeObservations.append(x)
-
-        for x in self.nucTypes:
-            makeObservations.append(x + "%")
+        makeObservations = statObservations + absQualities + relQualitites
 
         allobservations = {}
         for runid in parallelResult:
@@ -117,11 +120,16 @@ class NucleotideDistribution(ParallelPSTReportableInterface):
                 allNucl += nuclCounts[x]
 
             observations['TOTAL_BASES'] = allNucl
-
             for x in self.nucTypes:
                 observations[x + "%"] = nuclCounts[x] / allNucl
 
-            allobservations[runid] = observations
+
+            key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
+
+            if key in allobservations:
+                allobservations[key] = mergeDicts(allobservations[key], observations)
+            else:
+                allobservations[key] = observations
 
         sortedruns = sorted([x for x in allobservations])
 
@@ -134,3 +142,32 @@ class NucleotideDistribution(ParallelPSTReportableInterface):
                 allobs.append(str(allobservations[runid][x]))
 
             print("\t".join(allobs))
+
+        if not self.hasArgument('no_plot', args) or args.no_plot:
+
+            absPlotData = {}
+            relPlotData = {}
+
+            for runid in sortedruns:
+
+                allobs = []
+                absCounts = OrderedDict()
+                relCounts = OrderedDict()
+
+                for x in statObservations:
+                    allobs.append(str(allobservations[runid][x]))
+
+                for x in absQualities:
+                    allobs.append(str(allobservations[runid][x]))
+
+                    absCounts[x] = allobservations[runid][x]
+                    relCounts[x] = allobservations[runid][str(x) + '%']
+
+                absPlotData[runid] = absCounts
+                relPlotData[runid] = relCounts
+
+                print("\t".join(allobs))
+
+            PorePlot.plotBars(absPlotData, "Nucleotide Distribution (abs. counts)", "Nucleotide", "Count", args.pltcfg )
+            PorePlot.plotBars(relPlotData, "Nucleotide Distribution (perc.)", "Nucleotide", "Percentage", args.pltcfg )
+

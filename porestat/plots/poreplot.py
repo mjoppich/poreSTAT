@@ -1,3 +1,5 @@
+from enum import Enum
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -7,6 +9,8 @@ import os
 from collections import Counter
 import datetime as dt
 from matplotlib.ticker import Formatter
+
+from porestat.utils.OrderedSet import OrderedSet
 from .plotconfig import PlotConfig
 from matplotlib import gridspec
 
@@ -317,7 +321,23 @@ class PorePlot:
     @classmethod
     def plotSingleViolin(cls, data, title, ax):
 
-        ax.violinplot(data, showmeans=True, showextrema=True, showmedians=True, points=500)
+        if len(data) == 0:
+            plotData = [float('nan'), float('nan')]
+        else:
+            if type(data[0]) == list:
+
+                plotData = data
+
+                for i in range(0, len(plotData)):
+
+                    if type(plotData[i]) == list:
+                        if len(plotData[i]) == 0:
+                            plotData[i] = [float('nan'), float('nan')]
+
+            else:
+                plotData = data
+
+        ax.violinplot(plotData, showmeans=True, showextrema=True, showmedians=True, points=500)
         ax.set_title(title)
 
     @classmethod
@@ -396,11 +416,6 @@ class PorePlot:
         pltcfg.makePlot()
 
     @classmethod
-    def plotSingleBarplot(cls, barx, bary, title, ax):
-        ax.boxplot( barx, bary )
-        ax.set_title(title)
-
-    @classmethod
     def plotBarplot(cls, someData, labels, title, pltcfg = PlotConfig(),  axisManipulation = None, plotDirection=PlotDirectionTYPE.VERTICAL):
 
         if type(someData) == list:
@@ -470,5 +485,88 @@ class PorePlot:
                   fancybox=True, shadow=True, ncol=1)
 
         fig.autofmt_xdate()
+
+        pltcfg.makePlot()
+
+    @classmethod
+    def plotBars(cls, plotData, title, xlabel, ylabel, pltcfg=PlotConfig()):
+
+        def autolabel(rects):
+            """
+            Attach a text label above each bar displaying its height
+            """
+
+            maxHeight = 0
+            for rect in rects:
+                maxHeight = max( [maxHeight, rect.get_height()])
+
+            for rect in rects:
+                height = rect.get_height()
+
+                heightOffset = min(1.05*height - height, 10)
+
+                if maxHeight <= 1.0:
+                    ax.text(rect.get_x() + rect.get_width() / 2., height + heightOffset, '%0.2f' % height,
+                            ha='center', va='bottom')
+                else:
+                    ax.text(rect.get_x() + rect.get_width() / 2., height+heightOffset, '%d' % int(height),ha='center', va='bottom')
+
+        allRuns = []
+        allGroups = OrderedSet()
+        for x in sorted([run for run in plotData]):
+
+            allRuns.append(x)
+
+            for y in plotData[x]:
+                allGroups.add(y)
+
+        allGroups = list(allGroups)
+        N = len(allGroups)
+        width = 0.9 / len(allRuns)  # the width of the bars
+
+        ind = np.arange(N)  # the x locations for the groups
+
+        pltcfg.startPlot()
+        fig, ax = plt.subplots()
+
+        createdAxes = {}
+        colorVector = PorePlot.getColorVector(N)
+
+        runCount = 0
+        for runs in plotData:
+
+            data = []
+
+            for i in ind:
+                data.append(plotData[runs][allGroups[i]])
+
+            rects = ax.bar(ind + runCount * width, data, width, color=colorVector[runCount], label=runs)
+            createdAxes[runs] = rects
+
+            runCount += 1
+
+        # add some text for labels, title and axes ticks
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+
+        ax.set_xticks(ind + 0.9 / 2.0)
+        ax.set_xticklabels(allGroups)
+
+        allRects = []
+
+        for (run, rect) in createdAxes.items():
+            allRects.append(rect)
+
+        for rect in allRects:
+            autolabel(rect)
+
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0 + box.height * 0.1,
+                         box.width, box.height * 0.9])
+
+        # Put a legend below current axis
+        lgd = ax.legend(allRects, allRuns, loc='upper center', bbox_to_anchor=(0.5, -0.1),
+                        fancybox=True, shadow=True, ncol=1)
 
         pltcfg.makePlot()

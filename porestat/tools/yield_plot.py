@@ -20,7 +20,7 @@ class YieldPlotFactory(PSToolInterfaceFactory):
         parser = subparsers.add_parser('yield', help='expls help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser.add_argument('-p', '--plot', nargs='?', type=bool, const=True, default=False, help='issue plot?', required=False)
+
         parser.add_argument('-u', '--user-run', dest='groupByRunName', action='store_true', default=False)
         parser.add_argument('--no-read-type-subplot', dest='addTypeSubplot', action='store_false', default=True, help='do not add type subplots')
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)

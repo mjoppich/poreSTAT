@@ -68,6 +68,13 @@ class PlotConfig:
 
         self.createdPlots = []
 
+    def __str__(self):
+
+        allElements = [self.save_to_file, self.save_file, self.saved_plot, self.style, self.transparent_bg, self.createdPlots]
+        allStrElements = [str(x) for x in allElements]
+
+        return "[" + ", ".join(allStrElements) + "]"
+
     def saveToFile(self, filePath):
 
         self.save_to_file = True
@@ -96,7 +103,6 @@ class PlotConfig:
 
     def makePlot(self):
 
-        plt.tight_layout()
 
         if self.save_to_file:
 
@@ -108,5 +114,22 @@ class PlotConfig:
 
             self.createdPlots.append(exactFilename)
         else:
+
+            current_figure = plt.gcf()
+            legends = current_figure.legends
+
+            makeTightLayout = True
+            for lgd in legends + [ax.legend_ for ax in current_figure.axes]:
+
+                if lgd == None:
+                    continue
+
+                lgd.draggable()
+
+                makeTightLayout = makeTightLayout and lgd._bbox_to_anchor == None
+
+
+            if makeTightLayout:
+                plt.tight_layout()
 
             plt.show()

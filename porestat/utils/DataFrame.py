@@ -37,19 +37,21 @@ class DataRow:
 
     def __getitem__(self, item):
 
-        if type(item) == int:
+        if item in self.dHeader:
+            return self.elements[self.dHeader[item]]
+        elif type(item) == int:
 
             if item < 0 or item > len(self.elements):
                 raise DataRowException("Invalid column number: " + str(item))
 
             return self.elements[item]
-
         else:
-
             if not item in self.dHeader:
                 raise DataRowException("Invalid column id: " + str(item))
 
-            return self.elements[ self.dHeader[item] ]
+            raise DataRowException("Column not found: " + str(item))
+
+
 
     @classmethod
     def fromDict(cls, dictionary):
@@ -66,19 +68,23 @@ class DataRow:
         return DataRow(tuple(velements), dHeader)
 
 class ExportTYPEAction(argparse.Action):
+
+    def __init__(self, option_strings, dest, nargs=None, const=None, default=None, type=None, choices=None, required=False, help=None, metavar=None):
+        super(ExportTYPEAction, self).__init__(option_strings, dest, nargs, const, default, type, choices, required, help, metavar)
+
+        self.help = 'Sets type of file export and must be one of {m}'.format(m=', '.join([str(x.value) for x in ExportTYPE]))
+
     def __call__(self, parser, args, values, option_string=None):
 
         try:
-            eVal = ExportTYPE[values]
-
-            self.style = eVal
-            args.__dict__[ self.dest ] = self.style
+            eVal = ExportTYPE[values.upper()]
+            args.__dict__[ self.dest ] = eVal
 
         except:
 
             raise argparse.ArgumentError(None, 'ExportTYPE can not be {n}, '
                                                'it must be one of {m}'.format(n=values,
-                                                                              m=', '.join([str(x.value) for x in ExporTYPE])))
+                                                                              m=', '.join([str(x.value) for x in ExportTYPE])))
 
     def __repr__(self):
         return self.style
@@ -374,6 +380,8 @@ class DataFrame:
             sStr += "\n"
             sStr += sep.join([str(x) for x in oLine])
 
+        return sStr
+
     def _writeToFile(self, content, filename):
 
         with open(filename, 'w') as file:
@@ -399,16 +407,27 @@ class DataFrame:
 
     def export(self, outFile, exType=ExportTYPE.TSV):
 
-        if exType == ExportTYPE.TSV:
-            self._writeToFile(outFile, self._makeStr('\t'))
-        elif exType == ExportTYPE.CSV:
-            self._writeToFile(outFile, self._makeStr(';'))
-        elif exType == ExportTYPE.XLSX:
+        outputText = None
+
+        if exType == ExportTYPE.XLSX and outFile != None:
             self._makeXLSX(outFile)
+            return
+
+        if exType == ExportTYPE.TSV:
+            outputText = self._makeStr('\t')
+        elif exType == ExportTYPE.CSV:
+            outputText = self._makeStr(';')
         elif exType == None:
-            print(self._makeStr('\t'))
+            outputText = self._makeStr('\t')
+
+        if outFile == None:
+            print(outputText)
+            return
         else:
-            raise DataFrameException('Invalid export type: ' + str(type))
+            self._writeToFile( outputText, outFile )
+            return
+
+        raise DataFrameException('Invalid export type {n} with output file {m}'.format(n=str(exType), m=str(outFile)))
 
 
     @classmethod
