@@ -1,6 +1,6 @@
 # poreSTAT
 
-_poreSTAT_ is _work in progress_ and therefore might not run stable at times. If you are interested in using poreSTAT, please do not hesitate to contact me via github (issues)!
+**poreSTAT** is **work in progress** and therefore *might not run* stable at times. If you are interested in using poreSTAT, please do not hesitate to **contact** me via github (issues)!
 
 ## poreSTAT: a python framework for working with fast5 third gen sequencing data
 
