@@ -1,5 +1,9 @@
 from collections import OrderedDict
 
+import math
+
+import time
+
 from porestat.plots.poreplot import PorePlot
 
 from porestat.plots.plotconfig import PlotConfig
@@ -215,27 +219,31 @@ class QualityPosition(ParallelPSTReportableInterface):
 
                 stepLabels.append( "{0:.0f}-{1:.0f}".format(stepMin, stepMax) )
 
-                allData = Counter()
-                for pos in qualCounter:
+            # create empty counter for each step
+            for i in range(0, steps):
+                allDataPlot.append( Counter() )
 
-                    if stepMin <= pos and pos < stepMax:
 
-                        for q in qualCounter[pos]:
-                            allData[q] += qualCounter[pos][q]
+            for pos in qualCounter:
+
+                bin = divmod(pos, math.ceil(step))
+
+                for q in qualCounter[pos]:
+                    allDataPlot[bin[0]][q] += qualCounter[pos][q]
+
+            explodedData = []
+            for counterData in allDataPlot:
 
                 dataVal = []
-                dataPos = []
-
-                for q in allData:
-                    dataVal = dataVal + [ord(q)] * allData[q]
+                for q in counterData:
+                    dataVal = dataVal + [ord(q)] * counterData[q]
 
                     minQual = ord(q) if (minQual == None) or (minQual > ord(q)) else minQual
                     maxQual = ord(q) if (maxQual == None) or (maxQual < ord(q)) else maxQual
 
-
-                allDataPlot.append(dataVal)
+                explodedData.append(dataVal)
             
-            allPlotData[runid] = allDataPlot
+            allPlotData[runid] = explodedData
 
         minQual = 32
         maxQual = 127
@@ -248,9 +256,7 @@ class QualityPosition(ParallelPSTReportableInterface):
             axis.axes.get_yaxis().set_ticklabels([str(chr(i)) for i in range(minQual, maxQual+1)])
 
 
-        allAxisManip = []
-        for x in allPlotData:
-            allAxisManip.append(axManipulation)
+        allAxisManip = [axManipulation] * len(allPlotData)
 
         PorePlot.plotViolin( allPlotData, None, "Quality Position Distribution", axisManipulation=allAxisManip, pltcfg=args.pltcfg )
 

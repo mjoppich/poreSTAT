@@ -1,5 +1,6 @@
 import os
 
+from porestat.tools.experiment_ls import ExperimentLs
 from .quality_position import QualityPosition
 from .length_histogram import LengthHistogram
 from .nucleotide_distribution import NucleotideDistribution
@@ -9,7 +10,7 @@ from .channel_occupancy import ChannelOccupancy
 from .yield_plot import YieldPlot
 
 
-from ..plots.plotconfig import PlotConfig
+from ..plots.plotconfig import PlotConfig, PlotSaveTYPE
 from ..hdf5tool.Fast5File import Fast5TYPEAction
 
 from .ParallelPTTInterface import ParallelPSTInterface
@@ -20,7 +21,7 @@ from collections import Counter
 from ..utils.Utils import mergeDicts, mergeCounter
 
 from collections import OrderedDict
-
+import dill as pickle
 
 class ReportFactory(PSToolInterfaceFactory):
 
@@ -40,6 +41,9 @@ class ReportFactory(PSToolInterfaceFactory):
         parser.add_argument('--no-read-type-subplot', dest='addTypeSubplot', action='store_false', default=True, help='do not add type subplots')
         parser.add_argument('-q', '--read-type', nargs='+', dest='read_type', action=Fast5TYPEAction, default=None)
         parser.add_argument('-u', '--user-run', dest='groupByRunName', action='store_true', default=False)
+
+        parser.add_argument('--save-parallel-result', type=str, default=None)
+        parser.add_argument('--load-parallel-result', type=str, default=None)
 
 
         parser = PlotConfig.addParserArgs(parser)
@@ -61,6 +65,7 @@ class ReportAnalysis(ParallelPSTInterface):
         super(ReportAnalysis, self).__init__( args )
 
         self.dReporters = OrderedDict([
+            ('OVERVIEW', ExperimentLs(args)),
             ('OCCUPANCY', ChannelOccupancy(args)),
             ('YIELD', YieldPlot(args)),
             ('LENGTH', LengthHistogram(args)),
@@ -90,7 +95,12 @@ class ReportAnalysis(ParallelPSTInterface):
         args.pltcfg = pltcfg
 
     def prepareInputs(self, args):
-        return self.manage_folders_reads(args)
+
+        if args.load_parallel_result is None:
+            return self.manage_folders_reads(args)
+        else:
+            return []
+
 
 
     def execParallel(self, data, environment):
@@ -137,12 +147,30 @@ class ReportAnalysis(ParallelPSTInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
+        args.pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
+
+        if not args.save_parallel_result is None:
+
+            with open(args.save_parallel_result, 'wb') as pickleFile:
+                pickle.dump( parallelResult, pickleFile )
+
+            print("Result saved to: " + args.save_parallel_result)
+
+        if not args.load_parallel_result is None:
+            print("Trying to load result from: " + args.load_parallel_result)
+
+            with open(args.load_parallel_result, 'rb') as pickleFile:
+                parallelResult = pickle.load(pickleFile)
+
+            print("Result loaded: " + args.load_parallel_result)
 
         with open(args.output + args.output_name + ".html", 'w') as htmlFile:
 
             htmlFile.write("<html><body>\n")
 
             for report in self.dReporters:
+
+                print("Running report: " + str(report))
 
                 reporterArgs = self.prepareEnvironment(args)
                 reporterArgs.output = None
@@ -162,10 +190,11 @@ class ReportAnalysis(ParallelPSTInterface):
 
                 for x in createdPlots:
 
-                    relPath = os.path.relpath( x, args.output )
+                    #relPath = os.path.relpath( x, args.output )
 
-                    htmlFile.write("<p><img src=\"" + str(relPath) + "\"/></p>\n")
-                    print(str(report) + "\t" + str(relPath))
+                    htmlFile.write( x )
+                    #htmlFile.write("<p><img src=\"" + str(relPath) + "\"/></p>\n")
+                    #print(str(report) + "\t" + str(relPath))
 
                 htmlFile.flush()
 

@@ -86,8 +86,6 @@ class ExportTYPEAction(argparse.Action):
                                                'it must be one of {m}'.format(n=values,
                                                                               m=', '.join([str(x.value) for x in ExportTYPE])))
 
-    def __repr__(self):
-        return self.style
 
 class ExportTYPE(Enum):
     CSV=0

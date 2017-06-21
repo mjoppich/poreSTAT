@@ -1,5 +1,6 @@
 import os
 from collections import Counter
+from collections import defaultdict
 from itertools import chain
 
 
@@ -28,6 +29,9 @@ def mergeDicts( dict1, dict2, resultType=dict):
             elif type(v) == Counter:
 
                 dict3[k] = mergeCounter(dict3[k], v)
+
+            elif type(v) == defaultdict:
+                dict3[k] = mergeDefaultDict(dict3[k], v)
 
             elif type(v) == int or type(v) == float:
 
@@ -64,6 +68,21 @@ def mergeCounter( counter1, counter2):
         mergedCounter[x] += counter2[x]
 
     return mergedCounter
+
+def mergeDefaultDict( dict1, dict2):
+
+    mergedDefaultDict = defaultdict(dict1.default_factory)
+
+    for x in dict1:
+        mergedDefaultDict[x] = dict1[x]
+
+    for x in dict2:
+        if x in mergedDefaultDict:
+            mergedDefaultDict[x] = mergedDefaultDict[x] + dict2[x]
+        else:
+            mergedDefaultDict[x] = dict2[x]
+
+    return mergedDefaultDict
 
 def readFile(sFileName, sFunc, iSkip = 0, encoding = "utf-8", iMaxLines = -1):
 

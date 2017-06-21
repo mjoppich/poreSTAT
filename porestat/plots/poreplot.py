@@ -3,6 +3,7 @@ from enum import Enum
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from mpld3 import plugins
 from numpy import genfromtxt
 import os
 
@@ -33,6 +34,9 @@ class TimestampTimeFormatter(Formatter):
     def __call__(self, x, pos=0):
         'Return the label for time x at position pos'
 
+        return self.format(x)
+
+    def format(self, x):
         m, s = divmod(x, 60)
         h, m = divmod(m, 60)
 
@@ -81,6 +85,38 @@ class PorePlot:
         :param ylabel: ylabel of the plot
         :return:
         """
+
+        tooltipCSS = """
+        table
+        {
+          border-collapse: collapse;
+        }
+        th
+        {
+          color: #ffffff;
+          background-color: #000000;
+        }
+        td
+        {
+          background-color: #cccccc;
+        }
+        table, th, td
+        {
+          font-family:Arial, Helvetica, sans-serif;
+          border: 1px solid black;
+          text-align: right;
+        }
+        """
+
+        def makeHTMLTable( poreNum, poreReads, poreAvgLength):
+
+            poreNumLine = "<tr><th>Pore #</th><th>{pn}</th></tr>".format(pn=poreNum)
+            poreReadsLine = "<tr><td>Reads</td><td>{rc}</td></tr>".format(rc=poreReads)
+            poreLengthLine = "<tr><td>Avg Length</td><td>{:.2f}</td></tr>".format(poreAvgLength)
+
+            htmlStr = "<table>"+poreNumLine+poreReadsLine+poreLengthLine+"</table>"
+
+            return htmlStr
 
         p2c = Counter()
         p2l = {}
@@ -195,8 +231,17 @@ class PorePlot:
         axarr[0].tick_params(axis='both', left='off', top='off', right='off', bottom='off', labelleft='on', labeltop='off',
                         labelright='off', labelbottom='on')
 
+
+        htmlDescr = []
+        for i in range(0, chipLayout.shape[0]):
+            for j in range(0,chipLayout.shape[1]):
+
+                channelID = int(chipLayout[i,j])
+                htmlDescr.append( makeHTMLTable(channelID, p2c[channelID], p2l[channelID]) )
+
+
         #axarr[0].Axes(fig, [1, pores[0], 1, pores[1]])
-        axarr[0].scatter(xvec, yvec, s=area, c=color, alpha=0.5)
+        elems = axarr[0].scatter(xvec, yvec, s=area, c=color, alpha=0.5)
 
         sizeSteps = 5
         sizes = [ x for x in range(int(min(area)), int(max(area)), int((max(area)-min(area))/sizeSteps)) ]
@@ -208,7 +253,13 @@ class PorePlot:
 
         sizeLabels = [str(x) for x in sizes]
         sizeLabels[0] += " reads"
-        plt.legend(tuple(legendPlts), tuple(sizeLabels), scatterpoints=1, ncol=sizeSteps, loc='upper center', bbox_to_anchor=(0.5, -0.2), fancybox=True)
+
+        cls.makeLegend(fig, axarr[0], tuple(legendPlts), tuple(sizeLabels), pltcfg, bbox_to_anchor=(0.5, -0.2))
+
+        if pltcfg.usesMPLD3():
+            tooltip = plugins.PointHTMLTooltip(elems, htmlDescr, voffset=10, hoffset=10, css=tooltipCSS)
+            plugins.connect(fig, tooltip)
+
 
         #ax1 = fig.add_axes([0.05, 0.80, 0.9, 0.15])
         cb1 = mpl.colorbar.ColorbarBase(axarr[1], cmap=cls.getColorMap(scolormap),
@@ -322,22 +373,27 @@ class PorePlot:
     def plotSingleViolin(cls, data, title, ax):
 
         if len(data) == 0:
-            plotData = [float('nan'), float('nan')]
+            plotData = np.array([float('nan'), float('nan')], dtype=float)
+            plotPos = [1]
         else:
             if type(data[0]) == list:
 
                 plotData = data
+                plotPos = [i for i in range(1, len(plotData)+1)]
 
                 for i in range(0, len(plotData)):
 
                     if type(plotData[i]) == list:
                         if len(plotData[i]) == 0:
-                            plotData[i] = [float('nan'), float('nan')]
+                            plotData[i] = np.array([float('nan'), float('nan')], dtype=float)
+                        else:
+                            plotData[i] = np.array(plotData[i], dtype=float)
 
             else:
-                plotData = data
+                plotPos = [1]
+                plotData = np.array(data, dtype=float)
 
-        ax.violinplot(plotData, showmeans=True, showextrema=True, showmedians=True, points=500)
+        ax.violinplot(plotData, positions=plotPos, showmeans=True, showextrema=True, showmedians=True, points=100)
         ax.set_title(title)
 
     @classmethod
@@ -351,11 +407,15 @@ class PorePlot:
             
             if plotDirection == PlotDirectionTYPE.VERTICAL:
                 shape = (1, elems)
+                shareY = True
+                shareX = False
             else:
                 shape = (elems, 1)
+                shareY = False
+                shareX = True
 
         pltcfg.startPlot()
-        fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1])
+        fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1], sharex=shareX, sharey=shareY)
 
         if labels == None:
             labels = [x for x in someData]
@@ -363,16 +423,16 @@ class PorePlot:
         for i in range(0, len(labels)):
 
             x = labels[i]
-            pos = divmod(i, shape[1])
-
             axisManipulator = axisManipulation[labels[i]] if not axisManipulation is None and labels[i] in axisManipulation else None
 
-            cls.plotSingleViolin( someData[x], labels[i], ax[i] )
+            if shape == (1,1):
+                cls.plotSingleViolin( someData[x], labels[i], ax)
+            else:
+                cls.plotSingleViolin( someData[x], labels[i], ax[i] )
             
             if axisManipulator != None:
                 axisManipulator(ax[i])
 
-        plt.tight_layout()
         pltcfg.makePlot()
 
     @classmethod
@@ -407,8 +467,11 @@ class PorePlot:
 
             axisManipulator = axisManipulation[labels[i]] if not axisManipulation is None and labels[i] in axisManipulation else None
 
-            cls.plotSingleBoxplot( someData[x], labels[i], ax[i] )
-            
+            if shape == (1,1):
+                cls.plotSingleViolin( someData[x], labels[i], ax)
+            else:
+                cls.plotSingleViolin( someData[x], labels[i], ax[i] )
+
             if axisManipulator != None:
                 axisManipulator(ax[i])
 
@@ -460,7 +523,6 @@ class PorePlot:
         fig, ax = plt.subplots()
 
         formatter = TimestampTimeFormatter()
-        ax.xaxis.set_major_formatter(formatter)
 
         labels = sorted([x for x in dataDict])
         vDataSeries = []
@@ -470,21 +532,27 @@ class PorePlot:
 
         colors = PorePlot.getColorVector(len(labels))
 
+        allHandles = []
+        allLabels = []
         for i in range(0, len(labels)):
             xes = [x[0] for x in vDataSeries[i]]
             yes = [x[1] for x in vDataSeries[i]]
 
-            ax.plot(xes, yes, color=colors[i])
+            handle = ax.plot(xes, yes, color=colors[i])
+
+            allHandles.append(handle)
+            allLabels.append(labels[i])
 
         ax.set_xlabel( xlabel )
         ax.set_ylabel( ylabel )
         ax.set_title(title)
 
-        # Put a legend below current axis
-        ax.legend(labels, loc='upper center', bbox_to_anchor=(0.5, -0.2),
-                  fancybox=True, shadow=True, ncol=1)
+        xTicks = ax.get_xticks().tolist()
+        newLabels = [formatter.format(x) for x in xTicks]
 
-        fig.autofmt_xdate()
+        plt.xticks( xTicks, newLabels )
+
+        cls.makeLegend(fig, ax, allHandles, allLabels, pltcfg, bbox_to_anchor=(0.5, -0.2))
 
         pltcfg.makePlot()
 
@@ -554,19 +622,26 @@ class PorePlot:
         ax.set_xticklabels(allGroups)
 
         allRects = []
+        allLabels = []
 
         for (run, rect) in createdAxes.items():
             allRects.append(rect)
+            allLabels.append(run)
 
         for rect in allRects:
             autolabel(rect)
 
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0 + box.height * 0.1,
-                         box.width, box.height * 0.9])
-
-        # Put a legend below current axis
-        lgd = ax.legend(allRects, allRuns, loc='upper center', bbox_to_anchor=(0.5, -0.1),
-                        fancybox=True, shadow=True, ncol=1)
+        cls.makeLegend(fig, ax, allRects, allLabels, pltcfg)
 
         pltcfg.makePlot()
+
+    @classmethod
+    def makeLegend(cls, fig, ax, handles, labels, pltcfg, bbox_to_anchor=(0.5, -0.1)):
+
+        if pltcfg.usesMPLD3():
+            interactive_legend = plugins.InteractiveLegendPlugin(handles, labels, alpha_unsel=0.5, alpha_over=1.5, start_visible=True)
+            plugins.connect(fig, interactive_legend)
+        else:
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
+            ax.legend(handles, labels, loc='upper center', bbox_to_anchor=bbox_to_anchor, fancybox=True, shadow=True, ncol=1)

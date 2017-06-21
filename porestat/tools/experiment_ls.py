@@ -166,7 +166,9 @@ class ExperimentLs(ParallelPSTReportableInterface):
 
             outFrame.export(args.output, args.output_type)
 
-        if not args.no_plot:
+        showPlot = not self.hasArgument('no_plot', args) or args.no_plot
+
+        if showPlot:
 
             plotDict = {}
 

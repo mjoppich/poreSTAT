@@ -1,6 +1,9 @@
 import argparse
 from enum import Enum
 import matplotlib.pyplot as plt
+import mpld3
+from mpld3 import plugins
+
 
 class PlotStyle(Enum):
     DEFAULT='default',
@@ -12,22 +15,63 @@ class PlotStyle(Enum):
 
 
 class PlotStyleAction(argparse.Action):
+
+    def __init__(self, option_strings, dest, nargs=None, const=None, default=None, type=None, choices=None, required=False, help=None, metavar=None):
+        super(PlotStyleAction, self).__init__(option_strings, dest, nargs, const, default, type, choices, required, help, metavar)
+
+        self.help = 'Sets type of file export and must be one of {m}'.format(m=', '.join([str(x.value) for x in PlotStyle]))
+
     def __call__(self, parser, args, values, option_string=None):
 
         try:
             eVal = PlotStyle[values]
-
-            self.style = eVal
-            args.__dict__[ self.dest ] = self.style
+            args.__dict__[ self.dest ] = eVal
 
         except:
 
             raise argparse.ArgumentError(None, 'PlotStyle can not be {n}, '
                                                'it must be one of {m}'.format(n=values,
-                                                                              m=', '.join([str(x.name) for x in PlotStyle])))
+                                                                              m=', '.join(
+                                                                                  [str(x.name) for x in PlotStyle])))
 
-    def __repr__(self):
-        return self.style
+
+class PlotSaveTypeAction(argparse.Action):
+
+    def __init__(self, option_strings, dest, nargs=None, const=None, default=None, type=None, choices=None, required=False, help=None, metavar=None):
+        super(PlotSaveTypeAction, self).__init__(option_strings, dest, nargs, const, default, type, choices, required, help, metavar)
+
+        self.help = 'Sets type of file export and must be one of {m}'.format(m=', '.join([str(x.value) for x in PlotSaveTYPE]))
+
+    def __call__(self, parser, args, values, option_string=None):
+
+        try:
+            eVal = PlotSaveTYPE[values.upper()]
+            args.__dict__[ self.dest ] = eVal
+
+        except:
+
+            raise argparse.ArgumentError(None, 'ExportTYPE can not be {n}, '
+                                               'it must be one of {m}'.format(n=values,
+                                                                              m=', '.join([str(x.value) for x in PlotSaveTYPE])))
+class PlotSaveTYPE(Enum):
+    PNG='png'
+    HTML='HTML'
+    HTML_STRING='HTML_STRING'
+    JSON='json'
+    D3='D3'
+
+    @classmethod
+    def getFileExtension(cls, outType):
+
+        if outType == PlotSaveTYPE.PNG:
+            return 'png'
+
+        if outType == PlotSaveTYPE.HTML:
+            return 'html'
+
+        if outType == PlotSaveTYPE.JSON:
+            return 'json'
+
 
 class PlotConfig:
 
@@ -36,11 +80,14 @@ class PlotConfig:
 
         pltCfg = PlotConfig()
 
-        if simArgs.save_plot != None:
+        if 'save_plot' in simArgs.__dict__ and simArgs.save_plot != None:
             pltCfg.saveToFile( simArgs.save_plot )
 
-        if simArgs.plot_style != None:
+        if 'plot_style' in simArgs.__dict__ and simArgs.plot_style != None:
             pltCfg.setStyle( simArgs.plot_style )
+
+        if 'save_plot_type' in simArgs.__dict__ and simArgs.save_plot_type != None:
+            pltCfg.setOutputType(simArgs.save_plot_type)
 
         return pltCfg
 
@@ -49,11 +96,9 @@ class PlotConfig:
     @classmethod
     def addParserArgs(cls, parser):
 
-        def toPlotStyle(input):
-            return PlotStyle[input]
-
         parser.add_argument('-sp', '--save-plot', type=str, help='path-prefix to file where plots are saved. Final file will be save-plot.xxx.png')
-        parser.add_argument('-ps', '--plot-style', action=PlotStyleAction)
+        parser.add_argument('-spt', '--save-plot-type', action=PlotSaveTypeAction, default=PlotSaveTYPE.PNG)
+        parser.add_argument('-ps', '--plot-style', action=PlotStyleAction, default=PlotStyle.BMH)
 
         return parser
 
@@ -63,6 +108,7 @@ class PlotConfig:
         self.save_file = None
         self.saved_plot = 0
 
+        self.outputType = PlotSaveTYPE.PNG
         self.style = PlotStyle.DEFAULT
         self.transparent_bg = True
 
@@ -78,13 +124,18 @@ class PlotConfig:
     def saveToFile(self, filePath):
 
         self.save_to_file = True
-        self.save_file = filePath + ".%02d.png"
+        self.save_file = filePath + ".%02d." + PlotSaveTYPE.getFileExtension( self.outputType )
 
         plt.ioff()
 
+    def setOutputType(self, outType):
+        self.outputType = outType
+
+        if self.outputType == PlotSaveTYPE.HTML_STRING:
+            plt.ioff()
+
 
     def setStyle(self, style):
-
         self.style = style
 
     def startPlot(self):
@@ -101,21 +152,45 @@ class PlotConfig:
     def resetCreatedPlots(self):
         self.createdPlots = []
 
+    def usesMPLD3(self):
+
+        if self.outputType in [ PlotSaveTYPE.HTML_STRING, PlotSaveTYPE.HTML, PlotSaveTYPE.JSON, PlotSaveTYPE.D3 ]:
+            return True
+
+        return False
+
     def makePlot(self):
 
+        current_figure = plt.gcf()
+
+        if self.usesMPLD3():
+
+            plugins.connect(current_figure, plugins.MousePosition(fontsize=14))
+
+
+        if self.outputType == PlotSaveTYPE.HTML_STRING:
+            outString = mpld3.fig_to_html(current_figure)
+            self.createdPlots.append(outString)
+            return
+
+        if self.outputType == PlotSaveTYPE.D3:
+            mpld3.show(current_figure)
 
         if self.save_to_file:
 
             exactFilename = self.save_file % self.saved_plot
-
             self.saved_plot += 1
 
-            plt.savefig( exactFilename, transparent=self.transparent_bg, bbox_inches='tight')
+            if self.outputType == PlotSaveTYPE.HTML:
+                mpld3.save_html(current_figure, self.save_file)
+            elif self.outputType == PlotSaveTYPE.JSON:
+                mpld3.save_json(current_figure, self.save_file)
+            elif self.outputType == PlotSaveTYPE.PNG:
+                plt.savefig(exactFilename, transparent=self.transparent_bg, bbox_inches='tight')
 
             self.createdPlots.append(exactFilename)
         else:
 
-            current_figure = plt.gcf()
             legends = current_figure.legends
 
             makeTightLayout = True

@@ -5,7 +5,7 @@ from .ParallelPTTInterface import ParallelPSTInterface
 from .PTToolInterface import PSToolInterfaceFactory,PSToolException
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE, Fast5TYPEAction
 
-from ..utils.Files import makePath, fileExists, pathWritable, pathEmpty
+from ..utils.Files import makePath, fileExists, pathWritable, pathEmpty, eprint
 
 from collections import OrderedDict, Counter
 import argparse, sys, shutil
@@ -42,7 +42,7 @@ class DemangleFilesFactory(PSToolInterfaceFactory):
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
 
         parser.add_argument('-q', '--read_type', action=Fast5TYPEAction, default=None)
-        parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-u', '--user-run', dest='groupByUser', action='store_true', default=False)
         parser.add_argument('-e', '--experiments', nargs='+', type=str,
                             help='run ids of experiments to be extracted. if --user_run, give user_run_name s',
                             required=False)
@@ -176,7 +176,7 @@ class DemangleFiles(ParallelPSTInterface):
             return
 
         if existResult is None:
-            existResult = (Counter(), Counter())
+            existResult = (Counter(), Counter(), set())
 
         iChunkSize = -1
         if environment.chunk_size:
@@ -191,6 +191,16 @@ class DemangleFiles(ParallelPSTInterface):
                 destPath = destPath + str(chunkID[0]) + '/'
 
             existResult[0][originalDestPath] += 1
+
+            if not destPath in existResult[2]:
+                if not environment.simulate:
+
+                    try:
+                        os.makedirs(destPath, exist_ok=True)
+                        existResult[2].add(destPath)
+                    except:
+                        eprint(destPath + " already exists")
+
             existResult[1][destPath] += 1
 
             self.moveFile(source, destPath, environment.simulate, environment.method)
