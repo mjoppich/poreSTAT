@@ -243,22 +243,29 @@ class PorePlot:
         #axarr[0].Axes(fig, [1, pores[0], 1, pores[1]])
         elems = axarr[0].scatter(xvec, yvec, s=area, c=color, alpha=0.5)
 
-        sizeSteps = 5
-        sizes = [ x for x in range(int(min(area)), int(max(area)), int((max(area)-min(area))/sizeSteps)) ]
-
-        legendPlts = []
-        for size in sizes:
-            obj =axarr[0].scatter([], [], s=size, marker='o', color='#555555')
-            legendPlts.append(obj)
-
-        sizeLabels = [str(x) for x in sizes]
-        sizeLabels[0] += " reads"
-
-        cls.makeLegend(fig, axarr[0], tuple(legendPlts), tuple(sizeLabels), pltcfg, bbox_to_anchor=(0.5, -0.2))
 
         if pltcfg.usesMPLD3():
             tooltip = plugins.PointHTMLTooltip(elems, htmlDescr, voffset=10, hoffset=10, css=tooltipCSS)
             plugins.connect(fig, tooltip)
+        else:
+
+            sizeSteps = 5
+
+            frac = count / (maxCount - minCount)
+            area = minPoreRad + frac * (maxPoreRad-minPoreRad)
+
+            readCounts = [ x for x in range(int(minCount), int(maxCount), (int(maxCount)-int(minCount))/ sizeSteps)]
+            sizes = [x for x in range(int(min(area)), int(max(area)), int((max(area) - min(area)) / sizeSteps))]
+
+            legendPlts = []
+            for size in sizes:
+                obj = axarr[0].scatter([], [], s=size, marker='o', color='#555555')
+                legendPlts.append(obj)
+
+            sizeLabels = [str(x) for x in readCounts]
+            sizeLabels[0] += " reads"
+
+            cls.makeLegend(fig, axarr[0], tuple(legendPlts), tuple(sizeLabels), pltcfg, bbox_to_anchor=(0.5, -0.2))
 
 
         #ax1 = fig.add_axes([0.05, 0.80, 0.9, 0.15])
