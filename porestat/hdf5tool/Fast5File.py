@@ -4,11 +4,17 @@ import os
 import glob
 import tarfile
 import shutil
+
+import datetime
 import h5py
 from enum import Enum
 from collections import OrderedDict, Counter
+
+import time
+
 from .SequenceFormats import FASTQ
 from ..utils.Files import makePath
+import dateutil.parser
 
 class classproperty(object):
     """
@@ -302,7 +308,22 @@ class Fast5File:
         return int(self._get_attribute('/UniqueGlobalKey/context_tags', 'sample_frequency', 4000))
 
     def getExperimentStartTime(self):
-        return int(self._get_attribute('/UniqueGlobalKey/tracking_id', 'exp_start_time', None))
+
+        timeAttribData = self._get_attribute('/UniqueGlobalKey/tracking_id', 'exp_start_time', None)
+
+        try:
+            timestamp = int(timeAttribData)
+            return timestamp
+        except:
+            try:
+                parsedTime = dateutil.parser.parse(timeAttribData)
+                timestamp = parsedTime.timestamp()
+                return int(timestamp)
+
+            except:
+                raise Fast5FileException("Invalid exp start time format: " + str(timeAttribData))
+
+
 
     def readCreateTime(self):
 

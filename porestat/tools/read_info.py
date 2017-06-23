@@ -26,19 +26,16 @@ class ReadInfoFactory(PSToolInterfaceFactory):
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
 
         parser.add_argument('-q', '--read-type', nargs='+', dest='read_type', action=Fast5TYPEAction, default=None)
-        parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-u', '--user-run', dest='groupByUser', action='store_true', default=False)
         parser.add_argument('-e', '--experiments', nargs='+', type=str,
                             help='run ids of experiments to be extracted. if --user_run, give user_run_name s',
                             required=False)
 
         def fileOpener( filename ):
-
             open(filename, 'w').close()
-
             return filename
 
         parser.add_argument('-o', '--output', type=fileOpener, help='output location, default: std out', default=sys.stdout)
-        parser.add_argument('-of', '--output-format', )
 
         parser.set_defaults(func=self._prepObj)
 

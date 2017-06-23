@@ -31,6 +31,7 @@ class ChannelOccupancyFactory(PSToolInterfaceFactory):
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-e', '--experiments', nargs='+', type=str, help='experiments to list')
         parser.add_argument('-u', '--user_run', dest='groupByRunName', action='store_true', default=False)
+        parser.add_argument('--print-histogram', action='store_true', default=False)
         
         parser.add_argument('-o', '--output', nargs='?', type=str, default=None, const=None)
         parser.add_argument('-ot', '--output-type', nargs='?', action=ExportTYPEAction, default=ExportTYPE.CSV)
@@ -165,7 +166,8 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
         for runid in sortedruns:
             self.makePlot(runid, allobservations[runid]['CHANNELS'], args)
 
-        self.printChannelHistogram(args, allobservations)
+        if self.hasArgument('print-histogram', args) and args.print_histogram == True:
+            self.printChannelHistogram(args, allobservations)
 
 
 

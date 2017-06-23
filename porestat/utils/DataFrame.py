@@ -1,3 +1,4 @@
+from collections import defaultdict
 from enum import Enum
 from openpyxl import Workbook
 
@@ -28,45 +29,6 @@ class DataRowException(Exception):
 
         self.msg = msg
 
-class DataRow:
-
-    def __init__(self, elementTuple, dHeader):
-
-        self.dHeader = dHeader
-        self.elements = elementTuple
-
-    def __getitem__(self, item):
-
-        if item in self.dHeader:
-            return self.elements[self.dHeader[item]]
-        elif type(item) == int:
-
-            if item < 0 or item > len(self.elements):
-                raise DataRowException("Invalid column number: " + str(item))
-
-            return self.elements[item]
-        else:
-            if not item in self.dHeader:
-                raise DataRowException("Invalid column id: " + str(item))
-
-            raise DataRowException("Column not found: " + str(item))
-
-
-
-    @classmethod
-    def fromDict(cls, dictionary):
-
-        allitems = list(dictionary.items())
-
-        dHeader = {}
-        velements = []
-
-        for i in range(0, len(allitems)):
-            dHeader[ allitems[i][0] ] = i
-            velements.append(allitems[i][1])
-
-        return DataRow(tuple(velements), dHeader)
-
 class ExportTYPEAction(argparse.Action):
 
     def __init__(self, option_strings, dest, nargs=None, const=None, default=None, type=None, choices=None, required=False, help=None, metavar=None):
@@ -93,34 +55,109 @@ class ExportTYPE(Enum):
     XLSX=2
 
 
-class DataFrame:
-    def __init__(self, oDefaultEmptyValue=None):
+class DataSeries:
+    """
 
-        self.dHeader = {}
-        self.oDefaultEmptyValue = oDefaultEmptyValue
-        self.vElements = []
+    A simple list for data
+
+    """
+
+    def __init__(self, data):
+        self.data = data
+        self.dataIdx = 0
+
+    def __iter__(self):
+        self.dataIdx = 0
+        return self
+
+    def __next__(self):
+        try:
+            item = self.__getitem__(self.dataIdx)
+        except IndexError:
+            raise StopIteration()
+        self.dataIdx += 1
+
+        return item
+
+    def __getitem__(self, item):
+        return self.data[item]
+
+    def __setitem__(self, key, value):
+
+        if type(self.data) == tuple:
+            oldData = list(self.data)
+            oldData[key] = value
+            self.data = tuple(oldData)
+        else:
+            self.data[key] = value
+
+    def append_data(self, value):
+        self.data = [x for x in self.data] + [value]
+
+    def remove_data(self, idx):
+        self.data = [ self.data[i] for i in range(0, len(self.data)) if i != idx ]
+
+    def to_tuple(self):
+        return tuple(self.data)
+
+    def to_list(self):
+        return list(self.data)
+
+    def to_scalar(self):
+        if len(self.data) > 1:
+            raise DataFrameException("Data is not scalar: " + str(self.data))
+
+        return self.data[0]
+
+class DataColumnAccess:
+    """
+    A DataSeries with column names
+    """
+
+    def __init__(self, column2idx):
+
+
+        self.column2idx = column2idx
+        self.idx2default = []
+
+    def getColumnIndex(self, oColumn):
+
+        if oColumn in self.column2idx:
+            return self.column2idx[oColumn]
+
+        else:
+
+            try:
+                idx = int(oColumn)
+
+                if idx < 0 or idx > len(self.column2idx):
+                    raise DataRowException("Invalid column number: " + str(oColumn))
+
+                return idx
+
+            except:
+                raise DataFrameException("Invalid column: " + str(oColumn) + "\n\n Available columns: " + str([x for x in self.column2idx]))
+
+
+
+
+    def copyHeader(self):
+        return deepcopy(self.column2idx)
 
     def getHeader(self):
 
-        vReturn = [''] * len(self.dHeader)
+        vReturn = [''] * len(self.column2idx)
 
-        for x in self.dHeader:
-            iIdx = self.dHeader[x]
+        for x in self.column2idx:
+            iIdx = self.column2idx[x]
             vReturn[iIdx] = x
 
         return vReturn
 
-    def addColumns(self, names, default=None):
+    def columnExists(self, name):
+        return name in self.column2idx
 
-        for x in names:
-            if x in self.dHeader:
-                raise DataFrameException("Column already exists: " + x)
-
-        for x in names:
-            self.addColumn(x, default)
-
-
-    def addColumn(self, name, default=None):
+    def addColumn(self, name):
         """
 
         :param name: name of new column (must not be used already)
@@ -128,127 +165,219 @@ class DataFrame:
         :return: -1 if not succeeded (name already used), column index otherwise
         """
 
-        if name in self.dHeader:
-            return -1
+        if name in self.column2idx:
+            raise DataFrameException("Column already exists: " + name)
 
-        newColIdx = len(self.dHeader)
-        self.dHeader[name] = newColIdx
-
-        def addcol(x):
-
-            newx = []
-            for elem in x:
-                newx.append(elem)
-
-            newx.append(default)
-
-            return tuple(newx)
-
-        self.applyToRow(addcol)
+        newColIdx = len(self.column2idx)
+        self.column2idx[name] = newColIdx
 
         return newColIdx
 
     def removeColumn(self, name):
 
-        if not name in self.dHeader:
-            return -1
+        colIdx = self.getColumnIndex(name)
+        DataSeries.remove_data(self, colIdx)
 
-        colIdx = self.dHeader[name]
 
-        def removeCol(x):
 
-            newx = []
-            for i in range(0, len(x)):
-                if i != colIdx:
-                    newx.append(x[i])
+class DefaultColumns():
 
-            return tuple(newx)
+    def __init__(self, **kwargs):
 
-        self.applyToRow(removeCol)
+        self.hasDefault = False
 
-    def getIdxHeader(self):
+        if 'global_default' in kwargs:
+            self.hasDefault = True
+            self.idx2default = defaultdict(lambda x: kwargs['global_default'])
+        else:
+            self.idx2default = {}
 
-        return deepcopy(self.dHeader)
+    def add_default(self, colIdx, default):
+        self.idx2default[colIdx] = default
+
+    def get_default(self, colIdx):
+
+        if not colIdx in self.idx2default and not self.hasDefault:
+            raise DataFrameException("No default value for column: " + str(colIdx))
+
+        return self.idx2default[colIdx]
+
+class DefaultDataColumnAccess(DefaultColumns, DataColumnAccess):
+
+    def __init__(self, dHeader, **kwargs):
+
+        DataColumnAccess.__init__(self, dHeader)
+        DefaultColumns.__init__(self, **kwargs)
+
+    def addColumn(self, name, default=None):
+
+        newColIdx = DataColumnAccess.addColumn(self, name)
+        DefaultColumns.add_default(self, newColIdx, default)
+
+        return newColIdx
+
+
+    def addColumns(self, names, default=None):
+
+        for x in names:
+            if self.columnExists(x):
+                raise DataFrameException("Column already exists: " + x)
+
+        for x in names:
+            self.addColumn(x, default)
+
+
+class DataRow(DefaultDataColumnAccess, DataSeries):
+
+    def __init__(self, dHeader, data = [], **kwargs):
+
+        DefaultDataColumnAccess.__init__(self, dHeader, **kwargs)
+        DataSeries.__init__(self, data)
+
+    def __getitem__(self, item):
+        """
+
+        :param item: the key to look for
+        :return: if @item is column name, return column name. if @item is int, the item-th element is return.
+        """
+        try:
+            idx = self.getColumnIndex(item)
+            return self.data[idx]
+        except:
+            raise DataRowException("Column not found: " + str(item))
+
+    def addColumn(self, name, default=None):
+        DefaultDataColumnAccess.addColumn(self, name, default)
+        DataSeries.append_data(self, default)
+
+    def to_tuple(self):
+        return DataSeries.to_tuple(self)
+
+    @classmethod
+    def fromDict(cls, dictionary):
+
+        allitems = list(dictionary.items())
+
+        dHeader = {}
+        velements = []
+
+        for i in range(0, len(allitems)):
+            dHeader[ allitems[i][0] ] = i
+            velements.append(allitems[i][1])
+
+        return DataRow(dHeader, data=velements)
+
+
+class DataFrame(DataSeries, DefaultDataColumnAccess):
+    """
+
+        behave like a dataseries, but have columns
+
+    """
+
+    def __init__(self, default=None):
+
+        DefaultDataColumnAccess.__init__(self, {}, global_default=default)# for a col in row
+        DataSeries.__init__(self, []) # for each row
+
+
+    def __getitem__(self, item):
+
+        if type(item) == int:
+            return DataRow(self.column2idx, DataSeries.__getitem__(self, item))
+        elif type(item) == tuple or type(item) == list:
+
+            if len(item) == 1:
+                return DataRow(self.column2idx, DataSeries.__getitem__(self, item[0]))
+
+            elif len(item) == 2:
+                rowData = DataSeries.__getitem__(self, item[0])
+                row = DataRow(self.column2idx, rowData)
+
+                return row[item[1]]
+
+        elif type(item) == slice:
+
+            elemIdx = range(item.start, item.stop, item.step)
+            return [DataRow(self.column2idx, DataSeries.__getitem__(self, x)) for x in elemIdx]
+
+    def __setitem__(self, key, value):
+
+        if type(key) == int:
+            DataSeries.__setitem__(self, key, value)
+        elif type(key) == tuple or type(key) == list:
+
+            if len(key) == 1:
+                DataSeries.__setitem__(self, key, value)
+
+            elif len(key) == 2:
+                rowData = DataSeries.__getitem__(self, key[0])
+                row = DataRow(self.column2idx, rowData)
+                row[key[1]] = value
+                row_tuple = row.to_tuple()
+
+                DataSeries.__setitem__(self, key[0], row_tuple)
+
+        elif type(key) == slice:
+
+            elemIdx = range(key.start, key.stop, key.step)
+
+            if len(elemIdx) == len(value):
+                for x in elemIdx:
+                    DataSeries.__setitem__(x, value[x])
+
+    def merge(self, other):
+
+        if not type(other)==DataFrame:
+            raise DataFrameException("Can only merge two dataframes")
+
+        owncols = set(self.column2idx)
+        othercols = set(other.column2idx)
+
+        for x in owncols:
+            if x not in othercols:
+                raise DataFrameException("Missing col in other: " + str(x))
+
+        for row in other:
+            self.addRow( row )
+
+    def addColumn(self, name, default=None):
+        newColIdx = DefaultDataColumnAccess.addColumn(self, name, default)
+
+        for i in range(0, len(self)):
+            oldData = list(self.data[i])
+            oldData.append(default)
+
+            self.data[i] = tuple(oldData)
+
+        return newColIdx
+
+
+    def __len__(self):
+        return len(self.data)
 
     def toRowDict(self, oTuple):
 
-        if len(oTuple) != len(self.dHeader):
+        if len(oTuple) != len(self.column2idx):
             return None
 
         dReturn = {}
 
-        for x in self.dHeader:
-            dReturn[x] = oTuple[self.dHeader[x]]
+        for x in self.column2idx:
+            dReturn[x] = oTuple[self.column2idx[x]]
 
         return dReturn
 
-    def __getitem__(self, key):
 
-        if type(key) is tuple:
 
-            if (len(key) != 2):
-                return None
 
-            oElem = self.vElements[key[0]]
-
-            try:
-                return oElem[self.getColumnIndex(key[1])]
-
-            except KeyError:
-
-                return None
-
-        else:
-
-            try:
-                return self.vElements[key]
-            except KeyError:
-                return None
-
-    def __setitem__(self, key, value):
-
-        if type(key) is tuple:
-
-            if len(key) != 2:
-                raise ValueError("invalid length of key")
-
-            iRow = key[0]
-            iCol = self.getColumnIndex(key[1])
-
-            vElemLine = list(self.vElements[iRow])
-
-            vElemLine[iCol] = value
-
-            oLineTuple = tuple(vElemLine)
-
-            self.vElements[iRow] = oLineTuple
-
-        else:
-
-            if len(value) != len(self.dHeader):
-                raise ValueError("invalid length of value")
-
-            self.vElements[key] = value
-
-    def getColumnIndex(self, oColumn):
-
-        if oColumn in self.dHeader:
-
-            return self.dHeader[oColumn]
-
-        else:
-
-            try:
-                return int(oColumn)
-            except:
-                raise DataFrameException("Invalid column: " + str(oColumn) + "\n\n Available columns: " + str([x for x in self.dHeader]))
 
     def applyByRow(self, oColumn, oFunc):
 
         iColumnIndex = self.getColumnIndex(oColumn)
 
-        for i in range(0, len(self.vElements)):
-            vElemLine = list(self.vElements[i])
+        for i in range(0, len(self.data)):
+            vElemLine = list(self.data[i])
 
             self[i, iColumnIndex] = oFunc(vElemLine)
 
@@ -259,8 +388,8 @@ class DataFrame:
         :return:
         """
 
-        for i in range(0, len(self.vElements)):
-            vElemLine = list(self.vElements[i])
+        for i in range(0, len(self.data)):
+            vElemLine = list(self.data[i])
             vReturnLine = oFunc(vElemLine)
 
             self[i] = vReturnLine
@@ -271,47 +400,47 @@ class DataFrame:
 
         iColumnIndex = self.getColumnIndex(oColumn)
 
-        for i in range(0, len(self.vElements)):
+        for i in range(0, len(self.data)):
             vReturn.append(self[i, iColumnIndex])
 
         return vReturn
 
     def setColumn(self, oColumn, vNewValues):
 
-        if len(vNewValues) != len(self.vElements):
+        if len(vNewValues) != len(self.data):
             raise ValueError("elements have different lengths")
 
         iColumnIndex = self.getColumnIndex(oColumn)
 
-        for i in range(0, len(self.vElements)):
-            self.vElements[i, iColumnIndex] = vNewValues[i]
+        for i in range(0, len(self.data)):
+            self.data[i, iColumnIndex] = vNewValues[i]
 
     def addRow(self, row):
 
         if not (type(row) == DataRow):
             raise DataFrameException( 'Trying to insert invalid row type: ' + str(type(row)))
 
-        rowheaders = set([x for x in row.dHeader])
-        selfheaders = set([x for x in self.dHeader])
+        rowheaders = set([x for x in row.column2idx])
+        selfheaders = set([x for x in self.column2idx])
         setDifference = rowheaders.difference(selfheaders)
 
         if len(setDifference) > 0:
             raise DataFrameException( 'Row does not contain all needed headers: ' + str(selfheaders))
 
-        newrow = [None] * len(self.dHeader)
-        for x in self.dHeader:
-            newrow[ self.dHeader[x] ] = row[x]
+        newrow = [None] * len(self.column2idx)
+        for x in self.column2idx:
+            newrow[ self.column2idx[x] ] = row[x]
 
-        self.vElements.append(tuple(newrow))
+        self.data.append(tuple(newrow))
 
     def getRow(self, oColumn, oValue, oDefaultValue = None):
 
         iColumnIndex = self.getColumnIndex(oColumn)
 
-        for i in range(0, len(self.vElements)):
+        for i in range(0, len(self.data)):
 
-            if self.vElements[i][iColumnIndex] == oValue:
-                return DataRow(self.vElements[i], self.dHeader)
+            if self.data[i][iColumnIndex] == oValue:
+                return DataRow(self.data[i], self.column2idx)
 
         return oDefaultValue
 
@@ -320,10 +449,10 @@ class DataFrame:
         iColumnIndex = self.getColumnIndex(oColumn)
 
         vReturn = []
-        for i in range(0, len(self.vElements)):
+        for i in range(0, len(self.data)):
 
-            if self.vElements[i][iColumnIndex] in vValues:
-                vReturn.append( DataRow(self.vElements[i], self.dHeader) )
+            if self.data[i][iColumnIndex] in vValues:
+                vReturn.append( DataRow(self.data[i], self.column2idx) )
 
         return vReturn
 
@@ -332,10 +461,10 @@ class DataFrame:
 
         iColumnIndex = self.getColumnIndex(oColumn)
 
-        for i in range(0, len(self.vElements)):
+        for i in range(0, len(self.data)):
 
-            if self.vElements[i][iColumnIndex] == oValue:
-                return self.vElements[i]
+            if self.data[i][iColumnIndex] == oValue:
+                return self[i]
 
         return oDefaultValue
 
@@ -345,22 +474,22 @@ class DataFrame:
 
         vReturn = []
 
-        for i in range(0, len(self.vElements)):
+        for i in range(0, len(self.data)):
 
-            if self.vElements[i][iColumnIndex] in vValues:
-                vReturn.append(self.vElements[i])
+            if self.data[i][iColumnIndex] in vValues:
+                vReturn.append(self.data[i])
 
         return vReturn
 
     def __str__(self):
 
-        sortedHeader = sorted(self.dHeader.items(), key=operator.itemgetter(1))
+        sortedHeader = sorted(self.column2idx.items(), key=operator.itemgetter(1))
 
         vHeader = [str(x[0]) for x in sortedHeader]
 
         sStr = "\t".join(vHeader)
 
-        for oLine in self.vElements:
+        for oLine in self.data:
             sStr += "\n"
             sStr += "\t".join([str(x) for x in oLine])
 
@@ -368,13 +497,13 @@ class DataFrame:
 
     def _makeStr(self, sep='\t'):
 
-        sortedHeader = sorted(self.dHeader.items(), key=operator.itemgetter(1))
+        sortedHeader = sorted(self.column2idx.items(), key=operator.itemgetter(1))
 
         vHeader = [str(x[0]) for x in sortedHeader]
 
         sStr = sep.join(vHeader)
 
-        for oLine in self.vElements:
+        for oLine in self.data:
             sStr += "\n"
             sStr += sep.join([str(x) for x in oLine])
 
@@ -391,12 +520,12 @@ class DataFrame:
         ws = wb.active
 
         # Data can be assigned directly to cells
-        sortedHeader = sorted(self.dHeader.items(), key=operator.itemgetter(1))
+        sortedHeader = sorted(self.column2idx.items(), key=operator.itemgetter(1))
         vHeader = [str(x[0]) for x in sortedHeader]
 
         ws.append(vHeader)
 
-        for oLine in self.vElements:
+        for oLine in self.data:
             ws.append([str(x) for x in oLine])
 
         # Save the file
@@ -508,7 +637,7 @@ class DataFrame:
             oHeaderRes = cls.createHeader(oHeader, cDelim)
             oHeader = oHeaderRes[0]
 
-        oNewDataFrame.dHeader = oHeader
+        oNewDataFrame.column2idx = oHeader
 
         vNumberHeader = [False] * len(oHeader)
 
@@ -526,8 +655,8 @@ class DataFrame:
                     if isNumber(vLine[e]):
                         vNumberHeader[e] = True
 
-            lineTuple = cls.createLineTuple(sLine, oHeader, cDelim, vNumberHeader, oNewDataFrame.oDefaultEmptyValue)
+            lineTuple = cls.createLineTuple(sLine, oHeader, cDelim, vNumberHeader, None)
 
-            oNewDataFrame.vElements.append(lineTuple)
+            oNewDataFrame.data.append(lineTuple)
 
         return oNewDataFrame

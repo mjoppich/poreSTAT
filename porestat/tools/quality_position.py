@@ -198,7 +198,7 @@ class QualityPosition(ParallelPSTReportableInterface):
         steps = 10
 
         foundLengths = sorted(foundLengths)
-        maxLength = max(foundLengths)
+        maxLength = max(foundLengths)+1
         step = maxLength / steps;
 
         allPlotData = {}
@@ -227,6 +227,9 @@ class QualityPosition(ParallelPSTReportableInterface):
             for pos in qualCounter:
 
                 bin = divmod(pos, math.ceil(step))
+
+                if (bin[0] > len(allDataPlot)):
+                    bin = (len(allDataPlot)-1, 0)
 
                 for q in qualCounter[pos]:
                     allDataPlot[bin[0]][q] += qualCounter[pos][q]

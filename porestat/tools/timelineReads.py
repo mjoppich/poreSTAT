@@ -70,11 +70,7 @@ class TimelineReads(ParallelPSTInterface):
 
         for file in f5folder.collect():
 
-            runid = file.runID()
-
             iFilesInFolder += 1
-
-            runid = file.runID()
 
             winnerseq = file.getFastQ()
             creationTime = file.readCreateTime()

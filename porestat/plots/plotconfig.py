@@ -112,6 +112,9 @@ class PlotConfig:
         self.style = PlotStyle.DEFAULT
         self.transparent_bg = True
 
+        self.d3js = None
+        self.mpld3js=None
+
         self.createdPlots = []
 
     def __str__(self):
@@ -164,12 +167,11 @@ class PlotConfig:
         current_figure = plt.gcf()
 
         if self.usesMPLD3():
-
             plugins.connect(current_figure, plugins.MousePosition(fontsize=14))
 
 
         if self.outputType == PlotSaveTYPE.HTML_STRING:
-            outString = mpld3.fig_to_html(current_figure)
+            outString = mpld3.fig_to_html(current_figure, d3_url=self.d3js, mpld3_url=self.mpld3js)
             self.createdPlots.append(outString)
             return
 

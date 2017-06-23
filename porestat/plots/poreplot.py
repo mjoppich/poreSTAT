@@ -589,16 +589,16 @@ class PorePlot:
                 allGroups.add(y)
 
         allGroups = list(allGroups)
-        N = len(allGroups)
+
         width = 0.9 / len(allRuns)  # the width of the bars
 
-        ind = np.arange(N)  # the x locations for the groups
+        ind = np.arange( len(allGroups) )  # the x locations for the groups
 
         pltcfg.startPlot()
         fig, ax = plt.subplots()
 
         createdAxes = {}
-        colorVector = PorePlot.getColorVector(N)
+        colorVector = PorePlot.getColorVector( len(allRuns) )
 
         runCount = 0
         for runs in plotData:

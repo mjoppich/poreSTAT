@@ -3,6 +3,7 @@ import argparse
 import pickle
 from collections import defaultdict
 
+from porestat.hdf5tool.Fast5File import Fast5TYPEAction
 from ..plots.plotconfig import PlotConfig
 from porestat.hdf5tool import Fast5TYPE
 from porestat.plots.poreplot import PorePlot
@@ -52,7 +53,7 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--fasta', nargs='+', type=str, help='read inputs for alignment', required=True)
         parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
 
-        parser.add_argument('-q', '--read-type', nargs='+', type=str, choices=[x for x in Fast5TYPE.str2type], help='read types ('+ ",".join([x for x in Fast5TYPE.str2type]) +')')
+        parser.add_argument('-q', '--read-type', nargs='+', dest='read_type', action=Fast5TYPEAction, default=None)
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
 
         parser = PlotConfig.addParserArgs(parser)
@@ -82,6 +83,8 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
 
         self.cigar_ops = ['M', 'X', '=', 'D', 'I', 'S', 'X', 'H', 'N', 'P']
 
+        self.readInfoIdx = {}
+
 
     def readReadInfo(self, args):
 
@@ -90,22 +93,19 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
             if not fileExists(readInfoFile):
                 raise PSToolException("Read info file does not exist: " + str(readInfoFile))
 
-        self.readInfo = {}
+        self.readInfo = None
 
         for readInfoFile in args.read_info:
             allReadData = DataFrame.parseFromFile(readInfoFile, cDelim='\t')
 
-            readNameIdx = allReadData.getColumnIndex("READ_NAME")
-            readTypeIdx = allReadData.getColumnIndex("TYPE")
-            readRunIdx = allReadData.getColumnIndex("USER_RUN_NAME")
+            samIdx = allReadData.addColumn('SAM_READ_NAME')
+            readNameIdx = allReadData.getColumnIndex('READ_NAME')
+            allReadData.applyByRow(samIdx, lambda x: x[readNameIdx].split(' ')[0])
 
-            for elem in allReadData.vElements:
-
-                readName = elem[readNameIdx].split(" ")[0]
-                readType = elem[readTypeIdx]
-                readRun  = elem[readRunIdx]
-
-                self.readInfo[readName] = (readType, readRun)
+            if self.readInfo == None:
+                self.readInfo = allReadData
+            else:
+                self.readInfo.merge( allReadData )
 
     def readSequences(self, args):
 
@@ -151,17 +151,23 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
         else:
             opener = HTSeq.SAM_Reader
 
+
+        baseCompositions = defaultdict(Counter)
         allReadStats = []
 
         for readAlignment in opener( data ):
 
+            readName = readAlignment.read.name
+            readType = Fast5TYPE.UNKNOWN
+
+            print("Done: " + str(readName))
+
+            readInfo = self.readInfo.findRow('SAM_READ_NAME', readName)
+            if not readInfo == None:
+                readType = Fast5TYPE[ readInfo[ "TYPE" ] ]
+                readID = readInfo[ "READ_ID" ]
+
             if readAlignment.aligned:
-
-                readName = readAlignment.read.name
-
-                readType = Fast5TYPE.UNKNOWN
-                if readName in self.readInfo:
-                    readType = self.readInfo[readName][0]
 
                 readInterval = readAlignment.iv
                 cigarOfRead = readAlignment.cigar
@@ -170,6 +176,11 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
 
                 for cigarOp in cigarOfRead:
 
+                    readSeq = readAlignment.read_as_aligned[cigarOp.query_from:cigarOp.query_to]
+
+                    for base in readSeq.seq:
+                        baseCompositions[cigarOp.type][chr(base)] += 1
+
                     if cigarOp.type == 'M':
 
                         fastaReq = env.fasta[ readInterval.chrom ]
@@ -177,7 +188,6 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
                         fastaReq = fastaReq.toHTSeq()
 
                         fastaSeq = fastaReq[ cigarOp.ref_iv.start:cigarOp.ref_iv.end ]
-                        readSeq = readAlignment.read_as_aligned[cigarOp.query_from:cigarOp.query_to]
 
                         editDistance = self.calculateEditDistance( readSeq, fastaSeq )
 
@@ -188,7 +198,6 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
                     else:
                         cigarOp2Length[ cigarOp.type ].append(cigarOp.size)
 
-                print("done read: " + readName)
                 allReadStats.append( (readType, cigarOp2Length) )
 
         return allReadStats

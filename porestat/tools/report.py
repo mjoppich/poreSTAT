@@ -43,7 +43,7 @@ class ReportFactory(PSToolInterfaceFactory):
         parser.add_argument('-u', '--user-run', dest='groupByRunName', action='store_true', default=False)
 
         parser.add_argument('--save-parallel-result', type=str, default=None)
-        parser.add_argument('--load-parallel-result', type=str, default=None)
+        parser.add_argument('--load-parallel-result', nargs='+', type=str, default=None, help='specify any saved pickle files to combine for report')
 
 
         parser = PlotConfig.addParserArgs(parser)
@@ -74,6 +74,8 @@ class ReportAnalysis(ParallelPSTInterface):
             ('QUALITY BY POSITION', QualityPosition(args)),
         ])
 
+        args.output = makePath(args.output)
+
         print("Output folder: " + str(args.output))
         print("Output name:   " + str(args.output_name))
 
@@ -84,15 +86,23 @@ class ReportAnalysis(ParallelPSTInterface):
         if not os.path.exists(args.output):
             os.makedirs(args.output)
 
+        self.data_path = makePath(makePath(args.output) + args.output_name)
+        if not os.path.exists(self.data_path):
+            os.makedirs(self.data_path)
 
-        self.imagePath = makePath(args.output) + args.output_name
-        if not os.path.exists(self.imagePath):
-            os.makedirs(self.imagePath)
+        import mpld3, shutil
+        d3js_path = mpld3.getD3js()
+        mpld3_path = mpld3.getmpld3js(True)
 
-        pltcfg = PlotConfig()
-        pltcfg.saveToFile(self.imagePath)
+        d3js_dest = self.data_path + os.path.split(d3js_path)[1]
+        mpld3_dest = self.data_path + os.path.split(mpld3_path)[1]
 
-        args.pltcfg = pltcfg
+        shutil.copyfile(d3js_path, d3js_dest)
+        shutil.copyfile(mpld3_path, mpld3_dest)
+
+        args.pltcfg.d3js = os.path.relpath(d3js_dest, args.output)
+        args.pltcfg.mpld3js = os.path.relpath(mpld3_dest, args.output)
+
 
     def prepareInputs(self, args):
 
@@ -157,12 +167,18 @@ class ReportAnalysis(ParallelPSTInterface):
             print("Result saved to: " + args.save_parallel_result)
 
         if not args.load_parallel_result is None:
-            print("Trying to load result from: " + args.load_parallel_result)
+            print("Trying to load result from: " + ", ".join(args.load_parallel_result))
 
-            with open(args.load_parallel_result, 'rb') as pickleFile:
-                parallelResult = pickle.load(pickleFile)
+            for res in args.load_parallel_result:
+                with open(res, 'rb') as pickleFile:
+                    loadedResult = pickle.load(pickleFile)
 
-            print("Result loaded: " + args.load_parallel_result)
+                    if parallelResult == None:
+                        parallelResult = loadedResult
+                    else:
+                        parallelResult = mergeDicts(parallelResult, loadedResult)
+
+                print("Result loaded: " + res)
 
         with open(args.output + args.output_name + ".html", 'w') as htmlFile:
 

@@ -147,7 +147,7 @@ class YieldPlot(ParallelPSTReportableInterface):
 
         for runid in data:
 
-            locTL = sorted(data[runid]['TIME_LENGTHS'])
+            locTL = sorted(data[runid]['TIME_LENGTHS'], key=lambda x: x[0])
 
             cumL = 0
             cumLocTL = []
