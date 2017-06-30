@@ -153,19 +153,29 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
 
 
         baseCompositions = defaultdict(Counter)
-        allReadStats = []
+        allReadStats = {}
+
+        unalignedIDs = set()
+
+        iProcessedReads = 0
 
         for readAlignment in opener( data ):
 
             readName = readAlignment.read.name
             readType = Fast5TYPE.UNKNOWN
 
-            print("Done: " + str(readName))
+            iProcessedReads += 1
+
+            if iProcessedReads % 1000 == 0:
+                print("Done: " + str(iProcessedReads))
 
             readInfo = self.readInfo.findRow('SAM_READ_NAME', readName)
             if not readInfo == None:
                 readType = Fast5TYPE[ readInfo[ "TYPE" ] ]
                 readID = readInfo[ "READ_ID" ]
+            else:
+                print("read id none for " + str(readName))
+
 
             if readAlignment.aligned:
 
@@ -198,9 +208,16 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
                     else:
                         cigarOp2Length[ cigarOp.type ].append(cigarOp.size)
 
-                allReadStats.append( (readType, cigarOp2Length) )
+                allReadStats[readID] = cigarOp2Length
 
-        return allReadStats
+            else:
+                unalignedIDs.add(readID)
+
+
+
+
+
+        return ( allReadStats, unalignedIDs )
 
     def calculateEditDistance(self, htSeq1, htSeq2):
 
@@ -219,24 +236,74 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
     def joinParallel(self, existResult, newResult, oEnvironment):
 
         if existResult == None:
-            existResult = []
+            existResult = ({}, set())
 
-        existResult += newResult
-
-        return existResult
+        returnResult = (mergeDicts(existResult[0], newResult[0]), existResult[1].union(newResult[1]))
+        return returnResult
 
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
+        readCIGARs = parallelResult[0]
+        alignedIDs = set([x for x in parallelResult[0]])
+
+        unalignedIDs = parallelResult[1]
+
+        additionalUnalignedReads = set()
+
+        for row in self.readInfo:
+
+            readid = row['READ_ID']
+
+            if readid in alignedIDs:
+                continue
+
+            if readid in unalignedIDs:
+                continue
+
+            additionalUnalignedReads.add(readid)
+
+        plotDataDict = {}
+        plotDataDict['Aligned'] = len(alignedIDs)
+        plotDataDict['Unaligned'] = len(unalignedIDs)
+        plotDataDict['Not Aligned'] = len(additionalUnalignedReads)
+
+        plotDict = {'All Reads': plotDataDict}
+
+        print(plotDict)
+
+        PorePlot.plotBars(plotDict, "Alignment Stat", "X", "Y", pltcfg=args.pltcfg)
+
+
+        overviewByAligned = defaultdict(Counter)
+        for row in self.readInfo:
+
+            readid = row['READ_ID']
+            read_type = row['TYPE']
+
+            if readid in alignedIDs:
+                overviewByAligned['ALIGNED'][read_type] += 1
+            elif readid in unalignedIDs:
+                overviewByAligned['UNALIGNED'][read_type] += 1
+            elif readid in additionalUnalignedReads:
+                overviewByAligned['NOT ALIGNED'][read_type] += 1
+            else:
+                overviewByAligned['UNKNOWN'][read_type] += 1
+
+        print(overviewByAligned)
+
+        PorePlot.plotBars(overviewByAligned, "Alignment Stat", "X", "Y", pltcfg=args.pltcfg)
 
         if not args.read_type:
 
             totalCounter = defaultdict(list)
 
-            for counterPair in parallelResult:
+            for readID in readCIGARs:
 
-                for x in counterPair[1]:
-                    totalCounter[x] += counterPair[1][x]
+                cigarCounter = readCIGARs[readID]
+
+                for x in cigarCounter:
+                    totalCounter[x] += cigarCounter[x]
 
             if args.violin:
                 PorePlot.plotViolin(totalCounter, [x for x in totalCounter], "CIGARs", pltcfg=args.pltcfg)
@@ -246,7 +313,7 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
         else:
             totalCounter = defaultdict( defaultdict(list) )
 
-            for counterPair in parallelResult:
+            for counterPair in readCIGARs:
 
                 readType = counterPair[0]
                 readCounter = counterPair[1]

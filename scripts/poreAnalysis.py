@@ -5,6 +5,7 @@ import argparse
 
 from porestat.analysis.alignmentStatistics import AlignmentStatisticAnalysisFactory
 from porestat.analysis.read_counts import ReadCountAnalysisFactory
+from porestat.analysis.similarity_analysis import SimilarityAnalysisFactory
 
 from porestat.tools.PTToolInterface import PSToolException
 from porestat.utils import eprint
@@ -28,6 +29,7 @@ if __name__ == '__main__':
     cmd2tool = {}
     cmd2tool['read_counts'] = ReadCountAnalysisFactory(parser, subparsers)
     cmd2tool['alignment_stat'] = AlignmentStatisticAnalysisFactory(parser, subparsers)
+    cmd2tool['similarity'] = SimilarityAnalysisFactory(parser, subparsers)
 
     args = parser.parse_args()
 

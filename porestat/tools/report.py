@@ -74,6 +74,15 @@ class ReportAnalysis(ParallelPSTInterface):
             ('QUALITY BY POSITION', QualityPosition(args)),
         ])
 
+        self.dReportersArgs = OrderedDict([
+
+            ('YIELD', {
+                        'separate_subplots': True,
+                        'user_run': True
+                       })
+
+        ])
+
         args.output = makePath(args.output)
 
         print("Output folder: " + str(args.output))
@@ -100,8 +109,8 @@ class ReportAnalysis(ParallelPSTInterface):
         shutil.copyfile(d3js_path, d3js_dest)
         shutil.copyfile(mpld3_path, mpld3_dest)
 
-        args.pltcfg.d3js = os.path.relpath(d3js_dest, args.output)
-        args.pltcfg.mpld3js = os.path.relpath(mpld3_dest, args.output)
+        args.pltcfg.d3js = os.path.relpath(d3js_dest, self.data_path)
+        args.pltcfg.mpld3js = os.path.relpath(mpld3_dest, self.data_path)
 
 
     def prepareInputs(self, args):
@@ -182,7 +191,21 @@ class ReportAnalysis(ParallelPSTInterface):
 
         with open(args.output + args.output_name + ".html", 'w') as htmlFile:
 
-            htmlFile.write("<html><body>\n")
+            mpld3js = "<script src="+self.data_path + "/" +  args.pltcfg.mpld3js +"></script>\n"
+            d3js = "<script src=" + self.data_path + "/" + args.pltcfg.d3js + "></script>\n"
+
+            htmlFile.write(
+                """
+                <html>
+                <head>
+                """
+                +d3js+
+                mpld3js+
+                """
+                </head>
+                <body>
+                """
+            )
 
             for report in self.dReporters:
 
@@ -191,8 +214,11 @@ class ReportAnalysis(ParallelPSTInterface):
                 reporterArgs = self.prepareEnvironment(args)
                 reporterArgs.output = None
                 reporterArgs.output_type = None
-
                 reporterArgs.pltcfg = args.pltcfg
+
+                reporterArgs = self.patchArgs(reporterArgs, report)
+
+                reporterArgs.pltcfg.saveToFile(self.data_path + "/" + report)
 
                 htmlFile.write("<h1>" + str(report) + "</h1>\n")
 
@@ -206,10 +232,9 @@ class ReportAnalysis(ParallelPSTInterface):
 
                 for x in createdPlots:
 
-                    #relPath = os.path.relpath( x, args.output )
+                    relPath = os.path.relpath( x, args.output )
+                    htmlFile.write(x + "\n")
 
-                    htmlFile.write( x )
-                    #htmlFile.write("<p><img src=\"" + str(relPath) + "\"/></p>\n")
                     #print(str(report) + "\t" + str(relPath))
 
                 htmlFile.flush()
@@ -217,3 +242,16 @@ class ReportAnalysis(ParallelPSTInterface):
             htmlFile.write("</body></html>\n")
 
 
+    def patchArgs(self, args, reporter):
+
+        if not reporter in self.dReportersArgs:
+            return args
+
+        repArgs =self.dReportersArgs[reporter]
+        if repArgs == None or len(repArgs) == 0:
+            return args
+
+        for x in repArgs:
+            args.__dict__[x] = repArgs[x]
+
+        return args

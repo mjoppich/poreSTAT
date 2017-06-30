@@ -559,12 +559,15 @@ class PorePlot:
 
         plt.xticks( xTicks, newLabels )
 
-        cls.makeLegend(fig, ax, allHandles, allLabels, pltcfg, bbox_to_anchor=(0.5, -0.2))
+        if not pltcfg.usesMPLD3():
+            allHandles = None # fix some mpl error
+
+        cls.makeLegend(fig, ax, allHandles, allLabels, pltcfg, bbox_to_anchor=(0.5, -0.1))
 
         pltcfg.makePlot()
 
     @classmethod
-    def plotBars(cls, plotData, title, xlabel, ylabel, pltcfg=PlotConfig()):
+    def plotBars(cls, plotData, title, xlabel, ylabel, xlabelrotation='horizontal', pltcfg=PlotConfig()):
 
         def autolabel(rects):
             """
@@ -626,7 +629,7 @@ class PorePlot:
         ax.set_xlabel(xlabel)
 
         ax.set_xticks(ind + 0.9 / 2.0)
-        ax.set_xticklabels(allGroups)
+        ax.set_xticklabels(allGroups, rotation=xlabelrotation)
 
         allRects = []
         allLabels = []
@@ -651,4 +654,9 @@ class PorePlot:
         else:
             box = ax.get_position()
             ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
-            ax.legend(handles, labels, loc='upper center', bbox_to_anchor=bbox_to_anchor, fancybox=True, shadow=True, ncol=1)
+
+            if handles == None:
+                ax.legend(labels, loc='upper center', bbox_to_anchor=bbox_to_anchor, fancybox=True, shadow=True, ncol=1)
+            else:
+                ax.legend(handles, labels, loc='upper center', bbox_to_anchor=bbox_to_anchor, fancybox=True,
+                          shadow=True, ncol=1)

@@ -166,7 +166,7 @@ class ExperimentLs(ParallelPSTReportableInterface):
 
             outFrame.export(args.output, args.output_type)
 
-        showPlot = not self.hasArgument('no_plot', args) or args.no_plot
+        showPlot = not self.hasArgument('no_plot', args) or not args.no_plot
 
         if showPlot:
 
@@ -181,6 +181,6 @@ class ExperimentLs(ParallelPSTReportableInterface):
 
                 plotDict[runid] = runData
 
-            PorePlot.plotBars(plotDict, "Read-Types by Experiment", "Read-Type", "Count", args.pltcfg)
+            PorePlot.plotBars(plotDict, "Read-Types by Experiment", "Read-Type", "Count", xlabelrotation=90, pltcfg=args.pltcfg)
 
 

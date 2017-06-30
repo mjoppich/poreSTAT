@@ -223,6 +223,9 @@ class DemangleFiles(ParallelPSTInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
+        if parallelResult == None:
+            return
+
         chunkFolders = sorted([x for x in parallelResult[1]])
 
         for x in chunkFolders:

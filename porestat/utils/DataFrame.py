@@ -103,6 +103,9 @@ class DataSeries:
     def to_list(self):
         return list(self.data)
 
+    def to_set(self):
+        return set(self.data)
+
     def to_scalar(self):
         if len(self.data) > 1:
             raise DataFrameException("Data is not scalar: " + str(self.data))
@@ -285,6 +288,17 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
 
         if type(item) == int:
             return DataRow(self.column2idx, DataSeries.__getitem__(self, item))
+        elif type(item) == str or (item in self.column2idx):
+
+            seriesData = [None] * len(self.data)
+
+            idx = self.getColumnIndex(item)
+            for i in range(0, len(self.data)):
+                val = self.data[i][idx]
+                seriesData[i] = val
+
+            return DataSeries(seriesData)
+
         elif type(item) == tuple or type(item) == list:
 
             if len(item) == 1:

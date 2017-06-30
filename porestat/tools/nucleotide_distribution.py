@@ -171,6 +171,6 @@ class NucleotideDistribution(ParallelPSTReportableInterface):
 
                 print("\t".join(allobs))
 
-            PorePlot.plotBars(absPlotData, "Nucleotide Distribution (abs. counts)", "Nucleotide", "Count", args.pltcfg )
-            PorePlot.plotBars(relPlotData, "Nucleotide Distribution (perc.)", "Nucleotide", "Percentage", args.pltcfg )
+            PorePlot.plotBars(absPlotData, "Nucleotide Distribution (abs. counts)", "Nucleotide", "Count", pltcfg=args.pltcfg )
+            PorePlot.plotBars(relPlotData, "Nucleotide Distribution (perc.)", "Nucleotide", "Percentage", pltcfg=args.pltcfg )
 

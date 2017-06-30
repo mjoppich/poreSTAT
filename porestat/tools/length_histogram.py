@@ -23,7 +23,7 @@ class LengthHistogramFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-p', '--plot', nargs='?', type=bool, const=True, default=False, help='issue plot?', required=False)
-        parser.add_argument('-u', '--user-run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-u', '--user-run', dest='user_run', action='store_true', default=False)
         parser.add_argument('-q', '--read-type', dest='addTypeSubplot', action='store_true', default=False, help='add type subplots')
 
 
@@ -119,7 +119,7 @@ class LengthHistogram(ParallelPSTReportableInterface):
                 'LENGTHS': lengthObversations
             }
 
-            key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
+            key = ",".join(run_user_name) if self.hasArgument('user_run', args) and args.user_run else runid
 
             if key in allobservations:
                 allobservations[key] = mergeDicts(allobservations[key], observations)

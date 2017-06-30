@@ -21,9 +21,12 @@ class YieldPlotFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
 
-        parser.add_argument('-u', '--user-run', dest='groupByRunName', action='store_true', default=False)
-        parser.add_argument('--no-read-type-subplot', dest='addTypeSubplot', action='store_false', default=True, help='do not add type subplots')
-        parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
+        parser.add_argument('-u', '--user-run', action='store_true', default=False, help='groups all runs by user run field')
+
+        parser.add_argument('--no-read-type-subplot', action='store_true', default=False, help='do not add type subplots')
+        parser.add_argument('--separate-subplots', action='store_true', default=False,
+                            help='add subplots by read type, but make separate figure')
+
         parser.add_argument('-rc', '--read-count', dest='read_count', action='store_true', default=False)
 
         parser = PlotConfig.addParserArgs(parser)
@@ -38,6 +41,34 @@ class YieldPlotFactory(PSToolInterfaceFactory):
         simArgs.pltcfg = PlotConfig.fromParserArgs(simArgs)
 
         return YieldPlot(simArgs)
+
+
+class YieldData:
+
+    def __init__(self, runid):
+        self.runid = runid
+        self.byType = {}
+        self.alldata = None
+
+    def addData(self, data, dataType):
+
+        self.byType[dataType] = data
+
+    def getData(self, dataType = None):
+
+        if dataType == None:
+
+            if self.alldata != None:
+                return self.alldata
+            else:
+                return []
+
+        else:
+
+            return self.byType[dataType]
+
+
+
 
 class YieldPlot(ParallelPSTReportableInterface):
 
@@ -91,9 +122,13 @@ class YieldPlot(ParallelPSTReportableInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
+        if parallelResult == None:
+            return
+
         makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'TOTAL_LENGTH', 'N50', 'L50']
 
         allobservations = {}
+
         for runid in parallelResult:
 
             props = parallelResult[runid]
@@ -119,7 +154,7 @@ class YieldPlot(ParallelPSTReportableInterface):
                 'TIME_LENGTHS': props['TIME_LENGTHS']
             }
 
-            key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
+            key = ",".join(run_user_name) if self.hasArgument('user_run', args) and args.user_run else runid
 
             if key in allobservations:
                 allobservations[key] = mergeDicts(allobservations[key], observations)
@@ -143,6 +178,50 @@ class YieldPlot(ParallelPSTReportableInterface):
 
     def makePlot(self, data, args):
 
+
+        # prepare data
+        makeReadTypeData = (not (self.hasArgument('no_read_type_subplot', args)) or not args.no_read_type_subplot)
+        rawPlotData = self.prepareData(data, makeReadTypeData)
+
+        if self.hasArgument('read_count', args) and args.read_count:
+            yDescription = "Cumulative Read Count"
+        else:
+            yDescription = "Cumulative BP"
+
+
+
+
+        plotData = {}
+
+        for runid in rawPlotData:
+            plotData[runid] = rawPlotData[runid].getData()
+
+        if args.separate_subplots:
+            PorePlot.yieldPlot(plotData, "Yield Plot (all reads)", "Time since exp. start", yDescription, pltcfg=args.pltcfg)
+            plotData = {}
+
+        for type in Fast5TYPE:
+            for runid in rawPlotData:
+                plotData[runid + " " + str(type)] = rawPlotData[runid].getData(dataType=type)
+
+            if args.separate_subplots:
+
+                totalElements = 0
+                for x in plotData:
+                    totalElements += len(plotData[x])
+
+                if totalElements == 0:
+                    plotData = {}
+                    continue
+
+                PorePlot.yieldPlot(plotData, "Yield Plot (" + str(type) + ")", "Time since exp. start", yDescription, pltcfg=args.pltcfg)
+                plotData = {}
+
+        if not args.separate_subplots:
+            PorePlot.yieldPlot(plotData, "Yield Plot", "Time since exp. start", yDescription, pltcfg=args.pltcfg)
+
+    def prepareData(self, data, makeReadTypeData):
+
         timeLengthData = {}
 
         for runid in data:
@@ -159,13 +238,21 @@ class YieldPlot(ParallelPSTReportableInterface):
 
                 cumL += locL
 
-            timeLengthData[runid] = cumLocTL
+            runData = YieldData(runid)
+            runData.alldata = cumLocTL
 
-            # additional plots if wanted
-            if not (self.hasArgument('no_read_type_subplot', args) and args.no_read_type_subplot):
+            """
+
+            BY READ TYPE
+
+            """
+
+            if makeReadTypeData:
 
                 cumLocTLbyType = {}
                 cumLByType = {}
+
+                locTL = sorted(data[runid]['TIME_LENGTHS'], key=lambda x: x[0])
 
                 for tpl in locTL:
 
@@ -175,27 +262,21 @@ class YieldPlot(ParallelPSTReportableInterface):
 
                     if not locType in cumLByType:
                         cumLByType[locType] = 0
-                        cumLocTLbyType[locType] = []
-
+                        cumLocTLbyType[locType] = [(0, 0)]
 
                     cumL = cumLByType[locType]
                     cumLocTL = cumLocTLbyType[locType]
 
                     cumL += locL
-                    cumLocTL.append( (locT, cumL) )
+                    cumLocTL.append((locT, cumL))
 
                     cumLByType[locType] = cumL
                     cumLocTLbyType[locType] = cumLocTL
 
-                for dataType in cumLocTLbyType:
+                for type in Fast5TYPE:
+                    cumData = cumLocTLbyType[type] if type in cumLocTLbyType else []
+                    runData.addData(cumData, type)
 
-                    label = runid + "_" + str(dataType)
+            timeLengthData[runid] = runData
 
-                    timeLengthData[ label ] = cumLocTLbyType[dataType]
-
-        if self.hasArgument('read_count', args) and args.read_count:
-            yDescription = "Cumulative Read Count"
-        else:
-            yDescription = "Cumulative BP"
-
-        PorePlot.yieldPlot(timeLengthData, "Yield Plot", "Time since exp. start", yDescription, pltcfg=args.pltcfg)
+        return timeLengthData

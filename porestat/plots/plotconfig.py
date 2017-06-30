@@ -115,6 +115,9 @@ class PlotConfig:
         self.d3js = None
         self.mpld3js=None
 
+        self.d3js = mpld3.getD3js()
+        self.mpld3js = mpld3.getmpld3js(True)
+
         self.createdPlots = []
 
     def __str__(self):
@@ -127,14 +130,14 @@ class PlotConfig:
     def saveToFile(self, filePath):
 
         self.save_to_file = True
-        self.save_file = filePath + ".%02d." + PlotSaveTYPE.getFileExtension( self.outputType )
+        self.save_file = filePath
 
         plt.ioff()
 
     def setOutputType(self, outType):
         self.outputType = outType
 
-        if self.outputType == PlotSaveTYPE.HTML_STRING:
+        if self.usesMPLD3():
             plt.ioff()
 
 
@@ -171,8 +174,9 @@ class PlotConfig:
 
 
         if self.outputType == PlotSaveTYPE.HTML_STRING:
-            outString = mpld3.fig_to_html(current_figure, d3_url=self.d3js, mpld3_url=self.mpld3js)
+            outString = mpld3.fig_to_html(current_figure, template_type='notebook', d3_url=self.d3js, mpld3_url=self.mpld3js)
             self.createdPlots.append(outString)
+            plt.close(current_figure)
             return
 
         if self.outputType == PlotSaveTYPE.D3:
@@ -180,17 +184,19 @@ class PlotConfig:
 
         if self.save_to_file:
 
-            exactFilename = self.save_file % self.saved_plot
+            exactFilename = self.save_file + ".%02d." + PlotSaveTYPE.getFileExtension( self.outputType )
+            exactFilename = exactFilename % self.saved_plot
             self.saved_plot += 1
 
             if self.outputType == PlotSaveTYPE.HTML:
-                mpld3.save_html(current_figure, self.save_file)
+                mpld3.save_html(current_figure, exactFilename, template_type='notebook', d3_url=self.d3js, mpld3_url=self.mpld3js)
             elif self.outputType == PlotSaveTYPE.JSON:
-                mpld3.save_json(current_figure, self.save_file)
+                mpld3.save_json(current_figure, exactFilename, d3_url=self.d3js, mpld3_url=self.mpld3js)
             elif self.outputType == PlotSaveTYPE.PNG:
                 plt.savefig(exactFilename, transparent=self.transparent_bg, bbox_inches='tight')
 
             self.createdPlots.append(exactFilename)
+
         else:
 
             legends = current_figure.legends
@@ -210,3 +216,5 @@ class PlotConfig:
                 plt.tight_layout()
 
             plt.show()
+
+        plt.close(current_figure)

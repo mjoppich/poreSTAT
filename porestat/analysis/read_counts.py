@@ -87,16 +87,11 @@ class ReadCountAnalysis(ParallelPSTInterface):
         for readInfoFile in args.read_info:
             allReadData = DataFrame.parseFromFile(readInfoFile, cDelim='\t')
 
-            readNameIdx = allReadData.getColumnIndex("READ_NAME")
-            readTypeIdx = allReadData.getColumnIndex("TYPE")
-            readRunIdx = allReadData.getColumnIndex("USER_RUN_NAME")
-            readLengthIdx = allReadData.getColumnIndex("READ_LENGTH")
-
-            for elem in allReadData.vElements:
-                readName = elem[readNameIdx]
-                readType = elem[readTypeIdx]
-                readRun = elem[readRunIdx]
-                readLength = int(elem[readLengthIdx])
+            for row in allReadData:
+                readName = row["READ_NAME"]
+                readType = row["TYPE"]
+                readRun = row["USER_RUN_NAME"]
+                readLength = int(row["READ_LENGTH"])
 
                 self.readInfo[readName] = (readType, readRun, readLength)
 
@@ -149,9 +144,9 @@ class ReadCountAnalysis(ParallelPSTInterface):
         featureCoverage = {}
         for feature in self.genomeAnnotation:
 
-            if feature.type == "exon" or feature.type == "operon":
+            if feature.type == "gene":
 
-                featureLocusName = feature.attr['gene_id'] if 'gene_id' in feature.attr else feature.name
+                featureLocusName = feature.attr['old_locus_tag'] if 'old_locus_tag' in feature.attr else feature.name
 
                 if not featureLocusName in featureLengths:
                     featureLengths[ featureLocusName ] = []
