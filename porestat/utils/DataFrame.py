@@ -1,5 +1,7 @@
 from collections import defaultdict
 from enum import Enum
+
+from jinja2 import Template
 from openpyxl import Workbook
 
 __author__ = 'joppich'
@@ -53,6 +55,7 @@ class ExportTYPE(Enum):
     CSV=0
     TSV=1
     XLSX=2
+    HTML=3
 
 
 class DataSeries:
@@ -545,6 +548,95 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         # Save the file
         wb.save( outFile )
 
+    def _makeHTML(self, outFile):
+
+        htmlfile="""
+
+        <html>
+            <head>
+                <link rel="stylesheet" href="https://cdn.datatables.net/1.10.15/css/jquery.dataTables.min.css">
+                <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+                <script src="https://cdn.datatables.net/1.10.15/js/jquery.dataTables.min.js"></script>
+            </head>
+            <body>
+
+                <table id="example" class="display" cellspacing="0" width="100%">
+                <thead>
+                <tr>
+                {% for column in columns %}
+                    <th>{{column}}</th>
+                    {% endfor %}
+                </tr>
+                </thead>
+
+                <tbody>
+                {%- for row in rows %}
+                <tr>
+                    {% for idx in indices %}
+                    <td>{{ row[idx] }}</td>
+                    {%- endfor -%}
+                </tr>
+                {% endfor -%}
+                </tbody>
+
+                <tfoot>
+                <tr>
+                {% for column in columns %}
+                    <th>{{column}}</th>
+                    {% endfor %}
+                </tr>
+                </tfoot>
+
+                </table>
+
+                <script>
+                $(document).ready(function() {
+                    $('#example tfoot th').each( function () {
+                        var title = $(this).text();
+                        $(this).html( '<input type="text" placeholder="Search '+title+'" />' );
+                    } );
+
+                    // DataTable
+                    var table = $('#example').DataTable();
+
+                    // Apply the search
+                    table.columns().every( function () {
+                        var that = this;
+
+                        $( 'input', this.footer() ).on( 'keyup change', function () {
+                            if ( that.search() !== this.value ) {
+                                that
+                                    .search( this.value )
+                                    .draw();
+                            }
+                        } );
+                    } );
+
+                } );
+                </script>
+
+            </body>
+        </html>
+        """
+
+        sortedHeader = sorted(self.column2idx.items(), key=operator.itemgetter(1))
+        vHeader = [str(x[0]) for x in sortedHeader]
+        vIndices = [x[1] for x in sortedHeader]
+
+
+
+        with open(outFile, 'w') as outHtml:
+
+            jinjaTemplate = Template(htmlfile)
+            output = jinjaTemplate.render(rows=self.data, indices=vIndices, columns=vHeader)
+
+            outHtml.write(output)
+
+
+
+
+
+
 
     def export(self, outFile, exType=ExportTYPE.TSV):
 
@@ -552,6 +644,10 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
 
         if exType == ExportTYPE.XLSX and outFile != None:
             self._makeXLSX(outFile)
+            return
+
+        if exType == ExportTYPE.HTML and outFile != None:
+            self._makeHTML(outFile)
             return
 
         if exType == ExportTYPE.TSV:

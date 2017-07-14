@@ -1,10 +1,10 @@
 from collections import defaultdict
 
 from ..plots.plotconfig import PlotConfig
-from ..plots.poreplot import PorePlot
+from ..plots.poreplot import PorePlot, PlotDirectionTYPE
 
 from .ParallelPTTInterface import ParallelPSTReportableInterface
-from .PTToolInterface import PSToolInterfaceFactory
+from .PTToolInterface import PSToolInterfaceFactory, PSToolException
 from ..utils.Stats import calcN50
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
@@ -24,7 +24,7 @@ class LengthHistogramFactory(PSToolInterfaceFactory):
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-p', '--plot', nargs='?', type=bool, const=True, default=False, help='issue plot?', required=False)
         parser.add_argument('-u', '--user-run', dest='user_run', action='store_true', default=False)
-        parser.add_argument('-q', '--read-type', dest='addTypeSubplot', action='store_true', default=False, help='add type subplots')
+        parser.add_argument('-q', '--read-type', dest='read_type', action='store_true', default=False, help='add type subplots')
 
 
         parser.add_argument('-c', '--combined', dest='combineRuns', action='store_true', default=False)
@@ -89,6 +89,9 @@ class LengthHistogram(ParallelPSTReportableInterface):
 
 
     def makeResults(self, parallelResult, oEnvironment, args):
+
+        if parallelResult == None:
+            raise PSToolException('No valid result generated.')
 
         makeObservations = ['RUNID', 'USER_RUN_NAME', 'FILES', 'TOTAL_LENGTH', 'N50', 'L50']
 
@@ -172,7 +175,7 @@ class LengthHistogram(ParallelPSTReportableInterface):
         if self.hasArgument('violin', args) and not args.violin:
             PorePlot.plotHistogram(plotData, None, 'Length Histogram for ', xlabel="Read Length", ylabel="Read Count", pltcfg=args.pltcfg)
         else:
-            PorePlot.plotViolin(plotData, None, 'Length Histogram', pltcfg=args.pltcfg)
+            PorePlot.plotViolin(plotData, None, 'Length Histogram', pltcfg=args.pltcfg, plotDirection=PlotDirectionTYPE.HORIZONTAL)
 
 
 

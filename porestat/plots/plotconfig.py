@@ -168,6 +168,7 @@ class PlotConfig:
     def makePlot(self):
 
         current_figure = plt.gcf()
+        mpld3.fig_to_html()
 
         if self.usesMPLD3():
             plugins.connect(current_figure, plugins.MousePosition(fontsize=14))

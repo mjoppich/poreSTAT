@@ -2,7 +2,7 @@ import argparse
 import HTSeq
 import matplotlib
 
-from porestat.plots.poreplot import PorePlot
+from porestat.plots.poreplot import PorePlot, MultiAxesPointHTMLTooltip
 
 from porestat.plots.plotconfig import PlotConfig
 from ..utils.DataFrame import DataFrame, DataRow
@@ -13,7 +13,7 @@ from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
 from ..utils.Files import fileExists
 from scipy import stats
-import sys
+import sys, math
 import numpy as np
 from matplotlib import pyplot as plt
 import mpld3
@@ -175,6 +175,11 @@ class SimilarityAnalysis(ParallelPSTInterface):
         fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.95,
                             hspace=0.1, wspace=0.1)
 
+        minx=float('inf')
+        maxx=float('-inf')
+        miny=float('inf')
+        maxy=float('-inf')
+
         allPltAnnot = []
         for i in range(dataShape[0]):
             for j in range(dataShape[0]):
@@ -196,8 +201,11 @@ class SimilarityAnalysis(ParallelPSTInterface):
                     htmlData.append( makeHTMLTable(unionGenes[k], dataRows[j], X[k], dataRows[i], Y[k]) )
                     colors.append( 'blue' )
 
-                print(X)
-                print(Y)
+                minx = min(minx, np.amin(X))
+                miny = min(miny, np.amin(Y))
+
+                maxx = max(maxx, np.amax(X))
+                maxy = max(maxy, np.amax(Y))
 
                 points = ax[i,j].scatter(X, Y, c=colors, s=40, alpha=0.6)
                 allPltAnnot.append((points, htmlData))
@@ -214,6 +222,29 @@ class SimilarityAnalysis(ParallelPSTInterface):
         #    for axis in [axi.xaxis, axi.yaxis]:
         #        axis.set_major_formatter(plt.NullFormatter())
 
+        minx = math.floor(minx)
+        miny = math.floor(miny)
+
+        maxx = math.ceil(maxx)
+        maxy = math.ceil(maxy)
+
+        stepSizeX = int((maxx-minx)/10.0)
+        stepSizeY = int((maxy-miny)/10.0)
+
+        for axi in ax.flat:
+
+            axi.set_ylim([miny, maxy])
+            axi.set_xlim([minx, maxx])
+
+            axi.xaxis.set_ticks([x for x in range(minx, maxx, stepSizeX)])
+            axi.yaxis.set_ticks([x for x in range(miny, maxy, stepSizeY)])
+
+            alllabels = axi.xaxis.get_ticklabels()
+
+            for tick in axi.xaxis.get_major_ticks():
+                tick.label._text = str(tick._loc)
+                tick.label.set_rotation(65)
+
         # Here we connect the linked brush plugin
         tooltip = MultiAxesPointHTMLTooltip( combinedPoints, combinedHTML, voffset=10, hoffset=10, css=tooltipCSS)
         mpld3.plugins.connect(fig, tooltip)
@@ -221,9 +252,6 @@ class SimilarityAnalysis(ParallelPSTInterface):
 
         mpld3.plugins.connect(fig, mpld3.plugins.LinkedBrush(points))
         mpld3.show()
-
-
-
 
         return
 
@@ -254,111 +282,6 @@ class SimilarityAnalysis(ParallelPSTInterface):
         else:
             return bool(re.match("^[a-zA-Z][a-zA-Z0-9\-\.\:\_]*$", objid))
 
-
-class MultiAxesPointHTMLTooltip(mpld3.plugins.PluginBase):
-    """A Plugin to enable an HTML tooltip:
-    formated text which hovers over points.
-
-    Parameters
-    ----------
-    points : matplotlib Collection or Line2D object
-        The figure element to apply the tooltip to
-    labels : list
-        The labels for each point in points, as strings of unescaped HTML.
-    hoffset, voffset : integer, optional
-        The number of pixels to offset the tooltip text.  Default is
-        hoffset = 0, voffset = 10
-    css : str, optional
-        css to be included, for styling the label html if desired
-    Examples
-    --------
-    >>> import matplotlib.pyplot as plt
-    >>> from mpld3 import fig_to_html, plugins
-    >>> fig, ax = plt.subplots()
-    >>> points = ax.plot(range(10), 'o')
-    >>> labels = ['<h1>{title}</h1>'.format(title=i) for i in range(10)]
-    >>> plugins.connect(fig, MultiAxesPointHTMLTooltip(points[0], labels))
-    >>> fig_to_html(fig)
-    """
-
-    JAVASCRIPT = """
-    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
-    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
-    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
-    HtmlTooltipPlugin.prototype.requiredProps = ["ids", "labels"];
-    HtmlTooltipPlugin.prototype.defaultProps = {hoffset:0,
-                                                voffset:10};
-    function HtmlTooltipPlugin(fig, props){
-        mpld3.Plugin.call(this, fig, props);
-    };
-
-    HtmlTooltipPlugin.prototype.draw = function(){
-
-           var tooltip = d3.select("body").append("div")
-                    .attr("class", "mpld3-tooltip")
-                    .style("position", "absolute")
-                    .style("z-index", "10")
-                    .style("visibility", "hidden");
-
-       combinedElements = null;
-       for (var i = 0; i < this.props.ids.length; i++)
-       {
-
-        console.log("adding info for element: " + this.props.ids[i] );
-
-       var obj = mpld3.get_element(this.props.ids[i]);
-       var labels = this.props.labels[i];
-       var self = this;
-       let pltelem = i;
-
-       console.log(labels);
-
-
-       obj.elements().on("mouseover", function(d, i){
-       console.log(pltelem);
-                              tooltip.html(self.props.labels[pltelem][i])
-                                     .style("visibility", "visible");})
-           .on("mousemove", function(d, i){
-                  tooltip
-                    .style("top", d3.event.pageY + this.props.voffset + "px")
-                    .style("left",d3.event.pageX + this.props.hoffset + "px");
-                 }.bind(this))
-           .on("mouseout",  function(d, i){
-                           tooltip.style("visibility", "hidden");});
-
-       }
-
-
-    };
-    """
-
-    def __init__(self, points, labels=None,
-                 hoffset=0, voffset=10, css=None):
-        self.points = points
-        self.labels = labels
-        self.voffset = voffset
-        self.hoffset = hoffset
-        self.css_ = css or ""
-
-        ids = []
-        for point in points:
-
-            if isinstance(points, matplotlib.lines.Line2D):
-                suffix = "pts"
-            else:
-                suffix = None
-
-            points_id = mpld3.utils.get_id(point, suffix)
-            ids.append(points_id)
-
-        print(ids)
-
-        self.dict_ = {"type": "htmltooltip",
-                      # "id": get_id(points, suffix),
-                      "ids": ids,
-                      "labels": labels,
-                      "hoffset": hoffset,
-                      "voffset": voffset}
 
 
 

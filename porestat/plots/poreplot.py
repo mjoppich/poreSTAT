@@ -1,5 +1,7 @@
 from enum import Enum
 
+import matplotlib
+import mpld3
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -41,6 +43,113 @@ class TimestampTimeFormatter(Formatter):
         h, m = divmod(m, 60)
 
         return "%d:%02d:%02d" % (h, m, s)
+
+class MultiAxesPointHTMLTooltip(mpld3.plugins.PluginBase):
+    """A Plugin to enable an HTML tooltip:
+    formated text which hovers over points.
+
+    Parameters
+    ----------
+    points : matplotlib Collection or Line2D object
+        The figure element to apply the tooltip to
+    labels : list
+        The labels for each point in points, as strings of unescaped HTML.
+    hoffset, voffset : integer, optional
+        The number of pixels to offset the tooltip text.  Default is
+        hoffset = 0, voffset = 10
+    css : str, optional
+        css to be included, for styling the label html if desired
+    Examples
+    --------
+    >>> import matplotlib.pyplot as plt
+    >>> from mpld3 import fig_to_html, plugins
+    >>> fig, ax = plt.subplots()
+    >>> points = ax.plot(range(10), 'o')
+    >>> labels = ['<h1>{title}</h1>'.format(title=i) for i in range(10)]
+    >>> plugins.connect(fig, MultiAxesPointHTMLTooltip(points[0], labels))
+    >>> fig_to_html(fig)
+    """
+
+    JAVASCRIPT = """
+    mpld3.register_plugin("htmltooltip", HtmlTooltipPlugin);
+    HtmlTooltipPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+    HtmlTooltipPlugin.prototype.constructor = HtmlTooltipPlugin;
+    HtmlTooltipPlugin.prototype.requiredProps = ["ids", "labels"];
+    HtmlTooltipPlugin.prototype.defaultProps = {hoffset:0,
+                                                voffset:10};
+    function HtmlTooltipPlugin(fig, props){
+        mpld3.Plugin.call(this, fig, props);
+    };
+
+    HtmlTooltipPlugin.prototype.draw = function(){
+
+           var tooltip = d3.select("body").append("div")
+                    .attr("class", "mpld3-tooltip")
+                    .style("position", "absolute")
+                    .style("z-index", "10")
+                    .style("visibility", "hidden");
+
+       combinedElements = null;
+       for (var i = 0; i < this.props.ids.length; i++)
+       {
+
+        console.log("adding info for element: " + this.props.ids[i] );
+
+       var obj = mpld3.get_element(this.props.ids[i]);
+       var labels = this.props.labels[i];
+       var self = this;
+       let pltelem = i;
+
+       console.log(labels);
+
+
+       obj.elements().on("mouseover", function(d, i){
+       console.log(pltelem);
+                              tooltip.html(self.props.labels[pltelem][i])
+                                     .style("visibility", "visible");})
+           .on("mousemove", function(d, i){
+                  tooltip
+                    .style("top", d3.event.pageY + this.props.voffset + "px")
+                    .style("left",d3.event.pageX + this.props.hoffset + "px");
+                 }.bind(this))
+           .on("mouseout",  function(d, i){
+                           tooltip.style("visibility", "hidden");});
+
+       }
+
+
+    };
+    """
+
+    def __init__(self, points, labels=None,
+                 hoffset=0, voffset=10, css=None):
+        self.points = points
+        self.labels = labels
+        self.voffset = voffset
+        self.hoffset = hoffset
+        self.css_ = css or ""
+
+        ids = []
+        for point in points:
+
+            if isinstance(points, matplotlib.lines.Line2D):
+                suffix = "pts"
+            else:
+                suffix = None
+
+            points_id = mpld3.utils.get_id(point, suffix)
+            ids.append(points_id)
+
+        print(ids)
+
+        self.dict_ = {"type": "htmltooltip",
+                      # "id": get_id(points, suffix),
+                      "ids": ids,
+                      "labels": labels,
+                      "hoffset": hoffset,
+                      "voffset": voffset}
+
+
 
 class PlotDirectionTYPE(Enum):
     VERTICAL='vertical'
@@ -245,7 +354,7 @@ class PorePlot:
 
 
         if pltcfg.usesMPLD3():
-            tooltip = plugins.PointHTMLTooltip(elems, htmlDescr, voffset=10, hoffset=10, css=tooltipCSS)
+            tooltip = MultiAxesPointHTMLTooltip([elems], [htmlDescr], voffset=10, hoffset=10, css=tooltipCSS)
             plugins.connect(fig, tooltip)
         else:
 
@@ -328,9 +437,11 @@ class PorePlot:
 
     @classmethod
     def plotHistogram(cls, someData, labels, title, bins = 100, xlabel=None, ylabel=None, pltcfg = PlotConfig()):
+
+
         pltcfg.startPlot()
         fig, ax = plt.subplots()
-        linebc, bins, patches = ax.hist( someData , bins, histtype='bar', stacked=False, label=labels)
+        linebc, bins, patches = ax.hist( someData , bins, histtype='bar', stacked=False, label=labels, orientation='horizontal')
         ax.set_title( title )
 
         if xlabel != None:
@@ -338,6 +449,9 @@ class PorePlot:
 
         if ylabel != None:
             ax.set_ylabel( ylabel )
+
+        for tick in ax.xaxis.get_major_ticks():
+            tick.label.set_rotation(65)
 
 #        ax.axes.get_xaxis().set_ticks( [i for i in range(1, len(stepLabels)+1)] )
 #        ax.axes.get_xaxis().set_ticklabels( stepLabels, rotation=90 )
@@ -377,7 +491,7 @@ class PorePlot:
         pltcfg.makePlot()
 
     @classmethod
-    def plotSingleViolin(cls, data, title, ax):
+    def plotSingleViolin(cls, data, title, ax, vert=True):
 
         if len(data) == 0:
             plotData = np.array([float('nan'), float('nan')], dtype=float)
@@ -400,7 +514,7 @@ class PorePlot:
                 plotPos = [1]
                 plotData = np.array(data, dtype=float)
 
-        ax.violinplot(plotData, positions=plotPos, showmeans=True, showextrema=True, showmedians=True, points=100)
+        ax.violinplot(plotData, positions=plotPos, showmeans=True, showextrema=True, showmedians=True, points=100, vert=vert)
         ax.set_title(title)
 
     @classmethod
@@ -416,10 +530,15 @@ class PorePlot:
                 shape = (1, elems)
                 shareY = True
                 shareX = False
+
+                vert=True
+
             else:
                 shape = (elems, 1)
                 shareY = False
                 shareX = True
+
+                vert=False
 
         pltcfg.startPlot()
         fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1], sharex=shareX, sharey=shareY)
@@ -433,9 +552,9 @@ class PorePlot:
             axisManipulator = axisManipulation[labels[i]] if not axisManipulation is None and labels[i] in axisManipulation else None
 
             if shape == (1,1):
-                cls.plotSingleViolin( someData[x], labels[i], ax)
+                cls.plotSingleViolin( someData[x], labels[i], ax, vert=vert)
             else:
-                cls.plotSingleViolin( someData[x], labels[i], ax[i] )
+                cls.plotSingleViolin( someData[x], labels[i], ax[i], vert=vert)
             
             if axisManipulator != None:
                 axisManipulator(ax[i])
@@ -567,7 +686,7 @@ class PorePlot:
         pltcfg.makePlot()
 
     @classmethod
-    def plotBars(cls, plotData, title, xlabel, ylabel, xlabelrotation='horizontal', pltcfg=PlotConfig()):
+    def plotBars(cls, plotData, title, xlabel, ylabel, xlabelrotation='horizontal', pltcfg=PlotConfig(), noBarLabels=False):
 
         def autolabel(rects):
             """
@@ -638,8 +757,9 @@ class PorePlot:
             allRects.append(rect)
             allLabels.append(run)
 
-        for rect in allRects:
-            autolabel(rect)
+        if not noBarLabels:
+            for rect in allRects:
+                autolabel(rect)
 
         cls.makeLegend(fig, ax, allRects, allLabels, pltcfg)
 
