@@ -51,7 +51,8 @@ class ReadCountAnalysisFactory(PSToolInterfaceFactory):
 
         return ReadCountAnalysis(simArgs)
 
-
+class Evidences(object):
+    pass
 
 class ReadCountAnalysis(ParallelPSTInterface):
 
@@ -109,7 +110,7 @@ class ReadCountAnalysis(ParallelPSTInterface):
             if not fileExists(x):
                 PSToolException("sam file does not exist: " + str(x))
 
-        self.writeLinesToOutput(args.output, "\t".join(['gene', 'coverage', 'rank']) + "\n", mode='w')
+        self.writeLinesToOutput(args.output, "\t".join(['gene', 'coverage', 'coverage_rank', 'read_counts', 'read_counts_rank']) + "\n", mode='w')
 
 
         return args.sam
@@ -149,9 +150,12 @@ class ReadCountAnalysis(ParallelPSTInterface):
                     gene_id = list(gene_ids)[0]
                     readCounts[gene_id] += 1
                 elif len(gene_ids) == 0:
-                    readCounts["_no_feature"] += 1
+                    pass
                 else:
-                    readCounts["_ambiguous"] += 1
+
+                    for gene_id in gene_ids:
+                        readCounts[gene_id] += 1
+
 
             else:
                 foundReadsNotAligned.add( alngt.read.name )
@@ -215,16 +219,13 @@ class ReadCountAnalysis(ParallelPSTInterface):
             allGeneNames.add(x)
 
         allGeneNames = list(allGeneNames)
-
-        geneNames = [x for x in allGeneNames]
-
         rankedCoverage = stats.rankdata( [ coverages[gene] for gene in allGeneNames ] )
         rankedReadCount = stats.rankdata( [ readCounts[gene] for gene in allGeneNames] )
 
         allRankedCovs = []
         for i in range(0, len(allGeneNames)):
 
-            elem = object()
+            elem = Evidences()
             elem.name = allGeneNames[i]
 
             elem.coverage = coverages[elem.name]

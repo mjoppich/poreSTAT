@@ -100,9 +100,6 @@ class MultiAxesPointHTMLTooltip(mpld3.plugins.PluginBase):
        var self = this;
        let pltelem = i;
 
-       console.log(labels);
-
-
        obj.elements().on("mouseover", function(d, i){
        console.log(pltelem);
                               tooltip.html(self.props.labels[pltelem][i])
@@ -161,20 +158,20 @@ class PorePlot:
     def getToolTipCSS(cls):
 
         return """
-        table
+        table.tooltip
         {
           border-collapse: collapse;
         }
-        th
+        .tooltip th
         {
           color: #ffffff;
           background-color: #000000;
         }
-        td
+        .tooltip td
         {
           background-color: #cccccc;
         }
-        table, th, td
+        table.tooltip, .tooltip th, .tooltip td
         {
           font-family:Arial, Helvetica, sans-serif;
           border: 1px solid black;
@@ -228,7 +225,7 @@ class PorePlot:
             poreReadsLine = "<tr><td>Reads</td><td>{rc}</td></tr>".format(rc=poreReads)
             poreLengthLine = "<tr><td>Avg Length</td><td>{:.2f}</td></tr>".format(poreAvgLength)
 
-            htmlStr = "<table>"+poreNumLine+poreReadsLine+poreLengthLine+"</table>"
+            htmlStr = "<table class='tooltip'>"+poreNumLine+poreReadsLine+poreLengthLine+"</table>"
 
             return htmlStr
 
@@ -359,7 +356,7 @@ class PorePlot:
 
 
         if pltcfg.usesMPLD3():
-            tooltip = MultiAxesPointHTMLTooltip([elems], [htmlDescr], voffset=10, hoffset=10, css=cls.tooltipCSS)
+            tooltip = MultiAxesPointHTMLTooltip([elems], [htmlDescr], voffset=10, hoffset=10, css=cls.getToolTipCSS())
             plugins.connect(fig, tooltip)
         else:
 
@@ -402,7 +399,7 @@ class PorePlot:
             fcLine = "<tr><td>log2 FC</td><td>{fc}</td></tr>".format(fc=fc)
             pvalLine = "<tr><td>p-Value</td><td>{:.6f}</td></tr>".format(pv)
 
-            htmlStr = "<table>"+geneLine+fcLine+pvalLine+"</table>"
+            htmlStr = "<table class='tooltip'>"+geneLine+fcLine+pvalLine+"</table>"
 
             return htmlStr
 
@@ -411,6 +408,11 @@ class PorePlot:
         pvData = []
         colors = []
 
+        signfcData = []
+        signpvData = []
+        signHTMLDescr = []
+        signColors = []
+
         for i in range(0, len(genenames)):
             fc = foldchanges[i]
             pv = pvalues[i]
@@ -418,27 +420,34 @@ class PorePlot:
             if fc == None or pv == None:
                 continue
 
-            fcData.append(fc)
-            pvData.append(pv)
+
 
             if pv < 0.05:
-                colors.append('red')
-            else:
-                colors.append('blue')
+                signfcData.append(fc)
+                signpvData.append(pv)
+                signColors.append('red')
+                signHTMLDescr.append( makeHTML( genenames[i], fc, pv ))
 
-            htmlDescr.append( makeHTML( genenames[i], fc, pv ))
+            else:
+                fcData.append(fc)
+                pvData.append(pv)
+                colors.append('blue')
+                htmlDescr.append( makeHTML( genenames[i], fc, pv ))
 
         pltcfg.startPlot()
         fig, ax = plt.subplots()
 
         elems = ax.scatter(fcData, pvData, c=colors, alpha=0.5)
+        #elemsSign = ax.plot(signfcData, signpvData, c='r', alpha=0.5, marker='o', linestyle='')
 
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.set_title(title)
 
+        #ax.set_yscale("log")
+
         if pltcfg.usesMPLD3():
-            tooltip = MultiAxesPointHTMLTooltip([elems], [htmlDescr], voffset=10, hoffset=10, css=cls.tooltipCSS())
+            tooltip = MultiAxesPointHTMLTooltip([elems], [htmlDescr], voffset=10, hoffset=10, css=cls.getToolTipCSS())
             plugins.connect(fig, tooltip)
 
         pltcfg.makePlot()

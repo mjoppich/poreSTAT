@@ -142,7 +142,8 @@ class EnrichmentDF(DataFrame):
         if prefix != None and prefix != "" and prefix[len(prefix)-1] != "_":
             prefix += "_"
 
-        base = "/tmp/eb/" + prefix
+        basePath = "/tmp/eb/"
+        base = basePath + prefix
 
         exprFile = base + "expr"
         pdataFile = base + "p_data"
@@ -151,6 +152,15 @@ class EnrichmentDF(DataFrame):
 
         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/de_rseq.R"
 
+        import mpld3, shutil
+        d3js_path = mpld3.getD3js()
+        mpld3_path = mpld3.getmpld3js(True)
+
+        d3js_dest = basePath + os.path.split(d3js_path)[1]
+        mpld3_dest = basePath + os.path.split(mpld3_path)[1]
+
+        shutil.copyfile(d3js_path, d3js_dest)
+        shutil.copyfile(mpld3_path, mpld3_dest)
 
         for i in range(0, len(conditions)):
             cond1 = conditions[i]
@@ -210,7 +220,7 @@ class EnrichmentDF(DataFrame):
                 def addInfoFunc(x):
                     gene = x[0]
                     link = "<a target='_blank' href='http://bacteria.ensembl.org/Helicobacter_pylori_p12/Gene/Summary?g="+gene+"'>EnsemblBacteria</a><br/>" \
-                           "<a target='_blank' href='http://www.uniprot.org/uniprot/?query="+gene+"sort=score'>Uniprot</a>"
+                           "<a target='_blank' href='http://www.uniprot.org/uniprot/?query="+gene+"&sort=score'>Uniprot</a>"
 
                     if not gene.startswith("HP"):
                         link = ""
@@ -225,18 +235,22 @@ class EnrichmentDF(DataFrame):
                 pltcfg = PlotConfig()
                 pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
 
-                import HTSeq.scripts.count
+                pltcfg.d3js = os.path.relpath(d3js_dest, basePath)
+                pltcfg.mpld3js = os.path.relpath(mpld3_dest, basePath)
 
                 for method in usedMethod:
 
                     vpData = condVPData[method]
 
-                    PorePlot.vulcanoPlot(vpData[0], vpData[1], vpData[2], "Vulcano Plot " + cond1 + " vs " + cond2, "log2 FC", "raw pValue")
-                    PorePlot.vulcanoPlot(vpData[0], vpData[1], vpData[3], "Vulcano Plot " + cond1 + " vs " + cond2, "log2 FC", "adj pValue")
+                    PorePlot.vulcanoPlot(vpData[0], vpData[1], vpData[2], "Vulcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "raw pValue", pltcfg)
+                    PorePlot.vulcanoPlot(vpData[0], vpData[1], vpData[3], "Vulcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "adj pValue", pltcfg)
 
-                with open( base + prefix + cond1 + "_" + cond2 + ".html", 'w') as resultHTML:
+                with open( base + cond1 + "_" + cond2 + ".html", 'w') as resultHTML:
 
-                    outStr = "<html><head>" + headHTML + "</head><body><p>" + "\n".join(pltcfg.getCreatedPlots()) + "</p>" + bodyHTML + "</body></html>"
+                    mpld3js = "<script src=" + pltcfg.mpld3js + "></script>\n"
+                    d3js = "<script src=" + pltcfg.d3js + "></script>\n"
+
+                    outStr = "<html><head>" + headHTML +"\n" + d3js + mpld3js + "</head><body><p>" + "\n".join(pltcfg.getCreatedPlots()) + "</p>" + bodyHTML + "</body></html>"
                     resultHTML.write( outStr )
 
                 return
@@ -320,9 +334,12 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        for valueSource in ['coverage', 'read_count']:
+        vConds = sorted([x for x in self.counts])
 
-            for condition in self.counts:
+        for valueSource in ['coverage', 'read_counts']:
+            self.condData = EnrichmentDF()
+
+            for condition in vConds:
 
                 condData = self.counts[condition]
 
