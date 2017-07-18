@@ -56,6 +56,7 @@ class ExportTYPE(Enum):
     TSV=1
     XLSX=2
     HTML=3
+    HTML_STRING=4
 
 
 class DataSeries:
@@ -76,8 +77,9 @@ class DataSeries:
     def __next__(self):
         try:
             item = self.__getitem__(self.dataIdx)
-        except IndexError:
+        except (IndexError, DataRowException):
             raise StopIteration()
+
         self.dataIdx += 1
 
         return item
@@ -386,6 +388,27 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         return dReturn
 
 
+    def toDataRow(self, idxcol = None, datacol = None):
+
+        if datacol == None:
+            datacol = len(self.column2idx)-1
+
+        if idxcol == None:
+            idxcol = [x for x in range(0, len(self.data))]
+        else:
+            idxcol = [x[idxcol] for x in self.data]
+
+        dataDict = {}
+
+        for i in range(0, len(self.data)):
+
+            key = idxcol[i]
+            value = self.data[i][datacol]
+
+            dataDict[key] = value
+
+        return DataRow.fromDict(dataDict)
+
 
 
 
@@ -548,19 +571,16 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         # Save the file
         wb.save( outFile )
 
-    def _makeHTML(self, outFile):
+    def _makeHTMLString(self):
 
-        htmlfile="""
-
-        <html>
-            <head>
+        headpart = """
                 <link rel="stylesheet" href="https://cdn.datatables.net/1.10.15/css/jquery.dataTables.min.css">
                 <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
                 <script src="https://cdn.datatables.net/1.10.15/js/jquery.dataTables.min.js"></script>
-            </head>
-            <body>
+        """
 
-                <table id="example" class="display" cellspacing="0" width="100%">
+        bodypart = """
+        <table id="example" class="display" cellspacing="0" width="100%">
                 <thead>
                 <tr>
                 {% for column in columns %}
@@ -597,7 +617,11 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
                     } );
 
                     // DataTable
-                    var table = $('#example').DataTable();
+                    var table = $('#example').DataTable({
+                                                        "columnDefs": [
+                                                            { "type": "numeric-comma" }
+                                                        ]
+                                                    } );
 
                     // Apply the search
                     table.columns().every( function () {
@@ -614,23 +638,36 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
 
                 } );
                 </script>
-
-            </body>
-        </html>
         """
 
         sortedHeader = sorted(self.column2idx.items(), key=operator.itemgetter(1))
         vHeader = [str(x[0]) for x in sortedHeader]
         vIndices = [x[1] for x in sortedHeader]
 
+        jinjaTemplate = Template(bodypart)
+        output = jinjaTemplate.render(rows=self.data, indices=vIndices, columns=vHeader)
 
+        return (headpart, output)
+
+
+    def _makeHTML(self, outFile):
+
+        (headpart, bodypart) = self._makeHTMLString()
+
+        htmlfile="""
+
+        <html>
+            <head>
+        """ + headpart + """
+            </head>
+            <body>
+        """ + bodypart + """
+            </body>
+        </html>
+        """
 
         with open(outFile, 'w') as outHtml:
-
-            jinjaTemplate = Template(htmlfile)
-            output = jinjaTemplate.render(rows=self.data, indices=vIndices, columns=vHeader)
-
-            outHtml.write(output)
+            outHtml.write(htmlfile)
 
 
 
@@ -649,6 +686,9 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         if exType == ExportTYPE.HTML and outFile != None:
             self._makeHTML(outFile)
             return
+
+        if exType == ExportTYPE.HTML_STRING:
+            return self._makeHTMLString()
 
         if exType == ExportTYPE.TSV:
             outputText = self._makeStr('\t')

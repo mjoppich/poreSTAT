@@ -7,7 +7,7 @@ import matplotlib
 from porestat.plots.poreplot import PorePlot, MultiAxesPointHTMLTooltip
 
 from porestat.plots.plotconfig import PlotConfig
-from ..utils.DataFrame import DataFrame, DataRow
+from ..utils.DataFrame import DataFrame, DataRow, ExportTYPE
 from ..tools.ParallelPTTInterface import ParallelPSTInterface
 from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
 
@@ -21,6 +21,202 @@ from matplotlib import pyplot as plt
 import mpld3
 import random
 import os
+
+
+class EnrichmentDF(DataFrame):
+
+    def __init__(self):
+        super(EnrichmentDF, self).__init__()
+
+        self.idCol = self.addColumn('id')
+
+    def addCondition(self, condData, condName):
+
+        isDataRow = isinstance(condData, DataRow)
+        isDict = isinstance(condData, dict)
+
+        if not (isDataRow or isDict):
+            raise ValueError("parameter not of type datarow or dict")
+
+        if isDataRow:
+            return self._addConditionFromDataRow(condData, condName)
+
+        if isDict:
+            return self._addConditionFromDict(condData, condName)
+
+
+    def _addConditionFromDict(self, condData, condName):
+        dr = DataRow.fromDict(condData)
+        return self._addConditionFromDataRow(dr, condName)
+
+
+    def _addConditionFromDataRow(self, condData, condName):
+
+        newColIdx = self.addColumn(condName, None)
+
+        setFoundKeys = set()
+
+        for i in range(0, len(self.data)):
+            row = self.data[i]
+            rowID = row[ self.idCol ]
+
+            if rowID in condData.getHeader():
+                lrow = list(row)
+                lrow[newColIdx] = condData[rowID]
+                self.data[i] = tuple(lrow)
+                setFoundKeys.add(rowID)
+
+        for geneID in condData.getHeader():
+            if not geneID in setFoundKeys:
+
+                lrow = [None] * len(self.column2idx)
+                lrow[0] = geneID
+                lrow[newColIdx] = condData[geneID]
+
+                self.data.append(tuple(lrow))
+
+
+    def writeEnrichmentBrowserFiles(self, prepData, exprFile, pdataFile, fdataFile):
+
+        self.writeExpressionFile(exprFile, prepData)
+        self.writepDataFile(pdataFile, prepData)
+        self.writefDataFile(fdataFile, prepData)
+
+
+
+    def prepareEBData(self, cond1, cond2):
+
+        header = ['gene', cond1, cond2]
+        prepData = [tuple(header)]
+
+        cond1Idx = self.getColumnIndex(cond1)
+        cond2Idx = self.getColumnIndex(cond2)
+
+        for row in self:
+
+            count1 = int(row[cond1Idx])
+            count2 = int(row[cond2Idx])
+
+            gene = row[0]
+
+            if count1 == None or count2 == None:
+                continue
+
+            prepData.append( (gene, count1, count2) )
+
+        return prepData
+
+
+    def writepDataFile(self, file, prepData):
+
+        with open(file, 'w') as pdataFile:
+
+            conds = prepData[0][1:]
+            cnt = 0
+            for cond in conds:
+                pdataFile.write(cond + "\t" + str(cnt) + "\n")
+                cnt += 1
+
+
+    def writefDataFile(self, file, prepData):
+
+        with open(file, 'w') as fdataFile:
+
+            for line in prepData[1:]:
+                fdataFile.write( line[0] + "\t" + line[0] + "\n")
+
+    def writeExpressionFile(self, file, prepData):
+
+        with open(file, 'w') as exprFile:
+
+            for line in prepData[1:]:
+                exprFile.write( "\t".join([str(x) for x in line[1:]]) + "\n")
+
+
+
+    def runDEanalysis(self, conditions=None):
+
+        if conditions == None:
+            conditions = self.getHeader()[1:]
+
+        base = "/tmp/eb/"
+
+        exprFile = base + "expr"
+        pdataFile = base + "p_data"
+        fdataFile = base + "f_data"
+        outFileBase = base + "out_data"
+
+        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/de_rseq.R"
+
+
+        for i in range(0, len(conditions)):
+            cond1 = conditions[i]
+            for j in range(i+1, len(conditions)):
+                cond2 = conditions[j]
+
+                prepData = self.prepareEBData(cond1, cond2)
+                self.writeEnrichmentBrowserFiles(prepData, exprFile, pdataFile, fdataFile)
+
+                condResult = {}
+
+                for method in ['limma', 'edgeR', 'DESeq']:
+                    outFile = outFileBase + "_" + method
+
+                    os.system("/home/proj/biosoft/software/R/R-3.2.2/bin/Rscript "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile)
+
+                    methDF = DataFrame.parseFromFile(outFile)
+                    condResult[method] = methDF
+
+                geneNames = self.getColumnIndex('id')
+                cond1Counts = self.toDataRow(geneNames, self.getColumnIndex(cond1))
+                cond2Counts = self.toDataRow(geneNames, self.getColumnIndex(cond2))
+
+
+                compDF = EnrichmentDF()
+                compDF.addCondition(cond1Counts, cond1)
+                compDF.addCondition(cond2Counts, cond2)
+
+                usedMethod = []
+                for method in condResult:
+
+                    methDF = condResult[method]
+
+                    if methDF == None:
+                        continue
+
+                    l2FCTitle = method + "_log2FC"
+                    rawpTitle = method + "_RAW.PVA"
+                    adjpTitle = method + "_ADJ.PVAL"
+
+                    l2FCdata = methDF.toDataRow( methDF.getColumnIndex('GENE.ID'), methDF.getColumnIndex('log2FC') )
+                    rawPdata = methDF.toDataRow(methDF.getColumnIndex('GENE.ID'), methDF.getColumnIndex('RAW.PVAL'))
+                    adjPdata = methDF.toDataRow(methDF.getColumnIndex('GENE.ID'), methDF.getColumnIndex('ADJ.PVAL'))
+
+                    compDF.addCondition(l2FCdata, l2FCTitle)
+                    compDF.addCondition(rawPdata, rawpTitle)
+                    compDF.addCondition(adjPdata, adjpTitle)
+
+                print(compDF)
+
+                addInfo = compDF.addColumn("EnsemblBacteria")
+
+                def addInfoFunc(x):
+                    gene = x[0]
+                    link = "<a target='_blank' href='http://bacteria.ensembl.org/Helicobacter_pylori_p12/Gene/Summary?g="+gene+"'>EnsemblBacteria</a>"
+
+                    if not gene.startswith("HP"):
+                        link = ""
+
+                    x[addInfo] = link
+                    return tuple(x)
+
+                compDF.applyToRow( addInfoFunc )
+
+                (head, body) = compDF.export("/tmp/eb/table.html", ExportTYPE.HTML_STRING)
+
+
+                return
+
 
 from scipy.optimize import curve_fit
 from scipy.misc import factorial
@@ -61,7 +257,9 @@ class FoldChangeAnalysis(ParallelPSTInterface):
     def __init__(self, args):
 
         super(FoldChangeAnalysis, self).__init__(args)
+
         self.counts = None
+        self.condData = EnrichmentDF()
 
     def _makePropDict(self):
 
@@ -98,93 +296,20 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        genes = {}
-        unionGenes = set()
+        for condition in self.counts:
 
-        for x in self.counts:
-            df = self.counts[x]
-            allgenes = df['gene']
+            condData = self.counts[condition]
 
-            dfGenes = allgenes.to_set()
+            geneNames = condData.getColumnIndex('gene')
+            geneCounts = condData.getColumnIndex('coverage')
 
-            unionGenes = unionGenes.union(dfGenes)
+            condRow = condData.toDataRow(geneNames,geneCounts)
 
-            genes[x] = dfGenes
+            condition = condition.split("/")[8]
 
-        N = len(self.counts)
-        unionGenes = list(unionGenes)
+            self.condData.addCondition(condRow, condition)
 
-        dataRows = [x for x in self.counts]
-
-        cntData = np.zeros((N,len(unionGenes)))
-
-        for i in range(0, N):
-
-            expName = dataRows[i]
-            df = self.counts[expName]
-
-            for j in range(0,len(unionGenes)):
-
-                genename = unionGenes[j]
-                geneExpr = df.findRow('gene', genename)
-
-                if geneExpr == None:
-                    cntData[i, j] = 0.0
-                else:
-                    cntData[i, j] = geneExpr['coverage']
-
-
-        dataShape = cntData.shape
-
-
-        allFCs = defaultdict(list)
-
-        for i in range(dataShape[0]):
-            for j in range(dataShape[0]):
-
-                if (i==j):
-                    continue
-
-
-                X = cntData[j, :]
-                Y = cntData[i, :]
-
-
-                for k in range(0, len(unionGenes)):
-
-                    if i != j and X[k] == Y[k] and X[k] > 0:
-                        print(unionGenes[k])
-
-                    if (X[k] == 0) or (Y[k] == 0):
-                        continue
-
-                    #print(Y[k]/X[k])
-                    #print(math.log(Y[k] / X[k], 2))
-                    allFCs[ (dataRows[i], dataRows[j]) ].append( math.log(Y[k]/X[k], 2) )
-
-                print(allFCs[ (dataRows[i], dataRows[j]) ])
-
-                entries, bin_edges, patches = plt.hist(allFCs[ (dataRows[i], dataRows[j]) ], bins=50, normed=True)
-
-                # calculate binmiddles
-                bin_middles = 0.5 * (bin_edges[1:] + bin_edges[:-1])
-
-                # poisson function, parameter lamb is the fit parameter
-                def poisson(k, lamb):
-                    return (lamb ** k / factorial(k)) * np.exp(-lamb)
-
-                # fit with curve_fit
-                parameters, cov_matrix = curve_fit(poisson, bin_middles, entries)
-
-                # plot poisson-deviation with fitted parameter
-                x_plot = np.linspace(-100, 20, 100)
-
-                plt.plot(x_plot, poisson(x_plot, *parameters), 'r-', lw=2)
-                plt.show()
-
-                plt.show()
-
-        return
+        self.condData.runDEanalysis()
 
 
 
