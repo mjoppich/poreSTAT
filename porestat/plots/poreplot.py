@@ -158,6 +158,31 @@ class PlotDirectionTYPE(Enum):
 class PorePlot:
 
     @classmethod
+    def getToolTipCSS(cls):
+
+        return """
+        table
+        {
+          border-collapse: collapse;
+        }
+        th
+        {
+          color: #ffffff;
+          background-color: #000000;
+        }
+        td
+        {
+          background-color: #cccccc;
+        }
+        table, th, td
+        {
+          font-family:Arial, Helvetica, sans-serif;
+          border: 1px solid black;
+          text-align: right;
+        }
+        """
+
+    @classmethod
     def getColorVector(cls, elems, colormap="Viridis"):
 
         colors = []
@@ -195,27 +220,7 @@ class PorePlot:
         :return:
         """
 
-        tooltipCSS = """
-        table
-        {
-          border-collapse: collapse;
-        }
-        th
-        {
-          color: #ffffff;
-          background-color: #000000;
-        }
-        td
-        {
-          background-color: #cccccc;
-        }
-        table, th, td
-        {
-          font-family:Arial, Helvetica, sans-serif;
-          border: 1px solid black;
-          text-align: right;
-        }
-        """
+
 
         def makeHTMLTable( poreNum, poreReads, poreAvgLength):
 
@@ -354,7 +359,7 @@ class PorePlot:
 
 
         if pltcfg.usesMPLD3():
-            tooltip = MultiAxesPointHTMLTooltip([elems], [htmlDescr], voffset=10, hoffset=10, css=tooltipCSS)
+            tooltip = MultiAxesPointHTMLTooltip([elems], [htmlDescr], voffset=10, hoffset=10, css=cls.tooltipCSS)
             plugins.connect(fig, tooltip)
         else:
 
@@ -386,6 +391,57 @@ class PorePlot:
 
         pltcfg.makePlot()
 
+    @classmethod
+    def vulcanoPlot(cls, genenames, foldchanges, pvalues, title, xlabel, ylabel, pltcfg = PlotConfig()):
+
+        if len(genenames) != len(foldchanges) or len(genenames) != len(pvalues):
+            raise ValueError("genenames, foldchanges and pvalues must have same length, but is " + str((len(genenames), len(foldchanges), len(pvalues))))
+
+        def makeHTML(gene, fc, pv):
+            geneLine = "<tr><th>Gene</th><th>{gene}</th></tr>".format(gene=gene)
+            fcLine = "<tr><td>log2 FC</td><td>{fc}</td></tr>".format(fc=fc)
+            pvalLine = "<tr><td>p-Value</td><td>{:.6f}</td></tr>".format(pv)
+
+            htmlStr = "<table>"+geneLine+fcLine+pvalLine+"</table>"
+
+            return htmlStr
+
+        htmlDescr = []
+        fcData = []
+        pvData = []
+        colors = []
+
+        for i in range(0, len(genenames)):
+            fc = foldchanges[i]
+            pv = pvalues[i]
+
+            if fc == None or pv == None:
+                continue
+
+            fcData.append(fc)
+            pvData.append(pv)
+
+            if pv < 0.05:
+                colors.append('red')
+            else:
+                colors.append('blue')
+
+            htmlDescr.append( makeHTML( genenames[i], fc, pv ))
+
+        pltcfg.startPlot()
+        fig, ax = plt.subplots()
+
+        elems = ax.scatter(fcData, pvData, c=colors, alpha=0.5)
+
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+
+        if pltcfg.usesMPLD3():
+            tooltip = MultiAxesPointHTMLTooltip([elems], [htmlDescr], voffset=10, hoffset=10, css=cls.tooltipCSS())
+            plugins.connect(fig, tooltip)
+
+        pltcfg.makePlot()
 
 
     @classmethod

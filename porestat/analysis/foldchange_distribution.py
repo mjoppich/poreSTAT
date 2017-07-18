@@ -6,7 +6,7 @@ import matplotlib
 
 from porestat.plots.poreplot import PorePlot, MultiAxesPointHTMLTooltip
 
-from porestat.plots.plotconfig import PlotConfig
+from porestat.plots.plotconfig import PlotConfig, PlotSaveTYPE
 from ..utils.DataFrame import DataFrame, DataRow, ExportTYPE
 from ..tools.ParallelPTTInterface import ParallelPSTInterface
 from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
@@ -134,12 +134,15 @@ class EnrichmentDF(DataFrame):
 
 
 
-    def runDEanalysis(self, conditions=None):
+    def runDEanalysis(self, prefix= "", conditions=None):
 
         if conditions == None:
             conditions = self.getHeader()[1:]
 
-        base = "/tmp/eb/"
+        if prefix != None and prefix != "" and prefix[len(prefix)-1] != "_":
+            prefix += "_"
+
+        base = "/tmp/eb/" + prefix
 
         exprFile = base + "expr"
         pdataFile = base + "p_data"
@@ -176,6 +179,7 @@ class EnrichmentDF(DataFrame):
                 compDF.addCondition(cond1Counts, cond1)
                 compDF.addCondition(cond2Counts, cond2)
 
+                condVPData = {}
                 usedMethod = []
                 for method in condResult:
 
@@ -183,6 +187,8 @@ class EnrichmentDF(DataFrame):
 
                     if methDF == None:
                         continue
+
+                    usedMethod.append(method)
 
                     l2FCTitle = method + "_log2FC"
                     rawpTitle = method + "_RAW.PVA"
@@ -196,13 +202,15 @@ class EnrichmentDF(DataFrame):
                     compDF.addCondition(rawPdata, rawpTitle)
                     compDF.addCondition(adjPdata, adjpTitle)
 
-                print(compDF)
+                    condVPData[method] = ( l2FCdata.getHeader(), l2FCdata.to_list(), rawPdata.to_list(), adjPdata.to_list() )
+
 
                 addInfo = compDF.addColumn("EnsemblBacteria")
 
                 def addInfoFunc(x):
                     gene = x[0]
-                    link = "<a target='_blank' href='http://bacteria.ensembl.org/Helicobacter_pylori_p12/Gene/Summary?g="+gene+"'>EnsemblBacteria</a>"
+                    link = "<a target='_blank' href='http://bacteria.ensembl.org/Helicobacter_pylori_p12/Gene/Summary?g="+gene+"'>EnsemblBacteria</a><br/>" \
+                           "<a target='_blank' href='http://www.uniprot.org/uniprot/?query="+gene+"sort=score'>Uniprot</a>"
 
                     if not gene.startswith("HP"):
                         link = ""
@@ -212,8 +220,24 @@ class EnrichmentDF(DataFrame):
 
                 compDF.applyToRow( addInfoFunc )
 
-                (head, body) = compDF.export("/tmp/eb/table.html", ExportTYPE.HTML_STRING)
+                (headHTML, bodyHTML) = compDF.export(outFile=None, exType=ExportTYPE.HTML_STRING)
 
+                pltcfg = PlotConfig()
+                pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
+
+                import HTSeq.scripts.count
+
+                for method in usedMethod:
+
+                    vpData = condVPData[method]
+
+                    PorePlot.vulcanoPlot(vpData[0], vpData[1], vpData[2], "Vulcano Plot " + cond1 + " vs " + cond2, "log2 FC", "raw pValue")
+                    PorePlot.vulcanoPlot(vpData[0], vpData[1], vpData[3], "Vulcano Plot " + cond1 + " vs " + cond2, "log2 FC", "adj pValue")
+
+                with open( base + prefix + cond1 + "_" + cond2 + ".html", 'w') as resultHTML:
+
+                    outStr = "<html><head>" + headHTML + "</head><body><p>" + "\n".join(pltcfg.getCreatedPlots()) + "</p>" + bodyHTML + "</body></html>"
+                    resultHTML.write( outStr )
 
                 return
 
@@ -296,20 +320,22 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        for condition in self.counts:
+        for valueSource in ['coverage', 'read_count']:
 
-            condData = self.counts[condition]
+            for condition in self.counts:
 
-            geneNames = condData.getColumnIndex('gene')
-            geneCounts = condData.getColumnIndex('coverage')
+                condData = self.counts[condition]
 
-            condRow = condData.toDataRow(geneNames,geneCounts)
+                geneNames = condData.getColumnIndex('gene')
+                geneCounts = condData.getColumnIndex(valueSource)
 
-            condition = condition.split("/")[8]
+                condRow = condData.toDataRow(geneNames,geneCounts)
 
-            self.condData.addCondition(condRow, condition)
+                condition = condition.split("/")[8]
 
-        self.condData.runDEanalysis()
+                self.condData.addCondition(condRow, condition)
+
+            self.condData.runDEanalysis( prefix = valueSource )
 
 
 

@@ -8,7 +8,7 @@ from ..tools.ParallelPTTInterface import ParallelPSTInterface
 from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
-from collections import Counter
+from collections import Counter, defaultdict
 from ..utils.Files import fileExists
 from scipy import stats
 import sys
@@ -75,6 +75,12 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
         self.genomeAnnotation = HTSeq.GFF_Reader( args.gff, end_included=True )
 
+        self.features = HTSeq.GenomicArrayOfSets("auto", stranded=True)
+
+        for feature in self.genomeAnnotation:
+            if feature.type == "gene":
+                self.features[feature.iv] += self.getFeatureID(feature)
+
     def readReadInfo(self, args):
 
         for readInfoFile in args.read_info:
@@ -108,6 +114,10 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
         return args.sam
 
+    def getFeatureID(self, feature):
+        featureLocusName = feature.attr['old_locus_tag'] if 'old_locus_tag' in feature.attr else feature.name
+        return featureLocusName
+
     def execParallel(self, data, environment):
 
         cvg = HTSeq.GenomicArray("auto", stranded=False, typecode='i')
@@ -115,6 +125,8 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
         foundReadsAligned = set()
         foundReadsNotAligned = set()
+
+        readCounts = Counter()
 
         for alngt in alignment_file:
 
@@ -130,8 +142,20 @@ class ReadCountAnalysis(ParallelPSTInterface):
                     if cigar.type == 'M':
                         cvg[cigar.ref_iv] += 1
 
+                gene_ids = set()
+                for iv, val in self.features[alngt.iv].steps():
+                    gene_ids |= val
+                if len(gene_ids) == 1:
+                    gene_id = list(gene_ids)[0]
+                    readCounts[gene_id] += 1
+                elif len(gene_ids) == 0:
+                    readCounts["_no_feature"] += 1
+                else:
+                    readCounts["_ambiguous"] += 1
+
             else:
                 foundReadsNotAligned.add( alngt.read.name )
+
 
         print("Found aligned reads: " + str(len(foundReadsAligned)))
         print("Found unaligned reads: " + str(len(foundReadsNotAligned)))
@@ -146,7 +170,7 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
             if feature.type == "gene":
 
-                featureLocusName = feature.attr['old_locus_tag'] if 'old_locus_tag' in feature.attr else feature.name
+                featureLocusName = self.getFeatureID(feature)
 
                 if not featureLocusName in featureLengths:
                     featureLengths[ featureLocusName ] = []
@@ -163,12 +187,8 @@ class ReadCountAnalysis(ParallelPSTInterface):
         for x in featureCoverage:
             allKeys.append(x)
 
-        coverages = Counter()
-        covlengths = Counter()
 
-        summedAverage = Counter()
-
-        allCovs = []
+        coverages = defaultdict(int)
 
         for x in sorted(allKeys):
             featureCount = 0
@@ -185,34 +205,42 @@ class ReadCountAnalysis(ParallelPSTInterface):
             #print(str(x) + " " + str(cov))
 
             if not x.startswith("operon"):
-                allCovs.append( (x, cov) )
+                coverages[x] = cov
 
-            xa = x.split("_")
-            if len(xa) > 1 and xa[1].startswith("r"):
-                coverages["ribo"] += featureCount
-                covlengths["ribo"] += featureLength
 
-                summedAverage["ribo"] += cov
-            else:
-                coverages["nonribo"] += featureCount
-                covlengths["nonribo"] += featureLength
-
-                summedAverage["nonribo"] += cov
-
+        allGeneNames = set()
         for x in coverages:
-            print(str(x) + " " + str(float(coverages[x]) / float(covlengths[x])))
-            print(str(x) + " " + str(summedAverage))
+            allGeneNames.add(x)
+        for x in readCounts:
+            allGeneNames.add(x)
 
-        ranked = stats.rankdata( [x[1] for x in allCovs] )
+        allGeneNames = list(allGeneNames)
+
+        geneNames = [x for x in allGeneNames]
+
+        rankedCoverage = stats.rankdata( [ coverages[gene] for gene in allGeneNames ] )
+        rankedReadCount = stats.rankdata( [ readCounts[gene] for gene in allGeneNames] )
 
         allRankedCovs = []
-        for i in range(0, len(allCovs)):
-            allRankedCovs.append( (allCovs[i][0], allCovs[i][1], ranked[i]) )
+        for i in range(0, len(allGeneNames)):
+
+            elem = object()
+            elem.name = allGeneNames[i]
+
+            elem.coverage = coverages[elem.name]
+            elem.coverage_rank = rankedCoverage[i]
+
+            elem.read_count = readCounts[elem.name]
+            elem.read_rank = rankedReadCount[i]
+
+            allRankedCovs.append( elem )
 
 
         allLines = []
-        for x in sorted(allRankedCovs, key=lambda x: x[2]):
-            allLines.append( str(x[0]) + "\t" + str(x[1]) + "\t" + str(x[2]) + "\n" )
+        for x in sorted(allRankedCovs, key=lambda x: x.read_count):
+
+            dataStr = "\t".join([ x.name, str(x.coverage), str(x.coverage_rank), str(x.read_count), str(x.read_rank) ])
+            allLines.append( dataStr + "\n" )
 
         self.writeLinesToOutput(environment.output, allLines)
 
@@ -232,9 +260,13 @@ class ReadCountAnalysis(ParallelPSTInterface):
         if args.plot:
 
             plotData = {}
-            plotData['coverage'] = [x[1] for x in parallelResult]
-
+            plotData['coverage'] = [x.coverage for x in parallelResult]
             PorePlot.plotCumHistogram( plotData, [x for x in plotData], 'Coverage Plot', bins=len(parallelResult), pltcfg=args.pltcfg )
+
+            plotData = {}
+            plotData['read_count'] = [x.read_count for x in parallelResult]
+            PorePlot.plotCumHistogram(plotData, [x for x in plotData], 'Read Count Plot', bins=len(parallelResult),
+                                      pltcfg=args.pltcfg)
 
 
 
