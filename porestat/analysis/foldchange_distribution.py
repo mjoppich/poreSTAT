@@ -139,15 +139,18 @@ class EnrichmentDF(DataFrame):
         if conditions == None:
             conditions = self.getHeader()[1:]
 
+        filePrefix = prefix
         if prefix != None and prefix != "" and prefix[len(prefix)-1] != "_":
-            prefix += "_"
+            filePrefix = prefix + "_"
+
+        print("Running DE analysis with prefix " + str(prefix) + " and methods " + str(methods))
 
         basePath = outputFolder
 
         if not basePath[-1] == '/':
             basePath += "/"
 
-        base = basePath + prefix
+        base = basePath + filePrefix
 
         exprFile = base + "expr"
         pdataFile = base + "p_data"
@@ -185,7 +188,7 @@ class EnrichmentDF(DataFrame):
 
 
                 compDF = EnrichmentDF()
-                compDF.addColumn('evidence', prefix)
+                evCol = compDF.addColumn('evidence', prefix) # TODO this is just a quick hack!
                 compDF.addCondition(cond1Counts, cond1)
                 compDF.addCondition(cond2Counts, cond2)
 
@@ -219,6 +222,8 @@ class EnrichmentDF(DataFrame):
 
                 def addInfoFunc(x):
                     gene = x[0]
+                    x[evCol] = prefix
+
                     link = "<a target='_blank' href='http://bacteria.ensembl.org/Helicobacter_pylori_p12/Gene/Summary?g="+gene+"'>EnsemblBacteria</a><br/>" \
                            "<a target='_blank' href='http://www.uniprot.org/uniprot/?query="+gene+"&sort=score'>Uniprot</a>"
 
@@ -331,6 +336,7 @@ class FoldChangeDistributionFactory(PSToolInterfaceFactory):
         parser.add_argument('-c', '--counts', nargs='+', type=str, help='counts summary file', required=False)
         parser.add_argument('-d', '--diffreg', nargs='+', type=str, help='poreSTAT diffreg results', required=False)
         parser.add_argument('-v', '--no-analysis', dest='noanalysis', action='store_true', default=False)
+        parser.add_argument('-m', '--methods', type=str, nargs='+', default=['edgeR', 'DESeq'])
 
         parser.add_argument('-o', '--output', type=str, help='output location, default: std out', default=sys.stdout)
         parser.add_argument('-r', '--rscript', type=str, help='path to Rscript', default='/usr/bin/Rscript')
@@ -405,7 +411,7 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
             counts = self.readCounts(args)
 
-            vConds = sorted([x for x in self.counts])
+            vConds = sorted([x for x in counts])
 
             createdComparisons = defaultdict(list)
             conditions = []
@@ -415,7 +421,7 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
                 for condition in vConds:
 
-                    condData = self.counts[condition]
+                    condData = counts[condition]
 
                     geneNames = condData.getColumnIndex('gene')
                     geneCounts = condData.getColumnIndex(valueSource)
@@ -429,7 +435,7 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
                 print("Running for conditions: " + str(vConds))
 
-                createdComparisons[valueSource] += self.condData.runDEanalysis( args.output, prefix = valueSource, rscriptPath=args.rscript )
+                createdComparisons[valueSource] += self.condData.runDEanalysis( args.output, prefix = valueSource, rscriptPath=args.rscript, methods=args.methods )
 
             self.prepareHTMLOut(createdComparisons, args)
 
