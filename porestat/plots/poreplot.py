@@ -417,7 +417,7 @@ class PorePlot:
         pltcfg.makePlot()
 
     @classmethod
-    def vulcanoPlot(cls, genenames, foldchanges, pvalues, title, xlabel, ylabel, pltcfg = PlotConfig()):
+    def volcanoPlot(cls, genenames, foldchanges, pvalues, title, xlabel, ylabel, pltcfg = PlotConfig()):
 
         if len(genenames) != len(foldchanges) or len(genenames) != len(pvalues):
             raise ValueError("genenames, foldchanges and pvalues must have same length, but is " + str((len(genenames), len(foldchanges), len(pvalues))))

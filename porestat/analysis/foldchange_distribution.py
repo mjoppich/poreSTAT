@@ -134,7 +134,7 @@ class EnrichmentDF(DataFrame):
 
 
 
-    def runDEanalysis(self, outputFolder, rscriptPath="/usr/bin/Rscript", prefix= "", conditions=None):
+    def runDEanalysis(self, outputFolder, rscriptPath="/usr/bin/Rscript", prefix= "", conditions=None, methods=['DESeq', 'edgeR']):
 
         if conditions == None:
             conditions = self.getHeader()[1:]
@@ -168,7 +168,7 @@ class EnrichmentDF(DataFrame):
 
                 condResult = {}
 
-                for method in [ 'DESeq']: # 'limma' 'edgeR'
+                for method in methods: # 'limma' 'edgeR'
                     outFile = outFileBase + "_" + method
 
                     execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile
@@ -185,6 +185,7 @@ class EnrichmentDF(DataFrame):
 
 
                 compDF = EnrichmentDF()
+                compDF.addColumn('evidence', prefix)
                 compDF.addCondition(cond1Counts, cond1)
                 compDF.addCondition(cond2Counts, cond2)
 
@@ -258,17 +259,18 @@ class EnrichmentDF(DataFrame):
         for file in files:
 
             compDF = DataFrame.parseFromFile(file)
+            # 0 evidence, 1 gene, 2 cond1, 3 cond2, 4+ methods
 
             compHeader = compDF.getHeader()
 
-            cond1 = compHeader[1]
-            cond2 = compHeader[2]
+            cond1 = compHeader[2]
+            cond2 = compHeader[3]
 
             if not (cond1 in conditions and cond2 in conditions):
                 continue # comparison not needed
 
             methods = []
-            for i in range(3, len(compHeader)-1, 3):
+            for i in range(4, len(compHeader)-1, 3):
                 colVal = compHeader[i]
                 method = colVal.replace('_log2FC', '')
                 methods.append(method)
@@ -300,8 +302,8 @@ class EnrichmentDF(DataFrame):
                 rawPdata = parseList(compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(rawpTitle)).to_list())
                 adjPdata = parseList(compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(adjpTitle)).to_list())
 
-                PorePlot.vulcanoPlot(geneNames, l2FCdata, rawPdata, "Vulcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "raw pValue", pltcfg)
-                PorePlot.vulcanoPlot(geneNames, l2FCdata, adjPdata, "Vulcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "adj pValue", pltcfg)
+                PorePlot.volcanoPlot(geneNames, l2FCdata, rawPdata, "Volcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "raw pValue", pltcfg)
+                PorePlot.volcanoPlot(geneNames, l2FCdata, adjPdata, "Volcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "adj pValue", pltcfg)
 
             with open( base + cond1 + "_" + cond2 + ".html", 'w') as resultHTML:
 
@@ -327,6 +329,9 @@ class FoldChangeDistributionFactory(PSToolInterfaceFactory):
 
         parser = subparsers.add_parser('foldchange', help='expls help')
         parser.add_argument('-c', '--counts', nargs='+', type=str, help='counts summary file', required=False)
+        parser.add_argument('-d', '--diffreg', nargs='+', type=str, help='poreSTAT diffreg results', required=False)
+        parser.add_argument('-v', '--no-analysis', dest='noanalysis', action='store_true', default=False)
+
         parser.add_argument('-o', '--output', type=str, help='output location, default: std out', default=sys.stdout)
         parser.add_argument('-r', '--rscript', type=str, help='path to Rscript', default='/usr/bin/Rscript')
 
@@ -360,18 +365,27 @@ class FoldChangeAnalysis(ParallelPSTInterface):
     def readCounts(self, args):
 
         for countsFile in args.counts:
-
             if not fileExists(countsFile):
                 raise PSToolException("Read info file does not exist: " + str(countsFile))
 
-        self.counts = {}
-
+        counts = {}
         for countsFile in args.counts:
-            self.counts[countsFile] = DataFrame.parseFromFile(countsFile)
+            counts[countsFile] = DataFrame.parseFromFile(countsFile)
+
+        return counts
+
+    def readDiffRegs(self, args):
+
+        for countsFile in args.diffreg:
+            if not fileExists(countsFile):
+                raise PSToolException("Diffreg file does not exist: " + str(countsFile))
+
+        for diffFile in args.diffreg:
+
+            df = EnrichmentDF.parseFromFile(diffFile)
+
 
     def prepareInputs(self, args):
-        self.readCounts(args)
-
         return []
 
     def execParallel(self, data, environment):
@@ -386,37 +400,63 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
     def makeResults(self, parallelResult, oEnvironment, args):
 
-        vConds = sorted([x for x in self.counts])
 
-        createdComparisons = defaultdict(list)
-        conditions = []
+        if not args.noanalysis:
 
-        for valueSource in ['coverage', 'read_counts']:
-            self.condData = EnrichmentDF()
+            counts = self.readCounts(args)
 
-            for condition in vConds:
+            vConds = sorted([x for x in self.counts])
 
-                condData = self.counts[condition]
+            createdComparisons = defaultdict(list)
+            conditions = []
 
-                geneNames = condData.getColumnIndex('gene')
-                geneCounts = condData.getColumnIndex(valueSource)
+            for valueSource in ['coverage', 'read_counts']:
+                self.condData = EnrichmentDF()
 
-                condRow = condData.toDataRow(geneNames,geneCounts)
+                for condition in vConds:
 
-                condition = condition.split("/")[-2]
-                conditions.append(condition)
+                    condData = self.counts[condition]
 
-                self.condData.addCondition(condRow, condition)
+                    geneNames = condData.getColumnIndex('gene')
+                    geneCounts = condData.getColumnIndex(valueSource)
 
-            print("Running for conditions: " + str(vConds))
+                    condRow = condData.toDataRow(geneNames,geneCounts)
 
-            createdComparisons[valueSource] += self.condData.runDEanalysis( args.output, prefix = valueSource, rscriptPath=args.rscript )
+                    condition = condition.split("/")[-2]
+                    conditions.append(condition)
 
+                    self.condData.addCondition(condRow, condition)
 
+                print("Running for conditions: " + str(vConds))
+
+                createdComparisons[valueSource] += self.condData.runDEanalysis( args.output, prefix = valueSource, rscriptPath=args.rscript )
+
+            self.prepareHTMLOut(createdComparisons, args)
+
+        else:
+            if args.diffreg != None:
+
+                createdComparisons = defaultdict(list)
+                conditions = set()
+
+                for file in args.diffreg:
+
+                    df = EnrichmentDF.parseFromFile(file)
+                    valueSource = self.getValueSource(df)
+
+                    conditions.add(df.getHeader()[2])
+                    conditions.add(df.getHeader()[3])
+
+                    createdComparisons[valueSource].append(file)
+
+                self.prepareHTMLOut(createdComparisons, conditions, args)
+
+    def getValueSource(self, df):
+        return df.data[0][0]
+
+    def prepareHTMLOut(self, createdComparisons, conditions, args):
+        
         for valueSource in createdComparisons:
-
-            print(valueSource)
-            print(createdComparisons[valueSource])
             self.condData.printResult(args.output, outputPrefix=valueSource, conditions=conditions, files=createdComparisons[valueSource])
 
 
