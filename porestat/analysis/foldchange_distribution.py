@@ -134,7 +134,7 @@ class EnrichmentDF(DataFrame):
 
 
 
-    def runDEanalysis(self, outputFolder, prefix= "", conditions=None):
+    def runDEanalysis(self, outputFolder, rscriptPath="/usr/bin/Rscript", prefix= "", conditions=None):
 
         if conditions == None:
             conditions = self.getHeader()[1:]
@@ -171,7 +171,7 @@ class EnrichmentDF(DataFrame):
                 for method in [ 'DESeq']: # 'limma' 'edgeR'
                     outFile = outFileBase + "_" + method
 
-                    execStr = "/usr/bin/Rscript "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile
+                    execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile
                     print(execStr)
 
                     os.system(execStr)
@@ -327,9 +327,8 @@ class FoldChangeDistributionFactory(PSToolInterfaceFactory):
 
         parser = subparsers.add_parser('foldchange', help='expls help')
         parser.add_argument('-c', '--counts', nargs='+', type=str, help='counts summary file', required=False)
-
-
         parser.add_argument('-o', '--output', type=str, help='output location, default: std out', default=sys.stdout)
+        parser.add_argument('-r', '--rscript', type=str, help='path to Rscript', default='/usr/bin/Rscript')
 
         parser = PlotConfig.addParserArgs(parser)
         parser.set_defaults(func=self._prepObj)
@@ -411,7 +410,7 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
             print("Running for conditions: " + str(vConds))
 
-            createdComparisons[valueSource] += self.condData.runDEanalysis( args.output, prefix = valueSource )
+            createdComparisons[valueSource] += self.condData.runDEanalysis( args.output, prefix = valueSource, rscriptPath=args.rscript )
 
 
         for valueSource in createdComparisons:

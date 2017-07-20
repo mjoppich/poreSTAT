@@ -116,7 +116,7 @@ class ReadCountAnalysis(ParallelPSTInterface):
         return args.sam
 
     def getFeatureID(self, feature):
-        featureLocusName = feature.attr['old_locus_tag'] if 'old_locus_tag' in feature.attr else feature.name
+        featureLocusName = feature.attr['gene_id'] if 'gene_id' in feature.attr else feature.name
         return featureLocusName
 
     def execParallel(self, data, environment):
