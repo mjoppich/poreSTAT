@@ -134,7 +134,7 @@ class EnrichmentDF(DataFrame):
 
 
 
-    def runDEanalysis(self, prefix= "", conditions=None):
+    def runDEanalysis(self, outputFolder, prefix= "", conditions=None):
 
         if conditions == None:
             conditions = self.getHeader()[1:]
@@ -142,7 +142,11 @@ class EnrichmentDF(DataFrame):
         if prefix != None and prefix != "" and prefix[len(prefix)-1] != "_":
             prefix += "_"
 
-        basePath = "/tmp/eb/"
+        basePath = outputFolder
+
+        if not basePath[-1] == '/':
+            basePath += "/"
+
         base = basePath + prefix
 
         exprFile = base + "expr"
@@ -152,15 +156,7 @@ class EnrichmentDF(DataFrame):
 
         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/de_rseq.R"
 
-        import mpld3, shutil
-        d3js_path = mpld3.getD3js()
-        mpld3_path = mpld3.getmpld3js(True)
-
-        d3js_dest = basePath + os.path.split(d3js_path)[1]
-        mpld3_dest = basePath + os.path.split(mpld3_path)[1]
-
-        shutil.copyfile(d3js_path, d3js_dest)
-        shutil.copyfile(mpld3_path, mpld3_dest)
+        createdComparisons = []
 
         for i in range(0, len(conditions)):
             cond1 = conditions[i]
@@ -172,10 +168,13 @@ class EnrichmentDF(DataFrame):
 
                 condResult = {}
 
-                for method in ['limma', 'edgeR', 'DESeq']:
+                for method in [ 'DESeq']: # 'limma' 'edgeR'
                     outFile = outFileBase + "_" + method
 
-                    os.system("/home/proj/biosoft/software/R/R-3.2.2/bin/Rscript "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile)
+                    execStr = "/usr/bin/Rscript "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile
+                    print(execStr)
+
+                    os.system(execStr)
 
                     methDF = DataFrame.parseFromFile(outFile)
                     condResult[method] = methDF
@@ -230,30 +229,89 @@ class EnrichmentDF(DataFrame):
 
                 compDF.applyToRow( addInfoFunc )
 
-                (headHTML, bodyHTML) = compDF.export(outFile=None, exType=ExportTYPE.HTML_STRING)
+                outname = base + cond1 + "_" + cond2 + ".tsv"
 
-                pltcfg = PlotConfig()
-                pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
+                createdComparisons.append(outname)
 
-                pltcfg.d3js = os.path.relpath(d3js_dest, basePath)
-                pltcfg.mpld3js = os.path.relpath(mpld3_dest, basePath)
+                compDF.export(outFile=outname, exType=ExportTYPE.TSV)
 
-                for method in usedMethod:
+        return createdComparisons
 
-                    vpData = condVPData[method]
 
-                    PorePlot.vulcanoPlot(vpData[0], vpData[1], vpData[2], "Vulcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "raw pValue", pltcfg)
-                    PorePlot.vulcanoPlot(vpData[0], vpData[1], vpData[3], "Vulcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "adj pValue", pltcfg)
+    def printResult(self, outputFolder, outputPrefix, conditions, files):
 
-                with open( base + cond1 + "_" + cond2 + ".html", 'w') as resultHTML:
+        if not outputFolder[-1] == '/':
+            outputFolder += "/"
 
-                    mpld3js = "<script src=" + pltcfg.mpld3js + "></script>\n"
-                    d3js = "<script src=" + pltcfg.d3js + "></script>\n"
+        base = outputFolder + outputPrefix
 
-                    outStr = "<html><head>" + headHTML +"\n" + d3js + mpld3js + "</head><body><p>" + "\n".join(pltcfg.getCreatedPlots()) + "</p>" + bodyHTML + "</body></html>"
-                    resultHTML.write( outStr )
+        import mpld3, shutil
+        d3js_path = mpld3.getD3js()
+        mpld3_path = mpld3.getmpld3js(True)
 
-                return
+        d3js_dest = outputFolder + os.path.split(d3js_path)[1]
+        mpld3_dest = outputFolder + os.path.split(mpld3_path)[1]
+
+        shutil.copyfile(d3js_path, d3js_dest)
+        shutil.copyfile(mpld3_path, mpld3_dest)
+
+        for file in files:
+
+            compDF = DataFrame.parseFromFile(file)
+
+            compHeader = compDF.getHeader()
+
+            cond1 = compHeader[1]
+            cond2 = compHeader[2]
+
+            if not (cond1 in conditions and cond2 in conditions):
+                continue # comparison not needed
+
+            methods = []
+            for i in range(3, len(compHeader)-1, 3):
+                colVal = compHeader[i]
+                method = colVal.replace('_log2FC', '')
+                methods.append(method)
+
+            (headHTML, bodyHTML) = compDF.export(outFile=None, exType=ExportTYPE.HTML_STRING)
+
+            pltcfg = PlotConfig()
+            pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
+
+            pltcfg.d3js = os.path.relpath(d3js_dest, outputFolder)
+            pltcfg.mpld3js = os.path.relpath(mpld3_dest, outputFolder)
+
+            geneNames = compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex('id')).to_list()
+
+            for method in methods:
+                l2FCTitle = method + "_log2FC"
+                rawpTitle = method + "_RAW.PVA"
+                adjpTitle = method + "_ADJ.PVAL"
+
+                def parseList(x):
+                    ret = [None] * len(x)
+                    for i in range(0, len(x)):
+                        if x[i] != 'None':
+                            ret[i] = float(x[i])
+
+                    return ret
+
+                l2FCdata = parseList(compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(l2FCTitle)).to_list())
+                rawPdata = parseList(compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(rawpTitle)).to_list())
+                adjPdata = parseList(compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(adjpTitle)).to_list())
+
+                PorePlot.vulcanoPlot(geneNames, l2FCdata, rawPdata, "Vulcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "raw pValue", pltcfg)
+                PorePlot.vulcanoPlot(geneNames, l2FCdata, adjPdata, "Vulcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "adj pValue", pltcfg)
+
+            with open( base + cond1 + "_" + cond2 + ".html", 'w') as resultHTML:
+
+                mpld3js = "<script src=" + pltcfg.mpld3js + "></script>\n"
+                d3js = "<script src=" + pltcfg.d3js + "></script>\n"
+
+                outStr = "<html><head>" + headHTML +"\n" + d3js + mpld3js + "</head><body><p>" + "\n".join(pltcfg.getCreatedPlots()) + "</p>" + bodyHTML + "</body></html>"
+                resultHTML.write( outStr )
+
+        return
 
 
 from scipy.optimize import curve_fit
@@ -270,11 +328,8 @@ class FoldChangeDistributionFactory(PSToolInterfaceFactory):
         parser = subparsers.add_parser('foldchange', help='expls help')
         parser.add_argument('-c', '--counts', nargs='+', type=str, help='counts summary file', required=False)
 
-        def fileOpener( filename ):
-            open(filename, 'w').close()
-            return filename
 
-        parser.add_argument('-o', '--output', type=fileOpener, help='output location, default: std out', default=sys.stdout)
+        parser.add_argument('-o', '--output', type=str, help='output location, default: std out', default=sys.stdout)
 
         parser = PlotConfig.addParserArgs(parser)
         parser.set_defaults(func=self._prepObj)
@@ -318,8 +373,6 @@ class FoldChangeAnalysis(ParallelPSTInterface):
     def prepareInputs(self, args):
         self.readCounts(args)
 
-        self.writeLinesToOutput(args.output, "\t".join(['gene', 'coverage', 'rank']) + "\n", mode='w')
-
         return []
 
     def execParallel(self, data, environment):
@@ -336,6 +389,9 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
         vConds = sorted([x for x in self.counts])
 
+        createdComparisons = defaultdict(list)
+        conditions = []
+
         for valueSource in ['coverage', 'read_counts']:
             self.condData = EnrichmentDF()
 
@@ -348,11 +404,21 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
                 condRow = condData.toDataRow(geneNames,geneCounts)
 
-                condition = condition.split("/")[8]
+                condition = condition.split("/")[-2]
+                conditions.append(condition)
 
                 self.condData.addCondition(condRow, condition)
 
-            self.condData.runDEanalysis( prefix = valueSource )
+            print("Running for conditions: " + str(vConds))
+
+            createdComparisons[valueSource] += self.condData.runDEanalysis( args.output, prefix = valueSource )
+
+
+        for valueSource in createdComparisons:
+
+            print(valueSource)
+            print(createdComparisons[valueSource])
+            self.condData.printResult(args.output, outputPrefix=valueSource, conditions=conditions, files=createdComparisons[valueSource])
 
 
 

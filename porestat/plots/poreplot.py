@@ -1,13 +1,15 @@
 from enum import Enum
 
-import matplotlib
 import mpld3
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import re
 from mpld3 import plugins
+from mpld3.plugins import PointHTMLTooltip
 from numpy import genfromtxt
 import os
+import math
 
 from collections import Counter
 import datetime as dt
@@ -126,15 +128,17 @@ class MultiAxesPointHTMLTooltip(mpld3.plugins.PluginBase):
         self.hoffset = hoffset
         self.css_ = css or ""
 
+        from matplotlib.lines import Line2D
+
         ids = []
         for point in points:
 
-            if isinstance(points, matplotlib.lines.Line2D):
+            if isinstance(point, Line2D):
                 suffix = "pts"
             else:
                 suffix = None
 
-            points_id = mpld3.utils.get_id(point, suffix)
+            points_id = self.get_id(point, suffix)
             ids.append(points_id)
 
         print(ids)
@@ -145,6 +149,30 @@ class MultiAxesPointHTMLTooltip(mpld3.plugins.PluginBase):
                       "labels": labels,
                       "hoffset": hoffset,
                       "voffset": voffset}
+
+    def get_id(self, obj, suffix="", prefix="el", warn_on_invalid=True):
+        """Get a unique id for the object"""
+        if not suffix:
+            suffix = ""
+        if not prefix:
+            prefix = ""
+
+        objid = prefix + str(os.getpid()) + str(id(obj)) + suffix
+
+        if warn_on_invalid and not self.html_id_ok(objid):
+            print('"{0}" is not a valid html ID. This may cause problems')
+
+        return objid
+
+    def html_id_ok(self, objid, html5=False):
+        """Check whether objid is valid as an HTML id attribute.
+
+        If html5 == True, then use the more liberal html5 rules.
+        """
+        if html5:
+            return not re.search('\s', objid)
+        else:
+            return bool(re.match("^[a-zA-Z][a-zA-Z0-9\-\.\:\_]*$", objid))
 
 
 
@@ -394,14 +422,25 @@ class PorePlot:
         if len(genenames) != len(foldchanges) or len(genenames) != len(pvalues):
             raise ValueError("genenames, foldchanges and pvalues must have same length, but is " + str((len(genenames), len(foldchanges), len(pvalues))))
 
+
+        def logpv(pv):
+
+            if pv == None or pv == 0:
+                return 0
+            return math.log2(pv)
+
         def makeHTML(gene, fc, pv):
             geneLine = "<tr><th>Gene</th><th>{gene}</th></tr>".format(gene=gene)
-            fcLine = "<tr><td>log2 FC</td><td>{fc}</td></tr>".format(fc=fc)
+            fcLine = "<tr><td>log2 FC</td><td>{:.6f}</td></tr>".format(fc)
+            logpvLine = "<tr><td>log2 PV</td><td>{:.6f}</td></tr>".format(-logpv(pv))
+
             pvalLine = "<tr><td>p-Value</td><td>{:.6f}</td></tr>".format(pv)
 
-            htmlStr = "<table class='tooltip'>"+geneLine+fcLine+pvalLine+"</table>"
+            htmlStr = "<table class='tooltip'>"+geneLine+fcLine+logpvLine+pvalLine+"</table>"
 
             return htmlStr
+
+
 
         htmlDescr = []
         fcData = []
@@ -424,30 +463,31 @@ class PorePlot:
 
             if pv < 0.05:
                 signfcData.append(fc)
-                signpvData.append(pv)
+                signpvData.append(-logpv(pv))
                 signColors.append('red')
                 signHTMLDescr.append( makeHTML( genenames[i], fc, pv ))
 
             else:
                 fcData.append(fc)
-                pvData.append(pv)
+                pvData.append(-logpv(pv))
                 colors.append('blue')
                 htmlDescr.append( makeHTML( genenames[i], fc, pv ))
 
         pltcfg.startPlot()
         fig, ax = plt.subplots()
 
-        elems = ax.scatter(fcData, pvData, c=colors, alpha=0.5)
-        #elemsSign = ax.plot(signfcData, signpvData, c='r', alpha=0.5, marker='o', linestyle='')
+        elems = ax.plot(fcData, pvData, c='b', alpha=0.5, marker='o', linestyle='')
+        elemsSign = ax.plot(signfcData, signpvData, c='r', alpha=0.5, marker='o', linestyle='')
+
+        print(len(signHTMLDescr))
+        print(len(htmlDescr))
 
         ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
+        ax.set_ylabel("neg " + ylabel)
         ax.set_title(title)
 
-        #ax.set_yscale("log")
-
         if pltcfg.usesMPLD3():
-            tooltip = MultiAxesPointHTMLTooltip([elems], [htmlDescr], voffset=10, hoffset=10, css=cls.getToolTipCSS())
+            tooltip = MultiAxesPointHTMLTooltip([elems[0], elemsSign[0]], [htmlDescr, signHTMLDescr], voffset=10, hoffset=10, css=cls.getToolTipCSS())
             plugins.connect(fig, tooltip)
 
         pltcfg.makePlot()

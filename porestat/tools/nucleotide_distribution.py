@@ -120,12 +120,17 @@ class NucleotideDistribution(ParallelPSTReportableInterface):
                 allNucl += nuclCounts[x]
 
             observations['TOTAL_BASES'] = allNucl
+
+            allRelObs = 0
+
             for x in self.nucTypes:
                 if allNucl == 0:
                     observations[x + "%"] = 0
                 else:
-                    observations[x + "%"] = nuclCounts[x] / allNucl
-
+                    relObs = nuclCounts[x] / allNucl
+                    allRelObs += relObs
+                    observations[x + "%"] = relObs
+            print(relObs)
 
             key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
 
