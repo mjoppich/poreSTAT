@@ -40,7 +40,7 @@ class ReportFactory(PSToolInterfaceFactory):
 
         parser.add_argument('--no-read-type-subplot', dest='addTypeSubplot', action='store_false', default=True, help='do not add type subplots')
         parser.add_argument('-q', '--read-type', nargs='+', dest='read_type', action=Fast5TYPEAction, default=None)
-        parser.add_argument('-u', '--user-run', dest='groupByRunName', action='store_true', default=False)
+        parser.add_argument('-u', '--user-run', dest='user_run', action='store_true', default=False)
 
         parser.add_argument('--save-parallel-result', type=str, default=None)
         parser.add_argument('--load-parallel-result', nargs='+', type=str, default=None, help='specify any saved pickle files to combine for report')
@@ -77,9 +77,8 @@ class ReportAnalysis(ParallelPSTInterface):
         self.dReportersArgs = OrderedDict([
 
             ('YIELD', {
-                        'separate_subplots': True,
-                        'user_run': True
-                       })
+                        'separate_subplots': True
+            })
 
         ])
 
@@ -109,8 +108,12 @@ class ReportAnalysis(ParallelPSTInterface):
         shutil.copyfile(d3js_path, d3js_dest)
         shutil.copyfile(mpld3_path, mpld3_dest)
 
-        args.pltcfg.d3js = os.path.relpath(d3js_dest, self.data_path)
-        args.pltcfg.mpld3js = os.path.relpath(mpld3_dest, self.data_path)
+        self.html_path = args.output + args.output_name + ".html"
+
+        args.pltcfg.d3js = os.path.relpath(d3js_dest, args.output)
+        args.pltcfg.mpld3js = os.path.relpath(mpld3_dest, args.output)
+
+        print("Relative js path: " + args.pltcfg.d3js)
 
 
     def prepareInputs(self, args):
@@ -191,8 +194,8 @@ class ReportAnalysis(ParallelPSTInterface):
 
         with open(args.output + args.output_name + ".html", 'w') as htmlFile:
 
-            mpld3js = "<script src="+self.data_path + "/" +  args.pltcfg.mpld3js +"></script>\n"
-            d3js = "<script src=" + self.data_path + "/" + args.pltcfg.d3js + "></script>\n"
+            mpld3js = "<script src=" + args.pltcfg.mpld3js +"></script>\n"
+            d3js = "<script src=" + args.pltcfg.d3js + "></script>\n"
 
             htmlFile.write(
                 """

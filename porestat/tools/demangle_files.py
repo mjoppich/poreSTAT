@@ -41,8 +41,8 @@ class DemangleFilesFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
 
-        parser.add_argument('-q', '--read_type', action=Fast5TYPEAction, default=None)
-        parser.add_argument('-u', '--user-run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-q', '--read-type', action=Fast5TYPEAction, default=None)
+        parser.add_argument('-u', '--user-run', dest='user_run', action='store_true', default=False)
         parser.add_argument('-e', '--experiments', nargs='+', type=str,
                             help='run ids of experiments to be extracted. if --user_run, give user_run_name s',
                             required=False)
@@ -133,7 +133,7 @@ class DemangleFiles(ParallelPSTInterface):
             ######### Start assembling output path
             destPath = environment.output
 
-            if environment.groupByUser == True:
+            if environment.user_run == True:
                 destPath = makePath(destPath + fileUserRunName)
 
             else:
@@ -160,7 +160,7 @@ class DemangleFiles(ParallelPSTInterface):
         if args.read_type != None:
             env.read_type = [Fast5TYPE[x] for x in args.read_type]
 
-        env.groupByUser = args.groupByUser
+        env.user_run = args.user_run
         env.experiments = args.experiments
         env.simulate = args.simulate
         env.method = args.method

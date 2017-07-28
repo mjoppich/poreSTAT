@@ -154,7 +154,7 @@ class YieldPlot(ParallelPSTReportableInterface):
                 'TIME_LENGTHS': props['TIME_LENGTHS']
             }
 
-            key = ",".join(run_user_name) if self.hasArgument('user_run', args) and args.user_run else runid
+            key = self.makeKey(run_user_name, args, runid)
 
             if key in allobservations:
                 allobservations[key] = mergeDicts(allobservations[key], observations)

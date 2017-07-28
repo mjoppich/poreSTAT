@@ -30,7 +30,7 @@ class ChannelOccupancyFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan')
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-e', '--experiments', nargs='+', type=str, help='experiments to list')
-        parser.add_argument('-u', '--user_run', dest='groupByRunName', action='store_true', default=False)
+        parser.add_argument('-u', '--user_run', dest='user_run', action='store_true', default=False)
         parser.add_argument('--print-histogram', action='store_true', default=False)
         
         parser.add_argument('-o', '--output', nargs='?', type=str, default=None, const=None)
@@ -152,7 +152,7 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
                 'CHANNELS': props['CHANNELS']
             }
 
-            key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
+            key = self.makeKey(run_user_name, args, runid)
 
             if key in allobservations:
                 allobservations[key] = mergeDicts(allobservations[key], observations)

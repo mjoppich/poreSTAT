@@ -26,7 +26,7 @@ class ExperimentLsFactory(PSToolInterfaceFactory):
         parser = subparsers.add_parser('expls', help='expls help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
-        parser.add_argument('-u', '--user-run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-u', '--user-run', dest='user_run', action='store_true', default=False)
 
         parser.add_argument('-ot', '--output-type', default=ExportTYPE.TSV, action=ExportTYPEAction)
         parser.add_argument('-o', '--output', type=str, default=None, help='filename to export to as --export-type')
@@ -142,7 +142,7 @@ class ExperimentLs(ParallelPSTReportableInterface):
             ])
             observations = mergeDicts(observations, OrderedDict( [ (s, countByType[ t ]) for (t, s) in self.fileTypes.items() ] ), OrderedDict)
 
-            key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
+            key = self.makeKey(run_user_name, args, runid)
 
             if key in allobservations:
                 allobservations[key] = mergeDicts(allobservations[key], observations)

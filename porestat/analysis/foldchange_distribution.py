@@ -9,11 +9,11 @@ from porestat.plots.poreplot import PorePlot, MultiAxesPointHTMLTooltip
 from porestat.plots.plotconfig import PlotConfig, PlotSaveTYPE
 from ..utils.DataFrame import DataFrame, DataRow, ExportTYPE
 from ..tools.ParallelPTTInterface import ParallelPSTInterface
-from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
+from ..tools.PTToolInterface import PSToolInterfaceFactory, PSToolException, PSToolInterface
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
-from ..utils.Files import fileExists
+from ..utils.Files import fileExists, eprint
 from scipy import stats
 import sys, math
 import numpy as np
@@ -338,7 +338,7 @@ class FoldChangeDistributionFactory(PSToolInterfaceFactory):
         parser.add_argument('-v', '--no-analysis', dest='noanalysis', action='store_true', default=False)
         parser.add_argument('-m', '--methods', type=str, nargs='+', default=['edgeR', 'DESeq'])
 
-        parser.add_argument('-o', '--output', type=str, help='output location, default: std out', default=sys.stdout)
+        parser.add_argument('-o', '--output', type=str, help='output location, default: std out', required=True)
         parser.add_argument('-r', '--rscript', type=str, help='path to Rscript', default='/usr/bin/Rscript')
 
         parser = PlotConfig.addParserArgs(parser)
@@ -347,6 +347,9 @@ class FoldChangeDistributionFactory(PSToolInterfaceFactory):
         return parser
 
     def _prepObj(self, args):
+
+        if (not PSToolInterface.hasArgument('counts', args) and not PSToolInterface.hasArgument('diffreg', args) ) or (args.counts == None and args.diffreg == None):
+            raise argparse.ArgumentParser().error("error: Either counts [--counts] or diffreg results [--diffreg] must be set!")
 
         simArgs = self._makeArguments(args)
         simArgs.pltcfg = PlotConfig.fromParserArgs(simArgs)
@@ -441,6 +444,9 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
         else:
             if args.diffreg != None:
+
+                for x in args.diffreg:
+                    print(x)
 
                 createdComparisons = defaultdict(list)
                 conditions = set()

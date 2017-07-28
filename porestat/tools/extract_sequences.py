@@ -20,7 +20,7 @@ class ExtractSequencesFactory(PSToolInterfaceFactory):
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('--fasta', dest='fasta', action='store_true', default=False)
         parser.add_argument('--fastq', dest='fastq', action='store_true', default=True)
-        parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-u', '--user_run', dest='user_run', action='store_true', default=False)
 
         parser.add_argument('-e', '--experiments', nargs='+', type=str, help='run ids of experiments to be extracted. if --user_run, give user_run_name s', required=False)
 
@@ -56,7 +56,7 @@ class ExtractSequences(ParallelPSTInterface):
         oEnv.experiments = args.experiments
         oEnv.fasta = args.fasta
         oEnv.fastq = args.fastq
-        oEnv.groupByUser = args.groupByUser
+        oEnv.user_run = args.user_run
 
         oEnv.readTypes = None
         oEnv.read_type = None
@@ -100,7 +100,7 @@ class ExtractSequences(ParallelPSTInterface):
         if len(environment.experiments) == 0:
             return True
 
-        if environment.groupByUser:
+        if environment.user_run:
 
             userRun = file.user_filename_input()
             return userRun in environment.experiments

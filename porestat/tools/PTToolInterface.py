@@ -63,9 +63,12 @@ class PSToolInterface:
 
         return newArgs
 
+    @classmethod
     def hasArgument( self, argName, args ):
-
         return argName in args.__dict__
+
+    def makeKey(self, runUserName, args, runid):
+        return ",".join(runUserName) if self.hasArgument('user_run', args) and args.user_run else runid
 
     def manage_folders_reads(self, args):
 

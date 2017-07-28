@@ -139,7 +139,7 @@ class QualityPosition(ParallelPSTReportableInterface):
                 'QUAL_SIMPLE': simpleQualCounter
             }
 
-            key = ",".join(run_user_name) if self.hasArgument('groupByRunName', args) and args.groupByRunName else runid
+            key = self.makeKey(run_user_name, args, runid)
 
             if key in allobservations:
                 allobservations[key] = mergeDicts(allobservations[key], observations)
