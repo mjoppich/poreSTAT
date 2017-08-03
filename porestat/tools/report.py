@@ -74,6 +74,8 @@ class ReportAnalysis(ParallelPSTInterface):
             ('QUALITY BY POSITION', QualityPosition(args)),
         ])
 
+        #self.dReporters = OrderedDict([('OVERVIEW', ExperimentLs(args)), ('QUALITY BY POSITION', QualityPosition(args))])
+
         self.dReportersArgs = OrderedDict([
 
             ('YIELD', {

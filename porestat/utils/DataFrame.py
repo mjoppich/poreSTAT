@@ -261,6 +261,9 @@ class DataRow(DefaultDataColumnAccess, DataSeries):
     def to_tuple(self):
         return DataSeries.to_tuple(self)
 
+    def to_pairs(self):
+        return [ (x, self.__getitem__(x)) for x in self.column2idx ]
+
     @classmethod
     def fromDict(cls, dictionary):
 

@@ -59,6 +59,7 @@ class PlotSaveTYPE(Enum):
     HTML_STRING='HTML_STRING'
     JSON='json'
     D3='D3'
+    MPL='mpl'
 
     @classmethod
     def getFileExtension(cls, outType):
@@ -137,6 +138,10 @@ class PlotConfig:
     def setOutputType(self, outType):
         self.outputType = outType
 
+        if outType == PlotSaveTYPE.MPL:
+            self.save_to_file = False
+            plt.ion()
+
         if self.usesMPLD3():
             plt.ioff()
 
@@ -165,7 +170,7 @@ class PlotConfig:
 
         return False
 
-    def makePlot(self):
+    def makePlot(self, noTightLayout=False, figHeight='100%', figWidth='100%'):
 
         current_figure = plt.gcf()
 
@@ -174,7 +179,12 @@ class PlotConfig:
 
 
         if self.outputType == PlotSaveTYPE.HTML_STRING:
-            outString = mpld3.fig_to_html(current_figure, template_type='notebook', d3_url=self.d3js, mpld3_url=self.mpld3js)
+            outString = mpld3.fig_to_html(current_figure,
+                                          template_type='notebook',
+                                          d3_url=self.d3js,
+                                          mpld3_url=self.mpld3js,
+                                          figHeight=figHeight,
+                                          figWidth=figWidth)
             self.createdPlots.append(outString)
             plt.close(current_figure)
             return
@@ -197,23 +207,25 @@ class PlotConfig:
 
             self.createdPlots.append(exactFilename)
 
-        else:
+        else: # if self.outputType == PlotSaveTYPE.MPL
 
-            legends = current_figure.legends
+            if not noTightLayout:
 
-            makeTightLayout = True
-            for lgd in legends + [ax.legend_ for ax in current_figure.axes]:
+                legends = current_figure.legends
 
-                if lgd == None:
-                    continue
+                makeTightLayout = True
+                for lgd in legends + [ax.legend_ for ax in current_figure.axes]:
 
-                lgd.draggable()
+                    if lgd == None:
+                        continue
 
-                makeTightLayout = makeTightLayout and lgd._bbox_to_anchor == None
+                    lgd.draggable()
+
+                    makeTightLayout = makeTightLayout and lgd._bbox_to_anchor == None
 
 
-            if makeTightLayout:
-                plt.tight_layout()
+                if makeTightLayout:
+                    plt.tight_layout()
 
             plt.show()
 

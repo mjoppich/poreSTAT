@@ -18,6 +18,7 @@ from matplotlib.ticker import Formatter
 from porestat.utils.OrderedSet import OrderedSet
 from .plotconfig import PlotConfig
 from matplotlib import gridspec
+import scipy.cluster.hierarchy as sch
 
 
 class TimestampDateFormatter(Formatter):
@@ -664,6 +665,7 @@ class PorePlot:
             if axisManipulator != None:
                 axisManipulator(ax[i])
 
+        fig.suptitle(title)
         pltcfg.makePlot()
 
     @classmethod
@@ -699,12 +701,14 @@ class PorePlot:
             axisManipulator = axisManipulation[labels[i]] if not axisManipulation is None and labels[i] in axisManipulation else None
 
             if shape == (1,1):
-                cls.plotSingleViolin( someData[x], labels[i], ax)
+                cls.plotSingleBoxplot( someData[x], labels[i], ax)
             else:
-                cls.plotSingleViolin( someData[x], labels[i], ax[i] )
+                cls.plotSingleBoxplot( someData[x], labels[i], ax[i] )
 
             if axisManipulator != None:
                 axisManipulator(ax[i])
+
+        fig.suptitle(title)
 
         plt.tight_layout()
         pltcfg.makePlot()
@@ -743,6 +747,8 @@ class PorePlot:
             
             if axisManipulator != None:
                 axisManipulator(ax[i])
+
+        fig.suptitle(title)
 
         plt.tight_layout()
         pltcfg.makePlot()
@@ -790,8 +796,99 @@ class PorePlot:
 
         pltcfg.makePlot()
 
+
     @classmethod
-    def plotBars(cls, plotData, title, xlabel, ylabel, xlabelrotation='horizontal', pltcfg=PlotConfig(), noBarLabels=False):
+    def plotBarsNoHierarchy(cls, plotData, title, xlabel, ylabel, xlabelrotation='horizontal', pltcfg=PlotConfig(), noBarLabels=False, gridLines=True):
+
+        def autolabel(rects):
+            """
+            Attach a text label above each bar displaying its height
+            """
+
+            maxHeight = 0
+            for rect in rects:
+                maxHeight = max( [maxHeight, rect.get_height()])
+
+            for rect in rects:
+                height = rect.get_height()
+
+                heightOffset = min(1.05*height - height, 10)
+
+                if maxHeight <= 1.0:
+                    ax.text(rect.get_x() + rect.get_width() / 2., height + heightOffset, '%0.2f' % height,
+                            ha='center', va='bottom')
+                else:
+                    ax.text(rect.get_x() + rect.get_width() / 2., height+heightOffset, '%d' % int(height),ha='center', va='bottom')
+
+        pltcfg.startPlot()
+        fig, ax = plt.subplots()
+
+        createdAxes = {}
+        colorVector = PorePlot.getColorVector( len(plotData) )
+
+        runIDs = sorted([x for x in plotData])
+
+        runCount = 0
+
+        width = 0.8
+        offset = -width/2.0
+
+        mpld3Rects = []
+        for run in runIDs:
+
+            data = plotData[run]
+
+            rects = ax.bar(runCount+1+offset, data, width, color=colorVector[runCount], label=run)
+            createdAxes[run] = rects
+            mpld3Rects.append(rects[0])
+
+            runCount += 1
+
+        # add some text for labels, title and axes ticks
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+
+        ax.set_xlim([0, runCount+1])
+
+        ax.set_xticks([i for i in range(1, len(runIDs)+1)])
+        ax.set_xticklabels(runIDs, rotation=xlabelrotation)
+
+        ax.grid(gridLines)
+
+        allRects = []
+        allLabels = []
+
+        for (run, rect) in createdAxes.items():
+            allRects.append(rect)
+            allLabels.append(run)
+
+        if not noBarLabels:
+            if pltcfg.usesMPLD3():
+
+                def makeHTML( label ):
+                    runID = label
+                    runCount = plotData[label]
+
+                    runIDLine = "<tr><th>RunID</th><th>{rid}</th></tr>".format(rid=runID)
+                    countLine = "<tr><td>Read Count</td><td>{rc}</td></tr>".format(rc=runCount)
+
+                    htmlStr = "<table class='tooltip'>" + runIDLine + countLine + "</table>"
+
+                    return htmlStr
+
+                tooltip = MultiAxesPointHTMLTooltip(mpld3Rects, [[makeHTML(x)] for x in allLabels], voffset=10, hoffset=10, css=cls.getToolTipCSS())
+                plugins.connect(fig, tooltip)
+            else:
+                for rect in allRects:
+                    autolabel(rect)
+
+        cls.makeLegend(fig, ax, allRects, allLabels, pltcfg)
+
+        pltcfg.makePlot()
+
+    @classmethod
+    def plotBars(cls, plotData, title, xlabel, ylabel, xlabelrotation='horizontal', pltcfg=PlotConfig(), noBarLabels=False, gridLines=True):
 
         def autolabel(rects):
             """
@@ -835,6 +932,29 @@ class PorePlot:
         colorVector = PorePlot.getColorVector( len(allRuns) )
 
         runCount = 0
+
+        mpld3Rects = []
+        mpld3HTMLs = []
+
+        def makeHTML(label):
+            runID = label
+            runCounts = plotData[label]
+
+            runIDLine = "<tr><th>RunID</th><th>{rid}</th></tr>".format(rid=runID)
+            groupLines = ""
+            totalCounts = 0
+
+            for group in allGroups:
+                countLine = "<tr><td>" + group + "</td><td>{rc}</td></tr>".format(rc=runCounts[group])
+                groupLines += countLine
+                totalCounts += runCounts[group]
+
+            groupLines += "<tr><td>Total</td><td>{rc}</td></tr>".format(rc=totalCounts)
+
+            htmlStr = "<table class='tooltip'>" + runIDLine + groupLines + "</table>"
+
+            return htmlStr
+
         for runs in plotData:
 
             data = []
@@ -844,6 +964,10 @@ class PorePlot:
 
             rects = ax.bar(ind + runCount * width, data, width, color=colorVector[runCount], label=runs)
             createdAxes[runs] = rects
+
+            for i in range(0, len(rects)):
+                mpld3Rects.append(rects[i])
+                mpld3HTMLs.append( [makeHTML(runs)] )
 
             runCount += 1
 
@@ -855,6 +979,8 @@ class PorePlot:
         ax.set_xticks(ind + 0.9 / 2.0)
         ax.set_xticklabels(allGroups, rotation=xlabelrotation)
 
+        ax.grid(gridLines)
+
         allRects = []
         allLabels = []
 
@@ -863,8 +989,13 @@ class PorePlot:
             allLabels.append(run)
 
         if not noBarLabels:
-            for rect in allRects:
-                autolabel(rect)
+            if pltcfg.usesMPLD3():
+                tooltip = MultiAxesPointHTMLTooltip(mpld3Rects, mpld3HTMLs, voffset=10,
+                                                    hoffset=10, css=cls.getToolTipCSS())
+                plugins.connect(fig, tooltip)
+            else:
+                for rect in allRects:
+                    autolabel(rect)
 
         cls.makeLegend(fig, ax, allRects, allLabels, pltcfg)
 
@@ -885,3 +1016,143 @@ class PorePlot:
             else:
                 ax.legend(handles, labels, loc='upper center', bbox_to_anchor=bbox_to_anchor, fancybox=True,
                           shadow=True, ncol=1)
+
+
+    @classmethod
+    def heat_map_cluster(cls, oHeatMap, vXLabels, vYLabels, sTitle, sLegendText = None,
+                         oRange=None, bCluster = True, oHeatMapValues = None, bIsNumber = True, iRoundTo = 3, figSize=(30,30),
+                         sXDescr = "", sYDescr = "", iXAxisFontSize = 12, iYAxisFontSize=12, iTitleFontSize=12, iLegendSize=25,
+                         pltcfg=PlotConfig()):
+
+        leftbottom = (0.075,0.225)
+        widthheight = (0.75,0.75)
+
+        # Generate random features and distance matrix.
+        D = oHeatMap
+        Dt = np.array(oHeatMap)
+        Dt = Dt.transpose()
+
+        pltcfg.startPlot()
+        fig = plt.figure(figsize=figSize)
+
+        if len(vYLabels) > 1 and bCluster:
+            # Compute and plot first dendrogram.
+            ax1 = fig.add_axes([0.85,leftbottom[1],0.15,widthheight[1]])
+            Y = sch.linkage(D, method='centroid')
+            Z1 = sch.dendrogram(Y, orientation='right', labels = vYLabels)
+            ax1.set_xticks([])
+            ax1.set_yticks([])
+
+            idx1 = Z1['leaves']
+        else:
+            idx1 = [x for x in range(0, len(vYLabels))]
+
+        if len(vXLabels) > 1 and bCluster:
+            # Compute and plot second dendrogram.
+            ax2 = fig.add_axes([leftbottom[0],0.05,widthheight[0],0.15])
+            Y = sch.linkage(Dt, method='centroid')
+            Z2 = sch.dendrogram(Y, orientation='bottom', labels = vXLabels, leaf_rotation=90)
+            ax2.set_xticks([])
+            ax2.set_yticks([])
+
+            idx2 = Z2['leaves']
+
+        else:
+            idx2 = [x for x in range(0, len(vXLabels))]
+
+        # Plot distance matrix.
+        axmatrix = fig.add_axes([leftbottom[0], leftbottom[1],widthheight[0], widthheight[1]])
+
+
+        D = D[idx1,:]
+        D = D[:,idx2]
+
+        cmap = cls.getColorMap('viridis')
+        cmap.set_bad(alpha=0.0)
+        cmap.set_over(alpha=0.0)
+        cmap.set_under(alpha=0.0)
+
+        if oRange is None:
+            oRange = (np.min(D), np.max(D))
+
+        im = axmatrix.matshow(D, aspect='auto', origin='lower', cmap=cmap, vmin=oRange[0], vmax=oRange[1])
+
+        if not oHeatMapValues is None:
+
+            (xRange, yRange) = D.shape
+
+            oHeatMapValues = oHeatMapValues[idx1,:]
+            oHeatMapValues = oHeatMapValues[:,idx2]
+
+            for x in range(0, xRange):
+                for y in range(0, yRange):
+                    if bIsNumber:
+
+                        if oHeatMapValues[x,y] == int(oHeatMapValues[x,y]):
+                            axmatrix.text(y, x, str(int(oHeatMapValues[x,y])), va='center', ha='center')
+                        else:
+                            axmatrix.text(y, x, str(round(oHeatMapValues[x,y], iRoundTo)), va='center', ha='center')
+                    else:
+                        axmatrix.text(y, x, str(oHeatMapValues[x,y]).replace(' ','\n'), va='center', ha='center')
+
+        axmatrix.yaxis.set_label_position('left')
+        axmatrix.xaxis.set_label_position('top')
+
+        axmatrix.yaxis.set_ticks_position('right')
+        axmatrix.xaxis.set_ticks_position('bottom')
+
+        axmatrix.xaxis.set_label_text(sXDescr, fontdict={'size': iTitleFontSize})
+        axmatrix.yaxis.set_label_text(sYDescr, fontdict={'size': iTitleFontSize})
+
+        axmatrix.set_xticks(range(len(idx2)))
+        axmatrix.set_yticks(range(len(idx1)))
+
+        axmatrix.set_xticklabels( [vXLabels[i] for i in idx2] )
+        axmatrix.set_yticklabels( [vYLabels[i] for i in idx1] )
+
+        ax = im.axes
+        for item in ([ax.xaxis.label] + ax.get_xticklabels()):
+            item.set_fontsize( iXAxisFontSize )
+
+        for item in ([ax.yaxis.label] + ax.get_yticklabels()):
+            item.set_fontsize( iYAxisFontSize )
+
+        for item in [ax.title]:
+            item.set_fontsize( iTitleFontSize )
+
+        for label in im.axes.xaxis.get_ticklabels():
+            label.set_rotation(90)
+
+        # Plot colorbar.
+        axcolor = fig.add_axes([0.85,0.05,0.02,0.15])
+        minValue = np.amin(Dt)
+        maxValue = np.amax(Dt)
+
+        #cbar = mpl.colorbar.ColorbarBase(axcolor, cmap=cmap,
+        #                                norm=mpl.colors.Normalize(vmin=minValue, vmax=maxValue),
+        #                                orientation='horizontal')
+
+        #pylab.colorbar(im, cax=axcolor)
+        cbar = fig.colorbar(im, cax=axcolor)
+        #cbar.set_label(sTitle,size=iLegendSize)
+
+        iStep = float(cbar.vmax - cbar.vmin) / 8.0
+
+        vTicks = []
+        for i in np.arange(cbar.vmin, cbar.vmax, iStep):
+            vTicks.append(i)
+
+        if int(cbar.vmax) - vTicks[len(vTicks)-1] < vTicks[1]-vTicks[0]:
+            vTicks[len(vTicks)-1] = cbar.vmax
+        else:
+            vTicks.append(cbar.vmax)
+
+        cbar.set_ticks(vTicks)
+        cbar.ax.tick_params(labelsize=iLegendSize)
+
+        if sLegendText != None:
+            cbar.set_label(sLegendText, size=iLegendSize)
+
+        plt.title( sTitle )
+
+        pltcfg.makePlot(noTightLayout=True)

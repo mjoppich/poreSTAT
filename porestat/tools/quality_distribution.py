@@ -155,5 +155,5 @@ class QualityDistribution(ParallelPSTReportableInterface):
 
             print("\t".join(allobs))
         
-        PorePlot.plotBars(absPlotData, "Quality Distribution (abs. values)", "Qualities", "Count (nucl.)", pltcfg=args.pltcfg, noBarLabels=True)
-        PorePlot.plotBars(relPlotData, "Quality Distribution (perc)", "Qualities", "percentage", pltcfg=args.pltcfg, noBarLabels=True)
+        PorePlot.plotBars(absPlotData, "Quality Distribution (abs. values)", "Qualities", "Count (nucl.)", pltcfg=args.pltcfg, noBarLabels=True, gridLines=False)
+        PorePlot.plotBars(relPlotData, "Quality Distribution (perc)", "Qualities", "percentage", pltcfg=args.pltcfg, noBarLabels=True, gridLines=False)

@@ -3,14 +3,15 @@ import argparse
 import pickle
 from collections import defaultdict
 
-from porestat.hdf5tool.Fast5File import Fast5TYPEAction
+from .ParallelAlignmentPSTReportableInterface import ParallelAlignmentPSTReportableInterface
+from ..hdf5tool.Fast5File import Fast5TYPEAction
 from ..plots.plotconfig import PlotConfig
-from porestat.hdf5tool import Fast5TYPE
-from porestat.plots.poreplot import PorePlot
+from ..hdf5tool import Fast5TYPE
+from ..plots.poreplot import PorePlot
 
 from ..utils.Files import fileExists
 from ..utils.DataFrame import DataFrame
-from ..tools.ParallelPTTInterface import ParallelPSTInterface
+
 from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
 from ..utils.Utils import mergeDicts
 from ..utils.Stats import calcN50
@@ -50,7 +51,7 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
 
         parser = subparsers.add_parser('align_stats', help='Alignment statistics (amount aligned, indels, ...)')
         parser.add_argument('-s', '--sam', nargs='+', type=str, help='alignment files', required=True)
-        parser.add_argument('-f', '--fasta', nargs='+', type=str, help='read inputs for alignment', required=True)
+        parser.add_argument('-f', '--fasta', dest='fasta_files', nargs='+', type=str, help='read inputs for alignment', required=True)
         parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
 
         parser.add_argument('-q', '--read-type', nargs='+', dest='read_type', action=Fast5TYPEAction, default=None)
@@ -71,15 +72,11 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
 
 
 
-class AlignmentStatisticAnalysis(ParallelPSTInterface):
+class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
     def __init__(self, args):
 
         super(AlignmentStatisticAnalysis, self).__init__(args)
-
-        self.readInfo = None
-        self.fasta = None
-        self.genome_annotation = None
 
         self.cigar_ops = ['M', 'X', '=', 'D', 'I', 'S', 'X', 'H', 'N', 'P']
 
@@ -93,7 +90,7 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
             if not fileExists(readInfoFile):
                 raise PSToolException("Read info file does not exist: " + str(readInfoFile))
 
-        self.readInfo = None
+        args.readInfo = None
 
         for readInfoFile in args.read_info:
             allReadData = DataFrame.parseFromFile(readInfoFile, cDelim='\t')
@@ -102,24 +99,26 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
             readNameIdx = allReadData.getColumnIndex('READ_NAME')
             allReadData.applyByRow(samIdx, lambda x: x[readNameIdx].split(' ')[0])
 
-            if self.readInfo == None:
-                self.readInfo = allReadData
+            if args.readInfo == None:
+                args.readInfo = allReadData
             else:
-                self.readInfo.merge( allReadData )
+                args.readInfo.merge( allReadData )
 
     def readSequences(self, args):
 
-        for fastaFile in args.fasta:
+        for fastaFile in args.fasta_files:
 
             if not fileExists(fastaFile):
                 raise PSToolException("Fasta file does not exist: " + str(fastaFile))
 
-        self.fasta = {}
 
-        for fastaFile in args.fasta:
+        if not self.hasArgument('fasta', args) or args.fasta == None:
+            args.fasta = {}
 
-            for seq in HTSeq.FastaReader( fastaFile ):
-                self.fasta[seq.name] = MinimalSeq(seq.seq, seq.name, seq.descr)
+            for fastaFile in args.fasta_files:
+
+                for seq in HTSeq.FastaReader( fastaFile ):
+                    args.fasta[seq.name] = MinimalSeq(seq.seq, seq.name, seq.descr)
 
     def _makePropDict(self):
 
@@ -137,87 +136,59 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
 
         return [x for x in args.sam]
 
-    def prepareEnvironment(self, args):
+    def _createLocalEnvironment(self):
+        return { 'BASE_COMPOSITION': defaultdict(Counter),
+                 'UNALIGNED_READS': set(),
+                 'READ_STATS': {}
+                 }
 
-        env = self._makeArguments(args)
-        env.fasta = self.fasta
+    def handleEntity(self, readAlignment, localEnv, globalEnv):
 
-        return env
-
-    def execParallel(self, data, env):
-
-        if data.endswith(".bam"):
-            opener = HTSeq.BAM_Reader
+        readName = readAlignment.read.name
+        readInfo = globalEnv.readInfo.findRow('SAM_READ_NAME', readName)
+        if not readInfo == None:
+            readType = Fast5TYPE[ readInfo[ "TYPE" ] ]
+            readID = readInfo[ "READ_ID" ]
         else:
-            opener = HTSeq.SAM_Reader
+            print("read id none for " + str(readName))
 
+        if readAlignment.aligned:
 
-        baseCompositions = defaultdict(Counter)
-        allReadStats = {}
+            readInterval = readAlignment.iv
+            cigarOfRead = readAlignment.cigar
 
-        unalignedIDs = set()
+            cigarOp2Length = self._makePropDict()
 
-        iProcessedReads = 0
+            for cigarOp in cigarOfRead:
 
-        for readAlignment in opener( data ):
+                readSeq = readAlignment.read_as_aligned[cigarOp.query_from:cigarOp.query_to]
 
-            readName = readAlignment.read.name
-            readType = Fast5TYPE.UNKNOWN
+                for base in readSeq.seq:
+                    localEnv['BASE_COMPOSITION'][cigarOp.type][chr(base)] += 1
 
-            iProcessedReads += 1
+                if cigarOp.type == 'M':
 
-            if iProcessedReads % 1000 == 0:
-                print("Done: " + str(iProcessedReads))
+                    fastaReq = globalEnv.fasta[ readInterval.chrom ]
 
-            readInfo = self.readInfo.findRow('SAM_READ_NAME', readName)
-            if not readInfo == None:
-                readType = Fast5TYPE[ readInfo[ "TYPE" ] ]
-                readID = readInfo[ "READ_ID" ]
-            else:
-                print("read id none for " + str(readName))
+                    fastaReq = fastaReq.toHTSeq()
 
+                    fastaSeq = fastaReq[ cigarOp.ref_iv.start:cigarOp.ref_iv.end ]
 
-            if readAlignment.aligned:
+                    editDistance = self.calculateEditDistance( readSeq, fastaSeq )
 
-                readInterval = readAlignment.iv
-                cigarOfRead = readAlignment.cigar
+                    cigarOp2Length['M'].append(cigarOp.size)
+                    cigarOp2Length['X'].append(editDistance)
+                    cigarOp2Length['='].append(cigarOp.size - editDistance)
 
-                cigarOp2Length = self._makePropDict()
+                else:
+                    cigarOp2Length[ cigarOp.type ].append(cigarOp.size)
 
-                for cigarOp in cigarOfRead:
+            localEnv['READ_STATS'][(readID, readType)] = cigarOp2Length
 
-                    readSeq = readAlignment.read_as_aligned[cigarOp.query_from:cigarOp.query_to]
+        else:
+            localEnv['UNALIGNED_READS'].add(readID)
 
-                    for base in readSeq.seq:
-                        baseCompositions[cigarOp.type][chr(base)] += 1
-
-                    if cigarOp.type == 'M':
-
-                        fastaReq = env.fasta[ readInterval.chrom ]
-
-                        fastaReq = fastaReq.toHTSeq()
-
-                        fastaSeq = fastaReq[ cigarOp.ref_iv.start:cigarOp.ref_iv.end ]
-
-                        editDistance = self.calculateEditDistance( readSeq, fastaSeq )
-
-                        cigarOp2Length['M'].append(cigarOp.size)
-                        cigarOp2Length['X'].append(editDistance)
-                        cigarOp2Length['='].append(cigarOp.size - editDistance)
-
-                    else:
-                        cigarOp2Length[ cigarOp.type ].append(cigarOp.size)
-
-                allReadStats[readID] = cigarOp2Length
-
-            else:
-                unalignedIDs.add(readID)
-
-
-
-
-
-        return ( allReadStats, unalignedIDs )
+        return localEnv
 
     def calculateEditDistance(self, htSeq1, htSeq2):
 
@@ -229,107 +200,109 @@ class AlignmentStatisticAnalysis(ParallelPSTInterface):
             if seq1[i] != seq2[i]:
                 diff += 1
 
-
         return diff
 
 
     def joinParallel(self, existResult, newResult, oEnvironment):
 
         if existResult == None:
-            existResult = ({}, set())
+            existResult = {}
 
-        returnResult = (mergeDicts(existResult[0], newResult[0]), existResult[1].union(newResult[1]))
-        return returnResult
+        (file, data) = newResult
 
-
-    def makeResults(self, parallelResult, oEnvironment, args):
-
-        readCIGARs = parallelResult[0]
-        alignedIDs = set([x for x in parallelResult[0]])
-
-        unalignedIDs = parallelResult[1]
-
-        additionalUnalignedReads = set()
-
-        for row in self.readInfo:
-
-            readid = row['READ_ID']
-
-            if readid in alignedIDs:
-                continue
-
-            if readid in unalignedIDs:
-                continue
-
-            additionalUnalignedReads.add(readid)
-
-        plotDataDict = {}
-        plotDataDict['Aligned'] = len(alignedIDs)
-        plotDataDict['Unaligned'] = len(unalignedIDs)
-        plotDataDict['Not Aligned'] = len(additionalUnalignedReads)
-
-        plotDict = {'All Reads': plotDataDict}
-
-        print(plotDict)
-
-        PorePlot.plotBars(plotDict, "Alignment Stat", "X", "Y", pltcfg=args.pltcfg)
-
-
-        overviewByAligned = defaultdict(Counter)
-        for row in self.readInfo:
-
-            readid = row['READ_ID']
-            read_type = row['TYPE']
-
-            if readid in alignedIDs:
-                overviewByAligned['ALIGNED'][read_type] += 1
-            elif readid in unalignedIDs:
-                overviewByAligned['UNALIGNED'][read_type] += 1
-            elif readid in additionalUnalignedReads:
-                overviewByAligned['NOT ALIGNED'][read_type] += 1
-            else:
-                overviewByAligned['UNKNOWN'][read_type] += 1
-
-        print(overviewByAligned)
-
-        PorePlot.plotBars(overviewByAligned, "Alignment Stat", "X", "Y", pltcfg=args.pltcfg)
-
-        if not args.read_type:
-
-            totalCounter = defaultdict(list)
-
-            for readID in readCIGARs:
-
-                cigarCounter = readCIGARs[readID]
-
-                for x in cigarCounter:
-                    totalCounter[x] += cigarCounter[x]
-
-            if args.violin:
-                PorePlot.plotViolin(totalCounter, [x for x in totalCounter], "CIGARs", pltcfg=args.pltcfg)
-            else:
-                PorePlot.plotBoxplot(totalCounter, [x for x in totalCounter], "CIGARs", pltcfg=args.pltcfg)
-
+        if file in existResult:
+            existResult[file] = mergeDicts(existResult[file], data)
         else:
-            totalCounter = defaultdict( defaultdict(list) )
+            existResult[file] = data
+
+        return existResult
+
+
+    def makeResults(self, allFilesResult, oEnvironment, args):
+
+        for fileName in allFilesResult:
+
+            parallelResult = allFilesResult[fileName]
+
+            readCIGARs = parallelResult['READ_STATS']
+            alignedIDs = set([x[0] for x in readCIGARs])
+
+            unalignedIDs = parallelResult['UNALIGNED_READS']
+            additionalUnalignedReads = set()
+
+            for row in args.readInfo:
+
+                readid = row['READ_ID']
+
+                if readid in alignedIDs:
+                    continue
+
+                if readid in unalignedIDs:
+                    continue
+
+                additionalUnalignedReads.add(readid)
+
+            plotDataDict = {}
+            plotDataDict['Aligned'] = len(alignedIDs)
+            plotDataDict['Unaligned'] = len(unalignedIDs)
+            plotDataDict['Not Aligned'] = len(additionalUnalignedReads)
+
+            plotDict = {'All Reads': plotDataDict}
+
+            PorePlot.plotBars(plotDict, fileName + ": Alignment Result", "", "Count", pltcfg=args.pltcfg)
+
+            overviewByAligned = defaultdict(Counter)
+            for row in args.readInfo:
+
+                readid = row['READ_ID']
+                read_type = row['TYPE']
+
+                if readid in alignedIDs:
+                    overviewByAligned['ALIGNED'][read_type] += 1
+                elif readid in unalignedIDs:
+                    overviewByAligned['UNALIGNED'][read_type] += 1
+                elif readid in additionalUnalignedReads:
+                    overviewByAligned['NOT ALIGNED'][read_type] += 1
+                else:
+                    overviewByAligned['UNKNOWN'][read_type] += 1
+
+            print(overviewByAligned)
+
+            PorePlot.plotBars(overviewByAligned, fileName + ": Alignment Result By Type", "", "Count", pltcfg=args.pltcfg)
+
+            if not self.hasArgument('read_type', args) or not args.read_type:
+
+                totalCounter = defaultdict(list)
+
+                for counterPair in readCIGARs:
+
+                    readID = counterPair[0]
+                    readType = counterPair[1]
+                    readCounter = readCIGARs[counterPair]
+
+                    for x in readCounter:
+                        totalCounter[x] += readCounter[x]
+
+                if self.hasArgument('violin', args) and args.violin:
+                    PorePlot.plotViolin(totalCounter, [x for x in totalCounter], "CIGARs: all types", pltcfg=args.pltcfg)
+                else:
+                    PorePlot.plotBoxplot(totalCounter, [x for x in totalCounter], "CIGARs: all types", pltcfg=args.pltcfg)
+
+            totalCounter = defaultdict(lambda: defaultdict(list))
 
             for counterPair in readCIGARs:
 
-                readType = counterPair[0]
-                readCounter = counterPair[1]
+                readID = counterPair[0]
+                readType = counterPair[1]
+                readCounter = readCIGARs[counterPair]
 
                 for x in readCounter:
-                    totalCounter[readType][x] += readCounter
+                    totalCounter[readType][x] += readCounter[x]
 
             for readType in totalCounter:
-                if args.violin:
-                    PorePlot.plotViolin(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs", pltcfg=args.pltcfg)
+                if self.hasArgument('violin', args) and args.violin:
+                    PorePlot.plotViolin(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs: " + str(readType),
+                                        pltcfg=args.pltcfg)
                 else:
-                    PorePlot.plotBoxplot(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs", pltcfg=args.pltcfg)
-
-
-
-
-
-
-
+                    PorePlot.plotBoxplot(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs: " + str(readType),
+                                         pltcfg=args.pltcfg)

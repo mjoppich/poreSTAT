@@ -121,17 +121,6 @@ class NucleotideDistribution(ParallelPSTReportableInterface):
 
             observations['TOTAL_BASES'] = allNucl
 
-            allRelObs = 0
-
-            for x in self.nucTypes:
-                if allNucl == 0:
-                    observations[x + "%"] = 0
-                else:
-                    relObs = nuclCounts[x] / allNucl
-                    allRelObs += relObs
-                    observations[x + "%"] = relObs
-            print(relObs)
-
             key = self.makeKey(run_user_name, args, runid)
 
             if key in allobservations:
@@ -140,6 +129,20 @@ class NucleotideDistribution(ParallelPSTReportableInterface):
                 allobservations[key] = observations
 
         sortedruns = sorted([x for x in allobservations])
+
+        for runid in sortedruns:
+
+            runObservation = allobservations[runid]
+            allNucl = runObservation['TOTAL_BASES']
+
+            for x in self.nucTypes:
+                if allNucl == 0:
+                    runObservation[x + "%"] = 0
+                else:
+                    relObs = runObservation[x] / allNucl
+                    runObservation[x + "%"] = relObs
+
+            allobservations[runid] = runObservation
 
         print("\t".join(makeObservations))
 

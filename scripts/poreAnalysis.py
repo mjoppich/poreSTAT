@@ -3,9 +3,12 @@ import sys
 #import porestat.utils.PickleArgparse as pickArg
 import argparse
 
+from porestat.analysis.alignmentReport import ReportFactory
 from porestat.analysis.foldchange_distribution import FoldChangeDistributionFactory
+from porestat.analysis.foldchange_similarity import FoldChangeSimilarityFactory
 
 from porestat.analysis.alignmentStatistics import AlignmentStatisticAnalysisFactory
+from porestat.analysis.foldchange_top_regulated import FoldChangeTopRegulatedFactory
 from porestat.analysis.read_counts import ReadCountAnalysisFactory
 from porestat.analysis.similarity_analysis import SimilarityAnalysisFactory
 
@@ -33,6 +36,9 @@ if __name__ == '__main__':
     cmd2tool['alignment_stat'] = AlignmentStatisticAnalysisFactory(parser, subparsers)
     cmd2tool['similarity'] = SimilarityAnalysisFactory(parser, subparsers)
     cmd2tool['foldchange'] = FoldChangeDistributionFactory(parser, subparsers)
+    cmd2tool['summary'] = ReportFactory(parser, subparsers)
+    cmd2tool['fcdist'] = FoldChangeSimilarityFactory(parser, subparsers)
+    cmd2tool['topreg'] = FoldChangeTopRegulatedFactory(parser, subparsers)
 
     args = parser.parse_args()
 

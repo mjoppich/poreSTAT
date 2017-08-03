@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 import math
 
@@ -6,7 +6,7 @@ import time
 
 from porestat.plots.poreplot import PorePlot
 
-from porestat.plots.plotconfig import PlotConfig
+from porestat.plots.plotconfig import PlotConfig, PlotSaveTYPE
 
 from .ParallelPTTInterface import ParallelPSTReportableInterface
 from .PTToolInterface import PSToolInterfaceFactory
@@ -30,7 +30,7 @@ class QualityPositionFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-p', '--no-plot', action='store_true', default=False)
-        parser.add_argument('-u', '--user_run', dest='groupByUser', action='store_true', default=False)
+        parser.add_argument('-u', '--user_run', dest='user_run', action='store_true', default=False)
         parser = PlotConfig.addParserArgs(parser)
 
         parser.set_defaults(func=self._prepObj)
@@ -207,17 +207,18 @@ class QualityPosition(ParallelPSTReportableInterface):
         minQual = None
         maxQual = None
 
+        for i in range(0, steps):
+            stepMin = i * step
+            stepMax = stepMin + step
+
+            stepLabels.append("{0:.0f}-{1:.0f}".format(stepMin, stepMax))
+
+        allRunIDs = []
+
         for runid in qualCounters:
 
             allDataPlot = []
             qualCounter = qualCounters[runid]
-
-            for i in range(0, steps):
-
-                stepMin = i*step
-                stepMax = stepMin + step
-
-                stepLabels.append( "{0:.0f}-{1:.0f}".format(stepMin, stepMax) )
 
             # create empty counter for each step
             for i in range(0, steps):
@@ -247,6 +248,7 @@ class QualityPosition(ParallelPSTReportableInterface):
                 explodedData.append(dataVal)
             
             allPlotData[runid] = explodedData
+            allRunIDs.append(runid)
 
         minQual = 32
         maxQual = 127
@@ -261,7 +263,49 @@ class QualityPosition(ParallelPSTReportableInterface):
 
         allAxisManip = [axManipulation] * len(allPlotData)
 
-        PorePlot.plotViolin( allPlotData, None, "Quality Position Distribution", axisManipulation=allAxisManip, pltcfg=args.pltcfg )
+        #PorePlot.plotViolin( allPlotData, None, "Quality Position Distribution", axisManipulation=allAxisManip, pltcfg=args.pltcfg )
+        self.makePlot( allPlotData, stepLabels, sorted(allRunIDs), args.pltcfg )
+
+    def makePlot(self, allPlotData, steps, runIDs, pltcfg):
+
+        lengthsByStep = defaultdict(lambda: defaultdict(list))
+
+        for runid in runIDs:
+
+            for i in range(0, len(allPlotData[runid])):
+                lengthsByStep[ steps[i] ][ runid ] = allPlotData[runid][i]
+
+
+        pltcfg.startPlot()
+
+        figSize = (10, (2+len(runIDs)) * len(steps))
+
+        fig, ax = plt.subplots(nrows=len(steps), ncols=1, sharex=True, sharey=True, figsize=figSize)
+
+        for i in range(0, len(steps)):
+
+            step = steps[i]
+            plotData = lengthsByStep[step]
+
+            dataToPlot = []
+            for runid in runIDs:
+                if runid in plotData:
+                    dataToPlot.append(plotData[runid])
+                else:
+                    dataToPlot.append([])
+
+            print("Plotting step: " + str(step))
+            PorePlot.plotSingleViolin(dataToPlot, "Range " + str(step) + "bp", ax[i], vert=False)
+            ax[i].set_yticks([x for x in range(1, len(runIDs)+1)])
+            ax[i].set_yticklabels(runIDs)
+            ax[i].yaxis.tick_right()
+
+            for x in ax[i].get_yticklabels():
+                print(x)
+
+
+        pltcfg.makePlot(figHeight=None)
+
 
 
 

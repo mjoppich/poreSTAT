@@ -171,6 +171,7 @@ class ExperimentLs(ParallelPSTReportableInterface):
         if showPlot:
 
             plotDict = {}
+            plotDictCombined = Counter()
 
             for runid in allobservations:
 
@@ -178,9 +179,11 @@ class ExperimentLs(ParallelPSTReportableInterface):
 
                 for (readType, typeName) in self.fileTypes.items():
                     runData[ typeName ] = allobservations[runid][typeName]
+                    plotDictCombined[runid] += allobservations[runid][typeName]
 
                 plotDict[runid] = runData
 
             PorePlot.plotBars(plotDict, "Read-Types by Experiment", "Read-Type", "Count", xlabelrotation=90, pltcfg=args.pltcfg)
+            PorePlot.plotBarsNoHierarchy(plotDictCombined, "Read Counts by Experiment", "Experiment", "Count", xlabelrotation=90,pltcfg=args.pltcfg)
 
 
