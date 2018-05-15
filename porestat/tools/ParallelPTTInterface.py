@@ -79,13 +79,15 @@ class ParallelPSTReportableInterface(ParallelPSTInterface):
 
         localEnv = self._createLocalEnvironment()
 
-        f5folder = Fast5Directory(data)
+        for folder in data:
 
-        for file in f5folder.collect():
-            localEnv = self.handleEntity(file, localEnv, environment)
-            iFilesInFolder += 1
+            f5folder = Fast5Directory(folder)
 
-        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
+            for file in f5folder.collect():
+                localEnv = self.handleEntity(file, localEnv, environment)
+                iFilesInFolder += 1
+
+            print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
 
         return localEnv
 

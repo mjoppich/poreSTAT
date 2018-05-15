@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from ..analysis.similarity_analysis import SimilarityAnalysis
 from .DataFrame import DataFrame, DataRow, ExportTYPE
 import os

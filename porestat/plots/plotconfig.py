@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import mpld3
 from mpld3 import plugins
 
+from ..utils.ArgParseExt import FileStubType
+
 
 class PlotStyle(Enum):
     DEFAULT='default',
@@ -97,9 +99,9 @@ class PlotConfig:
     @classmethod
     def addParserArgs(cls, parser):
 
-        parser.add_argument('-sp', '--save-plot', type=str, help='path-prefix to file where plots are saved. Final file will be save-plot.xxx.png')
-        parser.add_argument('-spt', '--save-plot-type', action=PlotSaveTypeAction, default=PlotSaveTYPE.PNG)
-        parser.add_argument('-ps', '--plot-style', action=PlotStyleAction, default=PlotStyle.BMH)
+        parser.add_argument('-sp', '--save-plot', type=FileStubType('w'), help='path-prefix to file where plots are saved. Final file will be save-plot.xxx.png')
+        parser.add_argument('-spt', '--save-plot-type', action=PlotSaveTypeAction, default=PlotSaveTYPE.PNG, type=PlotSaveTYPE, nargs=1)
+        parser.add_argument('-ps', '--plot-style', action=PlotStyleAction, default=PlotStyle.BMH, type=PlotStyle, nargs=1)
 
         return parser
 

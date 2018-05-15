@@ -120,10 +120,15 @@ class ReportAnalysis(ParallelPSTInterface):
 
     def prepareInputs(self, args):
 
-        if args.load_parallel_result is None:
+        if args.load_parallel_result == None:
             return self.manage_folders_reads(args)
         else:
-            return []
+            llResultExists = all([os.path.isfile(x) for x in args.load_parallel_result])
+
+            if llResultExists:
+                return []
+
+        return self.manage_folders_reads(args)
 
 
 
@@ -132,24 +137,23 @@ class ReportAnalysis(ParallelPSTInterface):
 
         localEnv = {}
 
-        for report in self.dReporters:
-            reportObj = self.dReporters[report]
-            localEnv[report] = reportObj._createLocalEnvironment()
-
-
-        f5folder = Fast5Directory(data)
-
-        for file in f5folder.collect():
+        for folder in data:
 
             for report in self.dReporters:
-
                 reportObj = self.dReporters[report]
-                reportObj.handleEntity(file, localEnv[report], environment)
+                localEnv[report] = reportObj._createLocalEnvironment()
 
-            iFilesInFolder += 1
+            f5folder = Fast5Directory(folder)
 
+            for file in f5folder.collect():
 
-        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
+                for report in self.dReporters:
+                    reportObj = self.dReporters[report]
+                    reportObj.handleEntity(file, localEnv[report], environment)
+
+                iFilesInFolder += 1
+
+            print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
 
         return localEnv
 
@@ -180,7 +184,7 @@ class ReportAnalysis(ParallelPSTInterface):
 
             print("Result saved to: " + args.save_parallel_result)
 
-        if not args.load_parallel_result is None:
+        if not args.load_parallel_result is None and all([os.path.isfile(x) for x in args.load_parallel_result]):
             print("Trying to load result from: " + ", ".join(args.load_parallel_result))
 
             for res in args.load_parallel_result:

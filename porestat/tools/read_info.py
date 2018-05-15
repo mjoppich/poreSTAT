@@ -7,11 +7,8 @@ from .PTToolInterface import PSToolInterfaceFactory,PSToolException
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE, Fast5TYPEAction
 
-from ..utils.Parallel import Parallel as ll
-from ..utils.Utils import mergeDicts
-from ..utils.Stats import calcN50
 
-from collections import OrderedDict, Counter
+from collections import OrderedDict
 
 class ReadInfoFactory(PSToolInterfaceFactory):
 

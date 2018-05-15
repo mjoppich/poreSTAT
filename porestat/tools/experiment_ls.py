@@ -1,6 +1,7 @@
 import argparse
 from collections import OrderedDict
 
+from ..utils.ArgParseExt import FolderType
 from ..plots.plotconfig import PlotConfig
 from ..plots.poreplot import PorePlot
 
@@ -11,7 +12,6 @@ from .PTToolInterface import PSToolInterfaceFactory,PSToolException
 
 from ..hdf5tool.Fast5File import Fast5File, Fast5Directory, Fast5TYPE
 from collections import Counter
-from ..utils.Parallel import Parallel as ll
 from ..utils.Utils import mergeDicts
 from ..utils.Stats import calcN50
 
@@ -24,12 +24,12 @@ class ExperimentLsFactory(PSToolInterfaceFactory):
 
     def _addParser(self, subparsers):
         parser = subparsers.add_parser('expls', help='expls help')
-        parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
-        parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser.add_argument('-f', '--folders', nargs='+', type=FolderType('r'), help='folders to scan', required=False)
+        parser.add_argument('-r', '--reads', nargs='+', type=FolderType('r'), help='minion read folder', required=False)
         parser.add_argument('-u', '--user-run', dest='user_run', action='store_true', default=False)
 
         parser.add_argument('-ot', '--output-type', default=ExportTYPE.TSV, action=ExportTYPEAction)
-        parser.add_argument('-o', '--output', type=str, default=None, help='filename to export to as --export-type')
+        parser.add_argument('-o', '--output', type=argparse.FileType('w'), default=None, help='filename to export to as --export-type')
 
         parser.add_argument('-np', '--no-plot', default=False, action='store_true', help='If no plot should be created')
         parser = PlotConfig.addParserArgs(parser)
@@ -164,7 +164,13 @@ class ExperimentLs(ParallelPSTReportableInterface):
                 row = DataRow.fromDict( allobservations[runid] )
                 outFrame.addRow( row )
 
-            outFrame.export(args.output, args.output_type)
+            filename = None
+
+            if args.output != None:
+                filename = args.output.name
+                args.output.close()
+
+            outFrame.export(filename, args.output_type)
 
         showPlot = not self.hasArgument('no_plot', args) or not args.no_plot
 

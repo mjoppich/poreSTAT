@@ -19,7 +19,10 @@ from porestat.tools.yield_plot import YieldPlotFactory
 from porestat.tools.PTToolInterface import PSToolException
 from porestat.utils import eprint
 
-import random
+import random, os
+
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../")
+
 
 
 def argParseID(elem):
@@ -50,6 +53,7 @@ if __name__ == '__main__':
     cmd2tool['DEMANGLE'] = DemangleFilesFactory(parser, subparsers)
 
     args = parser.parse_args()
+
 
     if not 'func' in vars(args):
         parser.print_help()
