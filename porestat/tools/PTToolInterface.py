@@ -6,12 +6,18 @@ from porestat.utils import eprint
 class ArgObj(object):
     pass
 
-class PSToolInterfaceFactory:
+from abc import ABC, abstractmethod
 
-    def __init__(self, parser, subparser):
+
+class PSToolInterfaceFactory(ABC):
+
+    def __init__(self, parser, subparser, which):
 
         self.parser = parser
         self.subparser = subparser
+        self.which = which
+
+        self.subparser.set_defaults(which=which)
 
 
     def print_usage(self):
@@ -30,6 +36,10 @@ class PSToolInterfaceFactory:
         return newArgs
 
 
+    @abstractmethod
+    def _addParser(self, subparsers, which):
+        pass
+
 
 class PSToolException(Exception):
 
@@ -38,6 +48,13 @@ class PSToolException(Exception):
         super(PSToolException, self).__init__()
 
         self.msg = msg
+
+    def __str__(self):
+        fp = super().__str__()
+        fp += "\n\n"
+        fp += self.msg
+
+        return fp
 
 class PSToolInterface:
 

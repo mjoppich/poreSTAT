@@ -23,14 +23,12 @@ import os
 
 class SimilarityAnalysisFactory(PSToolInterfaceFactory):
 
-    def __init__(self, parser, subparsers):
+    def __init__(self, parser, subparsers, which):
 
-        super(SimilarityAnalysisFactory, self).__init__(parser, self._addParser(subparsers))
+        super(SimilarityAnalysisFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
-
-    def _addParser(self, subparsers):
-
-        parser = subparsers.add_parser('similarity', help='expls help')
+    def _addParser(self, subparsers, which):
+        parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-d', '--counts', nargs='+', type=str, help='counts summary file', required=False)
         parser.add_argument('-o', '--output', type=str, help='output location, default: std out', default=None)
 

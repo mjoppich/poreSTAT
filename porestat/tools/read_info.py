@@ -12,13 +12,14 @@ from collections import OrderedDict
 
 class ReadInfoFactory(PSToolInterfaceFactory):
 
-    def __init__(self, parser, subparsers):
+    def __init__(self, parser, subparsers, which):
 
-        super(ReadInfoFactory, self).__init__(parser, self._addParser(subparsers))
+        super(ReadInfoFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
 
-    def _addParser(self, subparsers):
-        parser = subparsers.add_parser('info', help='expls help')
+
+    def _addParser(self, subparsers, which):
+        parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
 
@@ -87,19 +88,19 @@ class ReadInfo(ParallelPSTInterface):
 
         foundReads = []
 
-        f5folder = Fast5Directory(data)
+        for folder in data:
+            f5folder = Fast5Directory(folder)
 
-        iFilesInFolder = 0
+            iFilesInFolder = 0
 
-        for file in f5folder.collect():
+            for file in f5folder.collect():
+                iFilesInFolder += 1
 
-            iFilesInFolder += 1
+                dReadInfo = self.makeReadInfo(file)
 
-            dReadInfo = self.makeReadInfo(file)
+                foundReads.append(dReadInfo)
 
-            foundReads.append(dReadInfo)
-
-        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
+            print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
 
         return foundReads
 

@@ -23,12 +23,14 @@ class Environment(object):
 
 class TimelineReadsFactory(PSToolInterfaceFactory):
 
-    def __init__(self, parser, subparsers):
+    def __init__(self, parser, subparsers, which):
 
-        super(TimelineReadsFactory, self).__init__(parser, self._addParser(subparsers))
+        super(TimelineReadsFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
-    def _addParser(self, subparsers):
-        parser = subparsers.add_parser('time', help='timeline help')
+
+
+    def _addParser(self, subparsers, which):
+        parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-o', '--out', action='store', type=argparse.FileType('w'), default=None)

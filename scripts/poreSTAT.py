@@ -1,9 +1,11 @@
-import sys
+import random, os, sys
+
+
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../")
 
 #import porestat.utils.PickleArgparse as pickArg
 import argparse
 
-from porestat.tools.demangle_files import DemangleFilesFactory
 from porestat.tools.experiment_ls import ExperimentLsFactory
 from porestat.tools.channel_occupancy import ChannelOccupancyFactory
 from porestat.tools.nucleotide_distribution import NucleotideDistributionFactory
@@ -18,10 +20,9 @@ from porestat.tools.yield_plot import YieldPlotFactory
 
 from porestat.tools.PTToolInterface import PSToolException
 from porestat.utils import eprint
+from porestat.tools.demangle_files import DemangleFilesFactory
 
-import random, os
 
-sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../")
 
 
 
@@ -39,18 +40,24 @@ if __name__ == '__main__':
     subparsers = parser.add_subparsers(help='sub-command help')
 
     cmd2tool = {}
-    cmd2tool['EXPLS'] = ExperimentLsFactory(parser, subparsers)
-    cmd2tool['OCC'] = ChannelOccupancyFactory(parser, subparsers)
-    cmd2tool['REPORT'] = ReportFactory(parser, subparsers)
-    cmd2tool['FASTQ'] = ExtractSequencesFactory(parser, subparsers)
-    cmd2tool['TIME'] = TimelineReadsFactory(parser, subparsers)
-    cmd2tool['NUC_DIST'] = NucleotideDistributionFactory(parser, subparsers)
-    cmd2tool['QUAL_DIST'] = QualityDistributionFactory(parser, subparsers)
-    cmd2tool['QUAL_POS'] = QualityPositionFactory(parser, subparsers)
-    cmd2tool['HIST'] = LengthHistogramFactory(parser, subparsers)
-    cmd2tool['YIELD'] = YieldPlotFactory(parser, subparsers)
-    cmd2tool['INFO'] = ReadInfoFactory(parser, subparsers)
-    cmd2tool['DEMANGLE'] = DemangleFilesFactory(parser, subparsers)
+
+    allTools = [
+        ReadInfoFactory(parser, subparsers, 'info'),
+        ExperimentLsFactory(parser, subparsers, 'expls'),
+        ChannelOccupancyFactory(parser, subparsers, 'occupancy'),
+        ReportFactory(parser, subparsers, 'summary'),
+        ExtractSequencesFactory(parser, subparsers, 'seq'),
+        TimelineReadsFactory(parser, subparsers, 'timeline'),
+        NucleotideDistributionFactory(parser, subparsers, 'nucleotides'),
+        QualityDistributionFactory(parser, subparsers, 'qual_dist'),
+        QualityPositionFactory(parser, subparsers, 'qual'),
+        LengthHistogramFactory(parser, subparsers, 'histo'),
+        YieldPlotFactory(parser, subparsers, 'yield'),
+        DemangleFilesFactory(parser, subparsers, 'demangle')
+    ]
+
+    for tool in allTools:
+        cmd2tool[tool.which] = tool
 
     args = parser.parse_args()
 
@@ -66,4 +73,7 @@ if __name__ == '__main__':
 
         except PSToolException as e:
             eprint(e)
+
+            if args.which:
+                cmd2tool[args.which].print_usage()
 

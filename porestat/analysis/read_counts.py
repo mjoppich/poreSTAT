@@ -17,14 +17,12 @@ import numpy as np
 
 class ReadCountAnalysisFactory(PSToolInterfaceFactory):
 
-    def __init__(self, parser, subparsers):
+    def __init__(self, parser, subparsers, which):
 
-        super(ReadCountAnalysisFactory, self).__init__(parser, self._addParser(subparsers))
+        super(ReadCountAnalysisFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
-
-    def _addParser(self, subparsers):
-
-        parser = subparsers.add_parser('counts', help='expls help')
+    def _addParser(self, subparsers, which):
+        parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-s', '--sam', nargs='+', type=str, required=True, help='alignment files')
         parser.add_argument('-g', '--gff', type=argparse.FileType("r"), required=True, help='gene annotation')
         parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
@@ -122,43 +120,47 @@ class ReadCountAnalysis(ParallelPSTInterface):
     def execParallel(self, data, environment):
 
         cvg = HTSeq.GenomicArray("auto", stranded=False, typecode='i')
-        alignment_file = HTSeq.SAM_Reader( data )
 
         foundReadsAligned = set()
         foundReadsNotAligned = set()
 
         readCounts = Counter()
 
-        for alngt in alignment_file:
-
-            if not alngt.read.name in self.readInfo:
-                self.readInfo[alngt.read.name] = (Fast5TYPE.UNKNOWN, None, len(alngt.read.seq))
+        for file in data:
+            alignment_file = HTSeq.SAM_Reader( file )
 
 
-            if alngt.aligned:
-                foundReadsAligned.add( alngt.read.name )
-                cigars = alngt.cigar
-                for cigar in cigars:
 
-                    if cigar.type == 'M':
-                        cvg[cigar.ref_iv] += 1
+            for alngt in alignment_file:
 
-                gene_ids = set()
-                for iv, val in self.features[alngt.iv].steps():
-                    gene_ids |= val
-                if len(gene_ids) == 1:
-                    gene_id = list(gene_ids)[0]
-                    readCounts[gene_id] += 1
-                elif len(gene_ids) == 0:
-                    pass
-                else:
+                if not alngt.read.name in self.readInfo:
+                    self.readInfo[alngt.read.name] = (Fast5TYPE.UNKNOWN, None, len(alngt.read.seq))
 
-                    for gene_id in gene_ids:
+
+                if alngt.aligned:
+                    foundReadsAligned.add( alngt.read.name )
+                    cigars = alngt.cigar
+                    for cigar in cigars:
+
+                        if cigar.type == 'M':
+                            cvg[cigar.ref_iv] += 1
+
+                    gene_ids = set()
+                    for iv, val in self.features[alngt.iv].steps():
+                        gene_ids |= val
+                    if len(gene_ids) == 1:
+                        gene_id = list(gene_ids)[0]
                         readCounts[gene_id] += 1
+                    elif len(gene_ids) == 0:
+                        pass
+                    else:
+
+                        for gene_id in gene_ids:
+                            readCounts[gene_id] += 1
 
 
-            else:
-                foundReadsNotAligned.add( alngt.read.name )
+                else:
+                    foundReadsNotAligned.add( alngt.read.name )
 
 
         print("Found aligned reads: " + str(len(foundReadsAligned)))

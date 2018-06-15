@@ -42,12 +42,12 @@ class MinimalSeq:
 
 class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
 
-    def __init__(self, parser, subparsers):
+    def __init__(self, parser, subparsers, which):
 
-        super(AlignmentStatisticAnalysisFactory, self).__init__(parser, self._addParser(subparsers))
+        super(AlignmentStatisticAnalysisFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
-
-    def _addParser(self, subparsers):
+    def _addParser(self, subparsers, which):
+        parser = subparsers.add_parser(which, help=which+' help')
 
         parser = subparsers.add_parser('align_stats', help='Alignment statistics (amount aligned, indels, ...)')
         parser.add_argument('-s', '--sam', nargs='+', type=str, help='alignment files', required=True)
@@ -84,6 +84,9 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
 
     def readReadInfo(self, args):
+
+        if args.read_info == None:
+            raise PSToolException("Read infos not given ... You must run poreSTAT info first")
 
         for readInfoFile in args.read_info:
 
@@ -284,7 +287,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                         totalCounter[x] += readCounter[x]
 
                 if self.hasArgument('violin', args) and args.violin:
-                    PorePlot.plotViolin(totalCounter, [x for x in totalCounter], "CIGARs: all types", pltcfg=args.pltcfg)
+                    PorePlot.plotViolin(totalCounter, [x for x in totalCounter], "CIGARs: all types", pltcfg=args.pltcfg, shareX = False, shareY=False)
                 else:
                     PorePlot.plotBoxplot(totalCounter, [x for x in totalCounter], "CIGARs: all types", pltcfg=args.pltcfg)
 
@@ -300,9 +303,13 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     totalCounter[readType][x] += readCounter[x]
 
             for readType in totalCounter:
+
+                print(readType)
+                print(self.hasArgument('violin', args),args.violin)
+
                 if self.hasArgument('violin', args) and args.violin:
                     PorePlot.plotViolin(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs: " + str(readType),
-                                        pltcfg=args.pltcfg)
+                                        pltcfg=args.pltcfg, shareX = False, shareY=False)
                 else:
                     PorePlot.plotBoxplot(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs: " + str(readType),
                                          pltcfg=args.pltcfg)

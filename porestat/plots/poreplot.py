@@ -624,7 +624,7 @@ class PorePlot:
         ax.set_title(title)
 
     @classmethod
-    def plotViolin(cls, someData, labels, title, pltcfg = PlotConfig(), axisManipulation = None, plotDirection=PlotDirectionTYPE.VERTICAL):
+    def plotViolin(cls, someData, labels, title, pltcfg = PlotConfig(), axisManipulation = None, plotDirection=PlotDirectionTYPE.VERTICAL, shareX=None, shareY=None):
 
         if type(someData) == list:
             shape = (1, 1)
@@ -634,15 +634,25 @@ class PorePlot:
             
             if plotDirection == PlotDirectionTYPE.VERTICAL:
                 shape = (1, elems)
-                shareY = True
-                shareX = False
+
+                if shareX == None:
+                    shareX = False
+
+                if shareY == None:
+                    shareY = True
+
 
                 vert=True
 
             else:
                 shape = (elems, 1)
-                shareY = False
-                shareX = True
+
+                if shareX == None:
+                    shareX = True
+
+                if shareY == None:
+                    shareY = False
+
 
                 vert=False
 
@@ -690,6 +700,9 @@ class PorePlot:
         pltcfg.startPlot()
         fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1])
 
+        if shape == (1,1):
+            ax = [ax]
+
         if labels == None:
             labels = [x for x in someData]
 
@@ -700,10 +713,9 @@ class PorePlot:
 
             axisManipulator = axisManipulation[labels[i]] if not axisManipulation is None and labels[i] in axisManipulation else None
 
-            if shape == (1,1):
-                cls.plotSingleBoxplot( someData[x], labels[i], ax)
-            else:
-                cls.plotSingleBoxplot( someData[x], labels[i], ax[i] )
+            cls.plotSingleBoxplot( someData[x], labels[i], ax[i] )
+            ax[i].set_title(labels[i])
+
 
             if axisManipulator != None:
                 axisManipulator(ax[i])

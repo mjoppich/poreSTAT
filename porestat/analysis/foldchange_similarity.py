@@ -27,11 +27,12 @@ from scipy.misc import factorial
 
 
 class FoldChangeSimilarityFactory(PSToolInterfaceFactory):
-    def __init__(self, parser, subparsers):
-        super(FoldChangeSimilarityFactory, self).__init__(parser, self._addParser(subparsers))
+    def __init__(self, parser, subparsers, which):
 
-    def _addParser(self, subparsers):
-        parser = subparsers.add_parser('fcdist', help='expls help')
+        super(FoldChangeSimilarityFactory, self).__init__(parser, self._addParser(subparsers, which), which)
+
+    def _addParser(self, subparsers, which):
+        parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-d', '--diffreg', nargs='+', type=str, help='poreSTAT diffreg results',
                             required=True)
         parser.add_argument('-m', '--methods', type=str, nargs='+', default=['edgeR', 'DESeq'])

@@ -67,3 +67,11 @@ class FolderType(object):
                 else:
                     raise argparse.ArgumentTypeError("readable_dir:{0} is not a writable dir".format(prospective_dir))
 
+            else:
+                os.makedirs(prospective_dir, exist_ok=True)
+
+                return prospective_dir
+
+        raise argparse.ArgumentTypeError("Directory Input:{0} is not a valid dir".format(prospective_dir))
+
+

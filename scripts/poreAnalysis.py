@@ -1,4 +1,5 @@
-import sys
+import random, os, sys
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../")
 
 #import porestat.utils.PickleArgparse as pickArg
 import argparse
@@ -24,6 +25,9 @@ def argParseID(elem):
 
 if __name__ == '__main__':
 
+    sys.stderr.write("Enrichment analysis requires the following packages to be installed: {}\n".format(" ".join(['libcurl4-openssl-dev', 'libssl-dev', 'libmariadbclient-dev', 'libcurl4-openssl-dev', 'libxml2-dev'])))
+
+
     parser = argparse.ArgumentParser(prog='poreAnalysis')
 
     parser.register('type', None, argParseID)
@@ -32,13 +36,20 @@ if __name__ == '__main__':
     subparsers = parser.add_subparsers(help='sub-command help')
 
     cmd2tool = {}
-    cmd2tool['read_counts'] = ReadCountAnalysisFactory(parser, subparsers)
-    cmd2tool['alignment_stat'] = AlignmentStatisticAnalysisFactory(parser, subparsers)
-    cmd2tool['similarity'] = SimilarityAnalysisFactory(parser, subparsers)
-    cmd2tool['foldchange'] = FoldChangeDistributionFactory(parser, subparsers)
-    cmd2tool['summary'] = ReportFactory(parser, subparsers)
-    cmd2tool['fcdist'] = FoldChangeSimilarityFactory(parser, subparsers)
-    cmd2tool['topreg'] = FoldChangeTopRegulatedFactory(parser, subparsers)
+
+    allTools = [
+        ReadCountAnalysisFactory(parser, subparsers, 'read_counts'),
+        AlignmentStatisticAnalysisFactory(parser, subparsers, 'alignment_stat'),
+        SimilarityAnalysisFactory(parser, subparsers, 'similarity'),
+        ReportFactory(parser, subparsers, 'summary'),
+        FoldChangeDistributionFactory(parser, subparsers, 'foldchange'),
+        ReportFactory(parser, subparsers, 'timeline'),
+        FoldChangeSimilarityFactory(parser, subparsers, 'fcdist'),
+        FoldChangeTopRegulatedFactory(parser, subparsers, 'topreg')
+    ]
+
+    for tool in allTools:
+        cmd2tool[tool.which] = tool
 
     args = parser.parse_args()
 
@@ -53,3 +64,5 @@ if __name__ == '__main__':
         except PSToolException as e:
             eprint(e)
 
+            if args.which:
+                cmd2tool[args.which].print_usage()

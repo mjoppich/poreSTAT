@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from porestat.utils.Numbers import toNumber
+
 from ..analysis.similarity_analysis import SimilarityAnalysis
 from .DataFrame import DataFrame, DataRow, ExportTYPE
 import os
@@ -7,6 +9,7 @@ import mpld3
 from ..plots.plotconfig import PlotConfig, PlotSaveTYPE
 from ..plots.poreplot import PorePlot
 import pickle
+from ..tools.PTToolInterface import PSToolException
 
 
 class EnrichmentDF(DataFrame):
@@ -123,7 +126,12 @@ class EnrichmentDF(DataFrame):
 
 
 
-    def runDEanalysis(self, outputFolder, rscriptPath="/usr/bin/Rscript", prefix= "", conditions=None, methods=['DESeq', 'edgeR']):
+    @property
+    def supported_de_methods(self):
+        return ['NOISeq', 'DESeq', 'lGFOLD']
+
+
+    def runDEanalysis(self, outputFolder, rscriptPath="/usr/bin/Rscript", prefix= "", conditions=None, methods=['NOISeq', 'DESeq']):
 
         if conditions == None:
             conditions = self.getHeader()[1:]
@@ -146,7 +154,12 @@ class EnrichmentDF(DataFrame):
         fdataFile = base + "f_data"
         outFileBase = base + "out_data"
 
-        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/de_rseq.R"
+        noiseqFile = base + "noiseq"
+
+        for x in methods:
+            if not x in self.supported_de_methods:
+                raise PSToolException("Unsupported DE Method in runDEAnalysis: " + str(x) + "\nAvailable Methods: " + ", ".join(self.supported_de_methods))
+
 
         createdComparisons = []
 
@@ -156,6 +169,12 @@ class EnrichmentDF(DataFrame):
                 cond2 = conditions[j]
 
                 prepData = self.prepareEBData(cond1, cond2)
+
+                with open(noiseqFile, 'w') as fout:
+
+                    for elem in prepData:
+                        fout.write("\t".join([str(x) for x in elem])  +"\n")
+
                 self.writeEnrichmentBrowserFiles(prepData, exprFile, pdataFile, fdataFile)
 
                 condResult = {}
@@ -163,10 +182,24 @@ class EnrichmentDF(DataFrame):
                 for method in methods: # 'limma' 'edgeR'
                     outFile = outFileBase + "_" + method
 
-                    execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile
-                    print(execStr)
+                    execStr = None
+                    if method in ['DESeq']:
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/de_rseq.R"
 
-                    os.system(execStr)
+                        execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile
+                            #raise PSToolException("Unable to run enrichment analsyis. " + str(execStr))
+
+                    elif method in ['NOISeq']:
+
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/noiseq_diffreg.R"
+
+                        execStr = rscriptPath+" "+scriptPath+" "+noiseqFile + " "+ outFile
+
+                    print(execStr)
+                    sysret = os.system(execStr)-255
+
+                    if sysret != 0:
+                        pass
 
                     methDF = DataFrame.parseFromFile(outFile)
                     condResult[method] = methDF
@@ -196,9 +229,16 @@ class EnrichmentDF(DataFrame):
                     rawpTitle = method + "_RAW.PVAL"
                     adjpTitle = method + "_ADJ.PVAL"
 
-                    l2FCdata = methDF.toDataRow( methDF.getColumnIndex('GENE.ID'), methDF.getColumnIndex('log2FC') )
-                    rawPdata = methDF.toDataRow(methDF.getColumnIndex('GENE.ID'), methDF.getColumnIndex('RAW.PVAL'))
-                    adjPdata = methDF.toDataRow(methDF.getColumnIndex('GENE.ID'), methDF.getColumnIndex('ADJ.PVAL'))
+
+                    geneIDidx = methDF.getColumnIndex('GENE.ID') if methDF.columnExists('GENE.ID') else methDF.getColumnIndex('PROBEID')
+                    log2FCidx = methDF.getColumnIndex('log2FC') if methDF.columnExists('log2FC') else methDF.getColumnIndex('FC')
+                    rawPValidx = methDF.getColumnIndex('RAW.PVAL') if methDF.columnExists('RAW.PVAL') else methDF.getColumnIndex('ADJ.PVAL')
+                    adjPValidx = methDF.getColumnIndex('ADJ.PVAL')
+
+
+                    l2FCdata = methDF.toDataRow( geneIDidx, log2FCidx)
+                    rawPdata = methDF.toDataRow( geneIDidx, rawPValidx)
+                    adjPdata = methDF.toDataRow( geneIDidx, adjPValidx)
 
                     compDF.addCondition(l2FCdata, l2FCTitle)
                     compDF.addCondition(rawPdata, rawpTitle)
@@ -294,7 +334,7 @@ class EnrichmentDF(DataFrame):
 
             for method in methods:
                 l2FCTitle = method + l2fcSuffix
-                rawpTitle = method + "_RAW.PVA"
+                rawpTitle = method + "_RAW.PVAL"
                 adjpTitle = method + "_ADJ.PVAL"
 
                 def parseList(x):
@@ -330,9 +370,9 @@ class EnrichmentDF(DataFrame):
 
         # making overview!
         overviewDF = DataFrame()
-        overviewDF.addColumns(['Condition1', 'Condition2', 'Similarity', 'Comparison HTML'])
+        overviewDF.addColumns(['Condition1', 'Condition2', 'Similarity', 'Comparison HTML', 'Similarity (avg log2 FC) ' + methods[0], 'Similarity (avg log2 FC) ' + methods[1]])
 
-        avgL2FCByMethod = defaultdict(lambda : defaultdict)
+        avgL2FCByMethod = defaultdict(lambda : defaultdict())
 
         for condPair in fileOutPuts:
 
@@ -341,8 +381,8 @@ class EnrichmentDF(DataFrame):
 
             simScore = SimilarityAnalysis.calcSimilarity(condData[0], condData[1])
 
-            avgL2FCByMethod[methods[0]][(condPair[0], condPair[1])] = self.calcAvgL2FC(condPair[3])
-            avgL2FCByMethod[methods[1]][(condPair[0], condPair[1])] = self.calcAvgL2FC(condPair[4])
+            avgL2FCByMethod[methods[0]][(condPair[0], condPair[1])] = self.calcAvgL2FC(condData[3])
+            avgL2FCByMethod[methods[1]][(condPair[0], condPair[1])] = self.calcAvgL2FC(condData[4])
 
             condPairData = {
                 'Condition1': condPair[0],
@@ -371,8 +411,15 @@ class EnrichmentDF(DataFrame):
         sum = 0
 
         for x in datarow.to_list():
-            if x != None:
-                sum += abs(x)
+
+            xn = toNumber(x)
+
+            if xn == None:
+                print("Not a number in calcAvgL2FC", str(xn))
+
+
+            if xn != None:
+                sum += abs(xn)
                 cnt += 1
 
         return sum / cnt

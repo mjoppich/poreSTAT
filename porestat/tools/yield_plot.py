@@ -11,13 +11,14 @@ from ..utils.Utils import mergeDicts, mergeCounter
 
 class YieldPlotFactory(PSToolInterfaceFactory):
 
-    def __init__(self, parser, subparsers):
+    def __init__(self, parser, subparsers, which):
 
-        super(YieldPlotFactory, self).__init__(parser, self._addParser(subparsers))
+        super(YieldPlotFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
 
-    def _addParser(self, subparsers):
-        parser = subparsers.add_parser('yield', help='expls help')
+
+    def _addParser(self, subparsers, which):
+        parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
 

@@ -23,13 +23,12 @@ import dill as pickle
 
 class ReportFactory(PSToolInterfaceFactory):
 
-    def __init__(self, parser, subparsers):
+    def __init__(self, parser, subparsers, which):
 
-        super(ReportFactory, self).__init__(parser, self._addParser(subparsers))
+        super(ReportFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
-
-    def _addParser(self, subparsers):
-        parser = subparsers.add_parser('summary', help='read performance summary')
+    def _addParser(self, subparsers, which):
+        parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-s', '--sam', nargs='+', type=str, help='alignment files', required=True)
         parser.add_argument('-f', '--fasta', dest='fasta_files', nargs='+', type=str, help='read inputs for alignment', required=True)
         parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
@@ -39,6 +38,8 @@ class ReportFactory(PSToolInterfaceFactory):
 
         parser.add_argument('--save-parallel-result', type=str, default=None)
         parser.add_argument('--load-parallel-result', nargs='+', type=str, default=None, help='specify any saved pickle files to combine for report')
+
+        parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
 
 
         parser = PlotConfig.addParserArgs(parser)
@@ -66,9 +67,100 @@ class ReportAnalysis(ParallelPSTInterface):
 
         self.dReportersArgs = OrderedDict([
             ('ALIGNMENT', {
-                'violin': False
+                'violin': args.violin
             })
         ])
+
+        self.filesPerReport = {}
+        self.reporterEnvironments = {}
+
+    def prepareInputs(self, args):
+
+        self.filesPerReport = {}
+        for report in self.dReporters:
+            reportObj = self.dReporters[report]
+            self.filesPerReport[report] = reportObj.prepareInputs(args)
+
+        allFiles = set()
+        for reporter in self.filesPerReport:
+            for file in self.filesPerReport[reporter]:
+                allFiles.add(file)
+
+        if args.load_parallel_result != None:
+            llResultExists = all([os.path.isfile(x) for x in args.load_parallel_result])
+
+            if llResultExists:
+                return []
+
+        return list(allFiles)
+
+    def prepareEnvironment(self, args):
+
+        self.reporterEnvironments = {}
+        for report in self.dReporters:
+            reportObj = self.dReporters[report]
+            self.reporterEnvironments[report] = reportObj.prepareEnvironment(args)
+
+        return self._makeArguments(args)
+
+
+    def execParallel(self, data, environment):
+
+        retTuples = []
+        for folder in data:
+
+            print("Processing File:", folder)
+
+            if folder.endswith(".bam"):
+                opener = HTSeq.BAM_Reader
+            else:
+                opener = HTSeq.SAM_Reader
+
+            iProcessedAlignments = 0
+            localEnv = {}
+            for report in self.dReporters:
+                reportObj = self.dReporters[report]
+                localEnv[report] = reportObj._createLocalEnvironment()
+
+
+            for readAlignment in opener(folder):
+
+                for report in self.dReporters:
+
+                    if folder in self.filesPerReport[report]:
+                        reportObj = self.dReporters[report]
+                        localEnv[report] = reportObj.handleEntity(readAlignment, localEnv[report], self.reporterEnvironments[report])
+
+                iProcessedAlignments += 1
+
+            print("File " + str(folder) + ": " + str(iProcessedAlignments) + "alignments processed")
+
+            retTuples.append( (folder, localEnv) ) #(data, localEnv)
+
+        return retTuples
+
+
+    def joinParallel(self, existResult, newResult, oEnvironment):
+
+        if existResult == None:
+            existResult = {}
+
+        for elem in newResult:
+            (file, newResults) = elem
+
+            for report in newResults:
+
+                if not report in existResult:
+                    existResult[report] = None
+
+                reportObj = self.dReporters[report]
+                existResult[report] = reportObj.joinParallel( existResult[report], (file, newResults[report]), self.reporterEnvironments[report] )
+
+        return existResult
+
+
+    def makeResults(self, parallelResult, oEnvironment, args):
+
 
         args.output = makePath(args.output)
 
@@ -103,95 +195,20 @@ class ReportAnalysis(ParallelPSTInterface):
 
         print("Relative js path: " + args.pltcfg.d3js)
 
-        self.filesPerReport = {}
-        self.reporterEnvironments = {}
-
-    def prepareInputs(self, args):
-
-        self.filesPerReport = {}
-        for report in self.dReporters:
-            reportObj = self.dReporters[report]
-            self.filesPerReport[report] = reportObj.prepareInputs(args)
-
-        allFiles = set()
-        for reporter in self.filesPerReport:
-            for file in self.filesPerReport[reporter]:
-                allFiles.add(file)
-
-        return list(allFiles)
-
-    def prepareEnvironment(self, args):
-
-        self.reporterEnvironments = {}
-        for report in self.dReporters:
-            reportObj = self.dReporters[report]
-            self.reporterEnvironments[report] = reportObj.prepareEnvironment(args)
-
-        return self._makeArguments(args)
-
-
-    def execParallel(self, data, environment):
-
-        if data.endswith(".bam"):
-            opener = HTSeq.BAM_Reader
-        else:
-            opener = HTSeq.SAM_Reader
-
-        iProcessedAlignments = 0
-        localEnv = {}
-        for report in self.dReporters:
-            reportObj = self.dReporters[report]
-            localEnv[report] = reportObj._createLocalEnvironment()
-
-
-        for readAlignment in opener(data):
-
-            for report in self.dReporters:
-
-                if data in self.filesPerReport[report]:
-                    reportObj = self.dReporters[report]
-                    localEnv[report] = reportObj.handleEntity(readAlignment, localEnv[report], self.reporterEnvironments[report])
-
-            iProcessedAlignments += 1
-
-        print("File " + str(data) + ": " + str(iProcessedAlignments) + "alignments processed")
-
-        return (data, localEnv)
-
-
-    def joinParallel(self, existResult, newResult, oEnvironment):
-
-        if existResult == None:
-            existResult = {}
-
-        (file, newResults) = newResult
-
-        for report in newResults:
-
-            if not report in existResult:
-                existResult[report] = None
-
-            reportObj = self.dReporters[report]
-            existResult[report] = reportObj.joinParallel( existResult[report], (file, newResults[report]), self.reporterEnvironments[report] )
-
-        return existResult
-
-
-    def makeResults(self, parallelResult, oEnvironment, args):
 
         args.pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
 
-        if not args.save_parallel_result is None:
-
-            with open(args.save_parallel_result, 'wb') as pickleFile:
-                pickle.dump( parallelResult, pickleFile )
-
-            print("Result saved to: " + args.save_parallel_result)
-
+        justLoaded = False
         if not args.load_parallel_result is None:
             print("Trying to load result from: " + ", ".join(args.load_parallel_result))
+            justLoaded = True
 
             for res in args.load_parallel_result:
+
+                if not os.path.isfile(res):
+                    justLoaded = False
+
+
                 with open(res, 'rb') as pickleFile:
                     loadedResult = pickle.load(pickleFile)
 
@@ -201,6 +218,14 @@ class ReportAnalysis(ParallelPSTInterface):
                         parallelResult = mergeDicts(parallelResult, loadedResult)
 
                 print("Result loaded: " + res)
+
+
+        if args.save_parallel_result != None and not justLoaded:
+
+            with open(args.save_parallel_result, 'wb') as pickleFile:
+                pickle.dump( parallelResult, pickleFile )
+
+            print("Result saved to: " + args.save_parallel_result)
 
         with open(args.output + args.output_name + ".html", 'w') as htmlFile:
 

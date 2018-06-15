@@ -17,13 +17,13 @@ from ..utils.Stats import calcN50
 
 class ExperimentLsFactory(PSToolInterfaceFactory):
 
-    def __init__(self, parser, subparsers):
+    def __init__(self, parser, subparsers, which):
 
-        super(ExperimentLsFactory, self).__init__(parser, self._addParser(subparsers))
+        super(ExperimentLsFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
+    def _addParser(self, subparsers, which):
+        parser = subparsers.add_parser(which, help=which+' help')
 
-    def _addParser(self, subparsers):
-        parser = subparsers.add_parser('expls', help='expls help')
         parser.add_argument('-f', '--folders', nargs='+', type=FolderType('r'), help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=FolderType('r'), help='minion read folder', required=False)
         parser.add_argument('-u', '--user-run', dest='user_run', action='store_true', default=False)

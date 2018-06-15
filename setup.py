@@ -10,5 +10,5 @@ setup(name='porestat',
       packages=['.', 'porestat.hdf5tool', 'porestat.tools', 'porestat.plots', 'porestat.utils', 'porestat.analysis'],
       package_data = {'': ['porestat/data/*.*']},
       zip_safe=False,
-      install_requires=['numpy', 'scipy', 'matplotlib', 'pathos', 'openpyxl', 'h5py']
+      install_requires=['numpy', 'scipy', 'matplotlib', 'pathos', 'openpyxl', 'h5py', 'htseq']
       )

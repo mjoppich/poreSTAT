@@ -20,13 +20,12 @@ from ..utils.DataFrame import DataFrame, ExportTYPEAction, ExportTYPE, DataRow
 
 class ChannelOccupancyFactory(PSToolInterfaceFactory):
 
-    def __init__(self, parser, subparsers):
+    def __init__(self, parser, subparsers, which):
 
-        super(ChannelOccupancyFactory, self).__init__(parser, self._addParser(subparsers))
+        super(ChannelOccupancyFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
-    def _addParser(self, subparsers):
-
-        parser = subparsers.add_parser('occ', help='occ help')
+    def _addParser(self, subparsers, which):
+        parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan')
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('-e', '--experiments', nargs='+', type=str, help='experiments to list')

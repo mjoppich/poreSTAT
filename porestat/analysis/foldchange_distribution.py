@@ -3,6 +3,7 @@ from collections import defaultdict
 
 import HTSeq
 import matplotlib
+from porestat.utils.ArgParseExt import FolderType
 
 from porestat.plots.poreplot import PorePlot, MultiAxesPointHTMLTooltip
 
@@ -27,21 +28,19 @@ from scipy.optimize import curve_fit
 from scipy.misc import factorial
 class FoldChangeDistributionFactory(PSToolInterfaceFactory):
 
-    def __init__(self, parser, subparsers):
+    def __init__(self, parser, subparsers, which):
 
-        super(FoldChangeDistributionFactory, self).__init__(parser, self._addParser(subparsers))
+        super(FoldChangeDistributionFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
-
-    def _addParser(self, subparsers):
-
-        parser = subparsers.add_parser('foldchange', help='expls help')
-        parser.add_argument('-c', '--counts', nargs='+', type=str, default=None, help='counts summary file', required=False)
+    def _addParser(self, subparsers, which):
+        parser = subparsers.add_parser(which, help=which+' help')
+        parser.add_argument('-c', '--counts', nargs='+', type=argparse.FileType('r'), default=None, help='counts summary file', required=False)
         parser.add_argument('-d', '--diffreg', nargs='+', type=str, default=None, help='poreSTAT diffreg results', required=False)
         parser.add_argument('-v', '--no-analysis', dest='noanalysis', action='store_true', default=False)
-        parser.add_argument('-m', '--methods', type=str, nargs='+', default=['edgeR', 'DESeq'])
+        parser.add_argument('-m', '--methods', type=str, nargs='+', default=['NOISeq', 'DESeq'])
 
-        parser.add_argument('-o', '--output', type=str, help='output location, default: std out', required=True)
-        parser.add_argument('-r', '--rscript', type=str, help='path to Rscript', default='/usr/bin/Rscript')
+        parser.add_argument('-o', '--output', type=FolderType('w'), help='output location, default: std out', required=True)
+        parser.add_argument('-r', '--rscript', type=argparse.FileType('r'), help='path to Rscript', default='/usr/bin/Rscript')
 
         parser = PlotConfig.addParserArgs(parser)
         parser.set_defaults(func=self._prepObj)
@@ -76,12 +75,12 @@ class FoldChangeAnalysis(ParallelPSTInterface):
     def readCounts(self, args):
 
         for countsFile in args.counts:
-            if not fileExists(countsFile):
+            if not fileExists(countsFile.name):
                 raise PSToolException("Read info file does not exist: " + str(countsFile))
 
         counts = {}
         for countsFile in args.counts:
-            counts[countsFile] = DataFrame.parseFromFile(countsFile)
+            counts[countsFile.name] = DataFrame.parseFromFile(countsFile.name)
 
         return counts
 
@@ -140,9 +139,9 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
                 print("Running for conditions: " + str(vConds))
 
-                createdComparisons[valueSource] += self.condData.runDEanalysis( args.output, prefix = valueSource, rscriptPath=args.rscript, methods=args.methods )
+                createdComparisons[valueSource] += self.condData.runDEanalysis( args.output, prefix = valueSource, rscriptPath=args.rscript.name, methods=args.methods )
 
-            self.prepareHTMLOut(createdComparisons, args)
+            self.prepareHTMLOut(createdComparisons, conditions, args)
 
 
         if args.diffreg != None:

@@ -9,13 +9,13 @@ from ..utils.Files import eprint
 
 class ExtractSequencesFactory(PSToolInterfaceFactory):
 
-    def __init__(self, parser, subparsers):
+    def __init__(self, parser, subparsers, which):
 
-        super(ExtractSequencesFactory, self).__init__(parser, self._addParser(subparsers))
+        super(ExtractSequencesFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
 
-    def _addParser(self, subparsers):
-        parser = subparsers.add_parser('seq', help='seq help')
+    def _addParser(self, subparsers, which):
+        parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
         parser.add_argument('--fasta', dest='fasta', action='store_true', default=False)
@@ -110,32 +110,33 @@ class ExtractSequences(ParallelPSTInterface):
             runid = file.runID()
             return runid in environment.experiments
 
-    def execParallel(self, data, environment):
+    def execParallel(self, datas, environment):
 
-        f5folder = Fast5Directory(data)
+        for data in datas:
+            f5folder = Fast5Directory(data)
 
-        iFilesInFolder = 0
-        collectedOutput = []
+            iFilesInFolder = 0
+            collectedOutput = []
 
-        for file in f5folder.collect():
+            for file in f5folder.collect():
 
-            runid = file.runID()
+                runid = file.runID()
 
-            iFilesInFolder += 1
+                iFilesInFolder += 1
 
-            if self.validFileContent(file, environment):
+                if self.validFileContent(file, environment):
 
-                output = None
+                    output = None
 
-                if not environment.fasta:
-                    output = file.getFastQ(environment.read_type)
-                else:
-                    output = file.getFastA(environment.read_type)
+                    if not environment.fasta:
+                        output = file.getFastQ(environment.read_type)
+                    else:
+                        output = file.getFastA(environment.read_type)
 
-                if output != None:
-                    collectedOutput.append( str(output) )
+                    if output != None:
+                        collectedOutput.append(str(output))
 
-        eprint("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
+            eprint("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
 
         return collectedOutput
 
