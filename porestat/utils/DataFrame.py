@@ -291,6 +291,12 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         DefaultDataColumnAccess.__init__(self, {}, global_default=default)# for a col in row
         DataSeries.__init__(self, []) # for each row
 
+        self.title = None
+
+    def setTitle(self, value):
+
+        self.title = value
+
 
     def __getitem__(self, item):
 
@@ -574,7 +580,7 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         # Save the file
         wb.save( outFile )
 
-    def _makeHTMLString(self):
+    def _makeHTMLString(self, html_element_id=None):
 
         headpart = """
                 <link rel="stylesheet" href="https://cdn.datatables.net/1.10.15/css/jquery.dataTables.min.css">
@@ -583,7 +589,10 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         """
 
         bodypart = """
-        <table id="example" class="display" cellspacing="0" width="100%">
+        {% if title %}
+        <h1>{{title}}</h1>
+        {% endif %}
+        <table id="{{html_element_id}}" class="display" cellspacing="0" width="100%">
                 <thead>
                 <tr>
                 {% for column in columns %}
@@ -614,7 +623,7 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
 
                 <script>
                 $(document).ready(function() {
-                    $('#example tfoot th').each( function () {
+                    $('#{{html_element_id}} tfoot th').each( function () {
                         var title = $(this).text();
                         $(this).html( '<input type="text" placeholder="Search '+title+'" />' );
                     } );
@@ -647,8 +656,11 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         vHeader = [str(x[0]) for x in sortedHeader]
         vIndices = [x[1] for x in sortedHeader]
 
+        if html_element_id == None:
+            html_element_id = "dftable"
+
         jinjaTemplate = Template(bodypart)
-        output = jinjaTemplate.render(rows=self.data, indices=vIndices, columns=vHeader)
+        output = jinjaTemplate.render(rows=self.data, indices=vIndices, columns=vHeader, title=self.title, html_element_id=html_element_id)
 
         return (headpart, output)
 
@@ -656,6 +668,9 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
     def _makeHTML(self, outFile):
 
         (headpart, bodypart) = self._makeHTMLString()
+
+        if self.title != None:
+            bodypart = "<h1>"+self.title+"</h1>" + bodypart
 
         htmlfile="""
 
@@ -678,7 +693,7 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
 
 
 
-    def export(self, outFile, exType=ExportTYPE.TSV):
+    def export(self, outFile, exType=ExportTYPE.TSV, html_element_id=None):
 
         outputText = None
 
@@ -691,7 +706,7 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
             return
 
         if exType == ExportTYPE.HTML_STRING:
-            return self._makeHTMLString()
+            return self._makeHTMLString(html_element_id)
 
         if exType == ExportTYPE.TSV:
             outputText = self._makeStr('\t')
@@ -765,11 +780,16 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
     @classmethod
     def parseFromFile(cls, sFileName, oHeader=None, cDelim='\t', bConvertTextToNumber=True, encoding="utf-8"):
 
-        if not fileExists(sFileName):
-            print("error loading file: " + sFileName)
-            print("file does not exist")
 
-            return None
+        if type(sFileName) == str:
+
+            if not fileExists(sFileName):
+                print("error loading file: " + sFileName)
+                print("file does not exist")
+
+                return None
+
+            sFileName = open(sFileName, 'r')
 
         oNewDataFrame = DataFrame()
 

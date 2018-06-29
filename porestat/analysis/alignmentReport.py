@@ -1,6 +1,8 @@
+import argparse
 import os
 
 import HTSeq
+from porestat.utils.ArgParseExt import FileStubType, FolderType
 
 from .alignmentStatistics import AlignmentStatisticAnalysis
 from .read_counts import ReadCountAnalysis
@@ -29,14 +31,14 @@ class ReportFactory(PSToolInterfaceFactory):
 
     def _addParser(self, subparsers, which):
         parser = subparsers.add_parser(which, help=which+' help')
-        parser.add_argument('-s', '--sam', nargs='+', type=str, help='alignment files', required=True)
-        parser.add_argument('-f', '--fasta', dest='fasta_files', nargs='+', type=str, help='read inputs for alignment', required=True)
-        parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
+        parser.add_argument('-s', '--sam', nargs='+', type=argparse.FileType('r'), help='alignment files', required=True)
+        parser.add_argument('-f', '--fasta', dest='fasta_files', nargs='+', type=argparse.FileType('r'), help='read inputs for alignment', required=True)
+        parser.add_argument('-r', '--read-info', nargs='+', type=argparse.FileType('r'), help='read summary file', required=False)
 
-        parser.add_argument('-o', '--output', type=str, help='output folder for report', required=True)
+        parser.add_argument('-o', '--output', type=FolderType('w'), help='output folder for report', required=True)
         parser.add_argument('-n', '--output-name', type=str, help='output name', required=False)
 
-        parser.add_argument('--save-parallel-result', type=str, default=None)
+        parser.add_argument('--save-parallel-result', type=argparse.FileType('w'), default=None)
         parser.add_argument('--load-parallel-result', nargs='+', type=str, default=None, help='specify any saved pickle files to combine for report')
 
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
@@ -67,7 +69,10 @@ class ReportAnalysis(ParallelPSTInterface):
 
         self.dReportersArgs = OrderedDict([
             ('ALIGNMENT', {
-                'violin': args.violin
+                'violin': args.violin,
+                'mc': 50,
+                'errork': 5,
+                'perfectk': 21
             })
         ])
 
@@ -107,11 +112,11 @@ class ReportAnalysis(ParallelPSTInterface):
     def execParallel(self, data, environment):
 
         retTuples = []
-        for folder in data:
+        for alignedFile in data:
 
-            print("Processing File:", folder)
+            print("Processing File:", alignedFile.name)
 
-            if folder.endswith(".bam"):
+            if alignedFile.name.endswith(".bam"):
                 opener = HTSeq.BAM_Reader
             else:
                 opener = HTSeq.SAM_Reader
@@ -123,19 +128,18 @@ class ReportAnalysis(ParallelPSTInterface):
                 localEnv[report] = reportObj._createLocalEnvironment()
 
 
-            for readAlignment in opener(folder):
+            for readAlignment in opener(alignedFile):
 
                 for report in self.dReporters:
-
-                    if folder in self.filesPerReport[report]:
+                    if alignedFile in self.filesPerReport[report]:
                         reportObj = self.dReporters[report]
                         localEnv[report] = reportObj.handleEntity(readAlignment, localEnv[report], self.reporterEnvironments[report])
 
                 iProcessedAlignments += 1
 
-            print("File " + str(folder) + ": " + str(iProcessedAlignments) + "alignments processed")
+            print("File " + str(alignedFile.name) + ": " + str(iProcessedAlignments) + "alignments processed")
 
-            retTuples.append( (folder, localEnv) ) #(data, localEnv)
+            retTuples.append( (alignedFile.name, localEnv) ) #(data, localEnv)
 
         return retTuples
 
@@ -154,7 +158,7 @@ class ReportAnalysis(ParallelPSTInterface):
                     existResult[report] = None
 
                 reportObj = self.dReporters[report]
-                existResult[report] = reportObj.joinParallel( existResult[report], (file, newResults[report]), self.reporterEnvironments[report] )
+                existResult[report] = reportObj.joinParallel( existResult[report], [(file, newResults[report])], self.reporterEnvironments[report] )
 
         return existResult
 

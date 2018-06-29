@@ -3,6 +3,7 @@ import argparse
 import pickle
 from collections import defaultdict
 
+from porestat.tools.kmer_coverage import KmerHistogram
 from .ParallelAlignmentPSTReportableInterface import ParallelAlignmentPSTReportableInterface
 from ..hdf5tool.Fast5File import Fast5TYPEAction
 from ..plots.plotconfig import PlotConfig
@@ -47,12 +48,15 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
         super(AlignmentStatisticAnalysisFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
     def _addParser(self, subparsers, which):
-        parser = subparsers.add_parser(which, help=which+' help')
 
-        parser = subparsers.add_parser('align_stats', help='Alignment statistics (amount aligned, indels, ...)')
-        parser.add_argument('-s', '--sam', nargs='+', type=str, help='alignment files', required=True)
-        parser.add_argument('-f', '--fasta', dest='fasta_files', nargs='+', type=str, help='read inputs for alignment', required=True)
-        parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
+        parser = subparsers.add_parser(which, help=which+' help')
+        parser.add_argument('-s', '--sam', nargs='+', type=argparse.FileType('r'), help='alignment files', required=True)
+        parser.add_argument('-f', '--fasta', dest='fasta_files', nargs='+', type=argparse.FileType('r'), help='read inputs for alignment', required=True)
+        parser.add_argument('-r', '--read-info', nargs='+', type=argparse.FileType('r'), help='read summary file', required=False)
+
+        parser.add_argument('--mc', dest="mc", nargs=1, type=int, default=10, required=False)
+        parser.add_argument('--errork', dest="errork", nargs=1, type=int, default=5, required=False)
+        parser.add_argument('--perfectk', dest="perfectk", nargs=1, type=int, default=21, required=False)
 
         parser.add_argument('-q', '--read-type', nargs='+', dest='read_type', action=Fast5TYPEAction, default=None)
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
@@ -69,6 +73,16 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
         simArgs.pltcfg = PlotConfig.fromParserArgs(simArgs)
 
         return AlignmentStatisticAnalysis(simArgs)
+
+
+"""
+
+--save-parallel-result
+/home/mjoppich/dev/data/minion_basecalled/170329_2d_sequencing_run_1.1_p12_pooled/align_summary.pickle
+--load-parallel-result
+/home/mjoppich/dev/data/minion_basecalled/170329_2d_sequencing_run_1.1_p12_pooled/align_summary.pickle
+
+"""
 
 
 
@@ -90,13 +104,13 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
         for readInfoFile in args.read_info:
 
-            if not fileExists(readInfoFile):
+            if not fileExists(readInfoFile.name):
                 raise PSToolException("Read info file does not exist: " + str(readInfoFile))
 
         args.readInfo = None
 
         for readInfoFile in args.read_info:
-            allReadData = DataFrame.parseFromFile(readInfoFile, cDelim='\t')
+            allReadData = DataFrame.parseFromFile(readInfoFile.name, cDelim='\t')
 
             samIdx = allReadData.addColumn('SAM_READ_NAME')
             readNameIdx = allReadData.getColumnIndex('READ_NAME')
@@ -111,7 +125,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
         for fastaFile in args.fasta_files:
 
-            if not fileExists(fastaFile):
+            if not fileExists(fastaFile.name):
                 raise PSToolException("Fasta file does not exist: " + str(fastaFile))
 
 
@@ -134,7 +148,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
         self.readSequences(args)
 
         for x in args.sam:
-            if not fileExists(x):
+            if not fileExists(x.name):
                 PSToolException("sam file does not exist: " + str(x))
 
         return [x for x in args.sam]
@@ -142,7 +156,9 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
     def _createLocalEnvironment(self):
         return { 'BASE_COMPOSITION': defaultdict(Counter),
                  'UNALIGNED_READS': set(),
-                 'READ_STATS': {}
+                 'READ_STATS': {},
+                 'KMER_STATS_ALIGNED': {},
+                 'KMER_PERF_ALIGNED': {}
                  }
 
     def handleEntity(self, readAlignment, localEnv, globalEnv):
@@ -161,6 +177,9 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             cigarOfRead = readAlignment.cigar
 
             cigarOp2Length = self._makePropDict()
+            alignedKmers = defaultdict(lambda: Counter())
+            perfKmers = Counter()
+
 
             for cigarOp in cigarOfRead:
 
@@ -179,14 +198,68 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
                     editDistance = self.calculateEditDistance( readSeq, fastaSeq )
 
+                    if len(readSeq) != len(fastaSeq):
+                        print(readSeq, fastaSeq, "strange lengths")
+                    else:
+
+                        fseq = str(readSeq)
+                        aseq = str(fastaSeq)
+
+                        equals = 0
+                        mismatches = 0
+                        for i in range(0, len(fseq)):
+
+                            if fseq[i] == aseq[i]:
+                                equals += 1
+
+                                if mismatches > 0:
+                                    cigarOp2Length['Xd'].append(mismatches)
+                                    mismatches = 0
+
+                            else:
+                                mismatches += 1
+
+                                if equals > 0:
+                                    cigarOp2Length['Md'].append(equals)
+
+                                    if i -5 >= 0:
+                                        kmerBeforeMM = fseq[i-5:i]
+                                        alignedKmers['Md'][kmerBeforeMM] += 1
+                                        
+                                        
+                                    if equals >= 21:
+                                        kmerseq = fseq[i-equals:i]
+                                        foundkmers = KmerHistogram.calcKmers(kmerseq, 21)
+                                        perfKmers += foundkmers
+
+
+
+                                    equals = 0
+
+                        if equals > 0:
+                            cigarOp2Length['Md'].append(equals)
+
+                        if mismatches > 0:
+                            cigarOp2Length['Xd'].append(mismatches)
+
                     cigarOp2Length['M'].append(cigarOp.size)
                     cigarOp2Length['X'].append(editDistance)
                     cigarOp2Length['='].append(cigarOp.size - editDistance)
 
                 else:
+
+                    kmerStart = cigarOp.query_from - 6
+                    kmerEnd = cigarOp.query_from -1
+
+                    if kmerStart >= 0:
+                        kmerBeforeError = str(readAlignment.read_as_aligned[kmerStart:kmerEnd])
+                        alignedKmers[cigarOp.type][kmerBeforeError] += 1
+
                     cigarOp2Length[ cigarOp.type ].append(cigarOp.size)
 
             localEnv['READ_STATS'][(readID, readType)] = cigarOp2Length
+            localEnv['KMER_STATS_ALIGNED'][(readID, readType)] = alignedKmers
+            localEnv['KMER_PERF_ALIGNED'][(readID, readType)] = perfKmers
 
         else:
             localEnv['UNALIGNED_READS'].add(readID)
@@ -211,12 +284,13 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
         if existResult == None:
             existResult = {}
 
-        (file, data) = newResult
 
-        if file in existResult:
-            existResult[file] = mergeDicts(existResult[file], data)
-        else:
-            existResult[file] = data
+        for file, data in newResult:
+
+            if file in existResult:
+                existResult[file] = mergeDicts(existResult[file], data)
+            else:
+                existResult[file] = data
 
         return existResult
 
@@ -228,6 +302,9 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             parallelResult = allFilesResult[fileName]
 
             readCIGARs = parallelResult['READ_STATS']
+            cigarKMERs = parallelResult['KMER_STATS_ALIGNED']
+            perfectKMERs = parallelResult['KMER_PERF_ALIGNED']
+
             alignedIDs = set([x[0] for x in readCIGARs])
 
             unalignedIDs = parallelResult['UNALIGNED_READS']
@@ -269,43 +346,111 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 else:
                     overviewByAligned['UNKNOWN'][read_type] += 1
 
-            print(overviewByAligned)
-
             PorePlot.plotBars(overviewByAligned, fileName + ": Alignment Result By Type", "", "Count", pltcfg=args.pltcfg)
 
             if not self.hasArgument('read_type', args) or not args.read_type:
 
+                print("no read_type")
+
                 totalCounter = defaultdict(list)
+                kmerCounter = defaultdict(lambda: Counter())
+                perfectCounter = Counter()
 
                 for counterPair in readCIGARs:
 
-                    readID = counterPair[0]
-                    readType = counterPair[1]
                     readCounter = readCIGARs[counterPair]
+                    readKmers = cigarKMERs[counterPair]
+
+                    perfectCounter += perfectKMERs[counterPair]
 
                     for x in readCounter:
                         totalCounter[x] += readCounter[x]
+
+                    for x in readKmers:
+                        kmerCounter[x] += readKmers[x]
+
+
+
+
+                obsInfo = {
+                    'RUNID': fileName + "_perfect",
+                    'USER_RUN_NAME': "perfect",
+                    'KMERCOUNTS': perfectCounter
+                }
+
+                kmerDF = KmerHistogram.dfSummary(obsInfo, args.mc)
+                kmerDF.setTitle("k-mer histogram: perfectly aligned (k={})".format(args.perfectk))
+                args.pltcfg.makeTable(kmerDF)
+
+
+                for evtype in kmerCounter:
+
+                    obsInfo = {
+                        'RUNID': fileName + "_" + str(evtype),
+                        'USER_RUN_NAME': evtype,
+                        'KMERCOUNTS': kmerCounter[evtype]
+                    }
+
+                    kmerDF = KmerHistogram.dfSummary(obsInfo, args.mc)
+                    kmerDF.setTitle("k-mer histogram: sequence before CIGAR " + evtype + " (k={})".format(args.errork))
+                    args.pltcfg.makeTable(kmerDF)
 
                 if self.hasArgument('violin', args) and args.violin:
                     PorePlot.plotViolin(totalCounter, [x for x in totalCounter], "CIGARs: all types", pltcfg=args.pltcfg, shareX = False, shareY=False)
                 else:
                     PorePlot.plotBoxplot(totalCounter, [x for x in totalCounter], "CIGARs: all types", pltcfg=args.pltcfg)
 
+
+
+
+
             totalCounter = defaultdict(lambda: defaultdict(list))
+            kmersByReadType = defaultdict(lambda: defaultdict(lambda: Counter()))
+            perfectCounter = defaultdict(lambda: Counter())
 
             for counterPair in readCIGARs:
 
                 readID = counterPair[0]
                 readType = counterPair[1]
                 readCounter = readCIGARs[counterPair]
+                readKmers = cigarKMERs[counterPair]
+
+                perfectCounter[readType] += perfectKMERs[counterPair]
 
                 for x in readCounter:
                     totalCounter[readType][x] += readCounter[x]
+
+                for x in readKmers:
+                    kmersByReadType[readType][x] += readKmers[x]
+
 
             for readType in totalCounter:
 
                 print(readType)
                 print(self.hasArgument('violin', args),args.violin)
+
+                obsInfo = {
+                    'RUNID': fileName + "_" + str(readType) + "_perfect",
+                    'USER_RUN_NAME': "perfect",
+                    'KMERCOUNTS': perfectCounter[readType]
+                }
+                kmerDF = KmerHistogram.dfSummary(obsInfo, args.mc)
+                kmerDF.setTitle("k-mer histogram: perfectly aligned (k={}, {})".format(args.perfectk, str(readType)))
+                args.pltcfg.makeTable(kmerDF)
+
+                for rtype in kmersByReadType[readType]:
+
+                    print("kmer", rtype)
+
+                    obsInfo = {
+                        'RUNID': fileName + "_" + str(readType) + "_" + str(rtype),
+                        'USER_RUN_NAME': rtype,
+                        'KMERCOUNTS': kmersByReadType[readType][rtype]
+                    }
+                    kmerDF = KmerHistogram.dfSummary(obsInfo, args.mc)
+                    kmerDF.setTitle("k-mer histogram: sequence before CIGAR " + rtype + " (k={}, {})".format(args.errork, str(readType)))
+                    args.pltcfg.makeTable(kmerDF)
+
 
                 if self.hasArgument('violin', args) and args.violin:
                     PorePlot.plotViolin(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs: " + str(readType),

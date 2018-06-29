@@ -13,11 +13,9 @@ class FASTQ:
         self.qual = qual.strip()
 
     def __str__(self):
-
         return '@' + self.id + os.linesep + self.seq + os.linesep + '+' + os.linesep + self.qual
 
     def __len__(self):
-
         return len(self.seq)
 
     @classmethod

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import mpld3
 from mpld3 import plugins
 
+from porestat.utils.DataFrame import DataFrame, ExportTYPE
 from ..utils.ArgParseExt import FileStubType
 
 
@@ -46,15 +47,28 @@ class PlotSaveTypeAction(argparse.Action):
 
     def __call__(self, parser, args, values, option_string=None):
 
-        try:
-            eVal = PlotSaveTYPE[values.upper()]
-            args.__dict__[ self.dest ] = eVal
+        if not len(values) == 1:
+            raise argparse.ArgumentError(None, "ExportTYPE must be one value")
 
-        except:
 
-            raise argparse.ArgumentError(None, 'ExportTYPE can not be {n}, '
-                                               'it must be one of {m}'.format(n=values,
-                                                                              m=', '.join([str(x.value) for x in PlotSaveTYPE])))
+        value = values[0]
+
+        if not type(value) == PlotSaveTYPE:
+
+            try:
+                eVal = PlotSaveTYPE[values.upper()]
+                args.__dict__[ self.dest ] = eVal
+
+            except:
+
+                raise argparse.ArgumentError(None, 'ExportTYPE can not be {n}, '
+                                                   'it must be one of {m}'.format(n=values,
+                                                                                  m=', '.join([str(x.value) for x in PlotSaveTYPE])))
+
+        else:
+            args.__dict__[self.dest] = value
+
+
 class PlotSaveTYPE(Enum):
     PNG='png'
     HTML='HTML'
@@ -99,7 +113,7 @@ class PlotConfig:
     @classmethod
     def addParserArgs(cls, parser):
 
-        parser.add_argument('-sp', '--save-plot', type=FileStubType('w'), help='path-prefix to file where plots are saved. Final file will be save-plot.xxx.png')
+        parser.add_argument('-sp', '--save-plot', type=FileStubType('w'), nargs=1, help='path-prefix to file where plots are saved. Final file will be save-plot.xxx.png')
         parser.add_argument('-spt', '--save-plot-type', action=PlotSaveTypeAction, default=PlotSaveTYPE.PNG, type=PlotSaveTYPE, nargs=1)
         parser.add_argument('-ps', '--plot-style', action=PlotStyleAction, default=PlotStyle.BMH, type=PlotStyle, nargs=1)
 
@@ -134,6 +148,13 @@ class PlotConfig:
 
         self.save_to_file = True
         self.save_file = filePath
+
+        if type(self.save_file) == list:
+            assert(len(self.save_file) > 0)
+            self.save_file = self.save_file[0]
+
+        if self.save_file == None:
+            print("pltcfg save file is empty", filePath, type(filePath))
 
         plt.ioff()
 
@@ -171,6 +192,37 @@ class PlotConfig:
             return True
 
         return False
+
+
+    def makeTable(self, df):
+
+        assert(type(df) == DataFrame)
+
+        if self.outputType == PlotSaveTYPE.HTML_STRING:
+
+            (header, body) = df.export(None, exType=ExportTYPE.HTML_STRING, html_element_id="dftable_" + str(len(self.createdPlots)))
+
+            self.createdPlots.append(header + body)
+
+            return
+
+        else:
+            df.export(None)
+
+        if self.save_to_file != None and self.save_to_file and self.save_file != None:
+
+            fileExt = PlotSaveTYPE.getFileExtension(self.outputType)
+
+            if fileExt == None:
+                print("Could not make table: invalid outputType", self.outputType)
+                return
+
+            exactFilename = self.save_file + ".%02d." + fileExt
+            exactFilename = exactFilename % self.saved_plot
+            self.saved_plot += 1
+
+            if self.outputType == PlotSaveTYPE.HTML:
+                df.export(exactFilename, exType=ExportTYPE.HTML)
 
     def makePlot(self, noTightLayout=False, figHeight='100%', figWidth='100%'):
 

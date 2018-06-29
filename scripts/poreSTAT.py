@@ -1,5 +1,6 @@
 import random, os, sys
 
+from porestat.tools.kmer_coverage import KmerHistogramFactory
 
 sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../")
 
@@ -53,7 +54,9 @@ if __name__ == '__main__':
         QualityPositionFactory(parser, subparsers, 'qual'),
         LengthHistogramFactory(parser, subparsers, 'histo'),
         YieldPlotFactory(parser, subparsers, 'yield'),
-        DemangleFilesFactory(parser, subparsers, 'demangle')
+        DemangleFilesFactory(parser, subparsers, 'demangle'),
+        KmerHistogramFactory(parser, subparsers, 'kmer')
+
     ]
 
     for tool in allTools:

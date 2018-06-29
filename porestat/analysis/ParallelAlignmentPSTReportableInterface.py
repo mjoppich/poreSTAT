@@ -16,18 +16,23 @@ class ParallelAlignmentPSTReportableInterface(ParallelPSTInterface):
 
     def execParallel(self, data, environment):
 
-        if data.endswith(".bam"):
-            opener = HTSeq.BAM_Reader
-        else:
-            opener = HTSeq.SAM_Reader
+        retData = []
+        for alignFile in data:
 
-        iProcessedAlignments = 0
-        localEnv = self._createLocalEnvironment()
+            if alignFile.name.endswith(".bam"):
+                opener = HTSeq.BAM_Reader
+            else:
+                opener = HTSeq.SAM_Reader
 
-        for readAlignment in opener(data):
-            localEnv = self.handleEntity(readAlignment, localEnv, environment)
-            iProcessedAlignments += 1
+            iProcessedAlignments = 0
+            localEnv = self._createLocalEnvironment()
 
-        print("In File " + str(data) + " " + str(iProcessedAlignments) + " have been processed")
+            for readAlignment in opener(alignFile):
+                localEnv = self.handleEntity(readAlignment, localEnv, environment)
+                iProcessedAlignments += 1
 
-        return (data, localEnv)
+            print("In File " + str(alignFile.name) + " " + str(iProcessedAlignments) + " have been processed")
+
+            retData.append( (alignFile.name, localEnv) )
+
+        return retData

@@ -542,12 +542,24 @@ class PorePlot:
         pltcfg.makePlot()
 
     @classmethod
-    def plotHistogram(cls, someData, labels, title, bins = 100, xlabel=None, ylabel=None, pltcfg = PlotConfig()):
+    def plotHistogram(cls, someData, labels, title, bins = 100, xlabel=None, ylabel=None, plotDirection=PlotDirectionTYPE.VERTICAL, pltcfg = PlotConfig()):
+
+        if type(someData) == dict:
+
+            if labels == None:
+                labels = [x for x in someData]
+
+            someData = [someData[x] for x in labels]
+
+
+        plotDir = 'horizontal'
+        if plotDirection ==  PlotDirectionTYPE.VERTICAL:
+            plotDir = 'vertical'
 
 
         pltcfg.startPlot()
         fig, ax = plt.subplots()
-        linebc, bins, patches = ax.hist( someData , bins, histtype='bar', stacked=False, label=labels, orientation='horizontal')
+        linebc, bins, patches = ax.hist( someData , bins, histtype='bar', stacked=False, label=labels, orientation=plotDir)
         ax.set_title( title )
 
         if xlabel != None:
@@ -568,16 +580,28 @@ class PorePlot:
         pltcfg.makePlot()
 
     @classmethod
-    def plotCumHistogram(cls, someData, labels, title, bins=100, xlabel=None, ylabel=None, pltcfg=PlotConfig()):
+    def plotCumHistogram(cls, someData, labels, title, bins = 100, xLogAxis=True,xlabel=None, normed=True, ylabel=None, plotDirection=PlotDirectionTYPE.VERTICAL, pltcfg = PlotConfig()):
 
         pltcfg.startPlot()
         fig, ax = plt.subplots()
 
-        dataVec = []
-        for x in labels:
-            dataVec.append( someData[x] )
+        if type(someData) == dict:
 
-        linebc, bins, patches = ax.hist(dataVec, bins, histtype='step', cumulative=1, normed=1, stacked=False, label=labels)
+            if labels == None:
+                labels = [x for x in someData]
+
+            someData = [someData[x] for x in labels]
+
+
+        plotDir = 'horizontal'
+        if plotDirection ==  PlotDirectionTYPE.VERTICAL:
+            plotDir = 'vertical'
+
+        if bins == -1:
+            bins = max([len(x) for x in someData])
+
+
+        linebc, bins, patches = ax.hist(someData, bins, histtype='step', cumulative=1, normed=normed, stacked=False, label=labels, orientation=plotDir)
         ax.set_title(title)
 
         if xlabel != None:
@@ -592,7 +616,8 @@ class PorePlot:
         if len(someData) > 1:
             ax.legend()
 
-        plt.xscale('log')
+        if xLogAxis:
+            plt.xscale('log')
 
         pltcfg.makePlot()
 

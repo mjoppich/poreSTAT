@@ -1,6 +1,7 @@
 import os
 
 from porestat.tools.experiment_ls import ExperimentLs
+from porestat.tools.kmer_coverage import KmerHistogram
 from .quality_position import QualityPosition
 from .length_histogram import LengthHistogram
 from .nucleotide_distribution import NucleotideDistribution
@@ -74,6 +75,7 @@ class ReportAnalysis(ParallelPSTInterface):
             ('NUCLEOTIDES', NucleotideDistribution(args)),
             ('QUALITY DISTRIBUTION', QualityDistribution(args)),
             ('QUALITY BY POSITION', QualityPosition(args)),
+            ('KMER DISTRIBUTION', KmerHistogram(args))
         ])
 
         #self.dReporters = OrderedDict([('OVERVIEW', ExperimentLs(args)), ('QUALITY BY POSITION', QualityPosition(args))])
@@ -81,7 +83,10 @@ class ReportAnalysis(ParallelPSTInterface):
         self.dReportersArgs = OrderedDict([
 
             ('YIELD', {
-                        'separate_subplots': True
+                'separate_subplots': True
+            }),
+            ('KMER DISTRIBUTION', {
+                'violin': True
             })
 
         ])

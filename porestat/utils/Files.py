@@ -89,7 +89,10 @@ def readLines(sFileName, vLines = None, encoding = "utf-8", iSkipLines = 0):
 
     vReturn = []
 
-    oFile = open(sFileName, 'r', encoding=encoding)
+    if type(sFileName) == str:
+        oFile = open(sFileName, 'r', encoding=encoding)
+    else:
+        oFile = sFileName
 
     iLineCount = 0
 

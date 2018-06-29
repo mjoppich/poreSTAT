@@ -14,7 +14,7 @@ class FileStubType(object):
 
         self._mode = mode
 
-    def __call__(self, parser, namespace, values, option_string=None):
+    def __call__(self, values):
 
         prospective_dir=values
 
@@ -25,7 +25,7 @@ class FileStubType(object):
             if not os.path.isdir(prospective_path):
                 raise argparse.ArgumentTypeError("readable_dir:{0} is not a valid path".format(prospective_dir))
             if os.access(prospective_path, os.R_OK):
-                setattr(namespace,self.dest,prospective_dir)
+                return prospective_dir
             else:
                 raise argparse.ArgumentTypeError("readable_dir:{0} is not a readable dir".format(prospective_dir))
 
@@ -33,9 +33,9 @@ class FileStubType(object):
 
             if os.path.isdir(prospective_path):
                 if os.access(prospective_path, os.W_OK):
-                    setattr(namespace, self.dest, prospective_dir)
+                    return prospective_dir
                 else:
-                    raise argparse.ArgumentTypeError("readable_dir:{0} is not a writable dir".format(prospective_dir))
+                    raise argparse.ArgumentTypeError("writable_dir:{0} is not a writable dir".format(prospective_dir))
 
 
 
