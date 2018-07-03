@@ -629,7 +629,7 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
                     } );
 
                     // DataTable
-                    var table = $('#example').DataTable({
+                    var table = $('#{{html_element_id}}').DataTable({
                                                         "columnDefs": [
                                                             { "type": "numeric-comma" }
                                                         ]

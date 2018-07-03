@@ -253,7 +253,7 @@ class PlotConfig:
             self.saved_plot += 1
 
             if self.outputType == PlotSaveTYPE.HTML:
-                mpld3.save_html(current_figure, exactFilename, template_type='notebook', d3_url=self.d3js, mpld3_url=self.mpld3js)
+                mpld3.save_html(current_figure, exactFilename, template_type='simple', d3_url=self.d3js, mpld3_url=self.mpld3js)
             elif self.outputType == PlotSaveTYPE.JSON:
                 mpld3.save_json(current_figure, exactFilename, d3_url=self.d3js, mpld3_url=self.mpld3js)
             elif self.outputType == PlotSaveTYPE.PNG:

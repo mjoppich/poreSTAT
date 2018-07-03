@@ -158,8 +158,18 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                  'UNALIGNED_READS': set(),
                  'READ_STATS': {},
                  'KMER_STATS_ALIGNED': {},
-                 'KMER_PERF_ALIGNED': {}
+                 'KMER_PERF_ALIGNED': {},
+                 'READ_INFO': {}
                  }
+
+
+    def calc_gc(self, readSeq):
+
+        gcCount = readSeq.count("G")
+        gcCount += readSeq.count("C")
+
+        return gcCount / len(readSeq)
+
 
     def handleEntity(self, readAlignment, localEnv, globalEnv):
 
@@ -180,6 +190,16 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             alignedKmers = defaultdict(lambda: Counter())
             perfKmers = Counter()
 
+            readIdentityCount = 0
+            alignmentIdentityCount = 0
+            alignmentLength = readAlignment.iv.end-readAlignment.iv.start
+
+            matchedGCContents = []
+            matchedLongestLength = None
+
+            fastaReq = globalEnv.fasta[readInterval.chrom]
+            fastaReq = fastaReq.toHTSeq()
+
 
             for cigarOp in cigarOfRead:
 
@@ -190,13 +210,17 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
                 if cigarOp.type == 'M':
 
-                    fastaReq = globalEnv.fasta[ readInterval.chrom ]
-
-                    fastaReq = fastaReq.toHTSeq()
-
                     fastaSeq = fastaReq[ cigarOp.ref_iv.start:cigarOp.ref_iv.end ]
 
                     editDistance = self.calculateEditDistance( readSeq, fastaSeq )
+
+
+                    gc_content = self.calc_gc(str(readSeq.seq))
+                    matchedGCContents.append( (gc_content, len(readSeq)) )
+
+
+                    readIdentityCount += len(readSeq) - editDistance
+                    alignmentIdentityCount += len(readSeq) - editDistance
 
                     if len(readSeq) != len(fastaSeq):
                         print(readSeq, fastaSeq, "strange lengths")
@@ -261,6 +285,13 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             localEnv['KMER_STATS_ALIGNED'][(readID, readType)] = alignedKmers
             localEnv['KMER_PERF_ALIGNED'][(readID, readType)] = perfKmers
 
+            localEnv['READ_INFO'][(readID, readType)] = {
+                'READ_IDENTITY': (readIdentityCount /len(readAlignment.read), len(readAlignment.read)),
+                'ALIGNMENT_IDENTITY': (alignmentIdentityCount/ alignmentLength, alignmentLength),
+                'MATCHED_GC_CONTENT': matchedGCContents,
+                'MATCHED_LONGEST_LENGTH': [matchedLongestLength]
+            }
+
         else:
             localEnv['UNALIGNED_READS'].add(readID)
 
@@ -302,6 +333,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             parallelResult = allFilesResult[fileName]
 
             readCIGARs = parallelResult['READ_STATS']
+            readInfo = parallelResult['READ_INFO']
             cigarKMERs = parallelResult['KMER_STATS_ALIGNED']
             perfectKMERs = parallelResult['KMER_PERF_ALIGNED']
 
@@ -350,16 +382,32 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
             if not self.hasArgument('read_type', args) or not args.read_type:
 
-                print("no read_type")
-
                 totalCounter = defaultdict(list)
                 kmerCounter = defaultdict(lambda: Counter())
                 perfectCounter = Counter()
+
+                allReadInfos = defaultdict(list)
 
                 for counterPair in readCIGARs:
 
                     readCounter = readCIGARs[counterPair]
                     readKmers = cigarKMERs[counterPair]
+
+                    allReadInfo = readInfo[counterPair]
+
+                    """
+                    {
+                        'READ_IDENTITY': (readIdentityCount / len(readAlignment.read), len(readAlignment.read)),
+                        'ALIGNMENT_IDENTITY': (alignmentIdentityCount / alignmentLength, alignmentLength),
+                        'MATCHED_GC_CONTENT': matchedGCContents,
+                        'MATCHED_LONGEST_LENGTH': [matchedLongestLength]
+                    }
+                    """
+
+                    allReadInfos['READ_IDENTITY'].append(allReadInfo['READ_IDENTITY'])
+                    allReadInfos['ALIGNMENT_IDENTITY'].append(allReadInfo['ALIGNMENT_IDENTITY'])
+                    allReadInfos['MATCHED_GC_CONTENT'] += allReadInfo['MATCHED_GC_CONTENT']
+                    allReadInfos['MATCHED_LONGEST_LENGTH'] += allReadInfo['MATCHED_LONGEST_LENGTH']
 
                     perfectCounter += perfectKMERs[counterPair]
 
@@ -368,9 +416,6 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
                     for x in readKmers:
                         kmerCounter[x] += readKmers[x]
-
-
-
 
                 obsInfo = {
                     'RUNID': fileName + "_perfect",
@@ -395,18 +440,39 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     kmerDF.setTitle("k-mer histogram: sequence before CIGAR " + evtype + " (k={})".format(args.errork))
                     args.pltcfg.makeTable(kmerDF)
 
+
+
+
+                """
+                READ IDENTITY, ALIGNMENT IDENTITY, MATCHED GC CONTENT, MAX MATCHED PART
+                """
+
+                xReadID = [x[0] for x in allReadInfos['READ_IDENTITY']]
+                yReadID = [x[1] for x in allReadInfos['READ_IDENTITY']]
+                PorePlot.plot_scatter_densities(xReadID, yReadID, "Read Identity vs Read Length", "Read Identity", "Read Length [bp]", pltcfg=args.pltcfg)
+
+                xReadID = [x[0] for x in allReadInfos['ALIGNMENT_IDENTITY']]
+                yReadID = [x[1] for x in allReadInfos['ALIGNMENT_IDENTITY']]
+                PorePlot.plot_scatter_densities(xReadID, yReadID, "Alignment Identity vs Alignment Length", "Alignment Identity", "Alignment Length [bp]", pltcfg=args.pltcfg)
+
+                xReadID = [x[0] for x in allReadInfos['MATCHED_GC_CONTENT']]
+                yReadID = [x[1] for x in allReadInfos['MATCHED_GC_CONTENT']]
+                PorePlot.plot_scatter_densities(xReadID, yReadID, "GC Content vs Aligned Seq Length", "GC Content", "Aligned Sequence Length [bp]", pltcfg=args.pltcfg)
+
                 if self.hasArgument('violin', args) and args.violin:
-                    PorePlot.plotViolin(totalCounter, [x for x in totalCounter], "CIGARs: all types", pltcfg=args.pltcfg, shareX = False, shareY=False)
+                    PorePlot.plotViolin(totalCounter, sorted([x for x in totalCounter]), "CIGARs: all types", pltcfg=args.pltcfg, shareX = False, shareY=False)
                 else:
-                    PorePlot.plotBoxplot(totalCounter, [x for x in totalCounter], "CIGARs: all types", pltcfg=args.pltcfg)
+                    PorePlot.plotBoxplot(totalCounter, sorted([x for x in totalCounter]), "CIGARs: all types", pltcfg=args.pltcfg)
 
 
-
+            return
 
 
             totalCounter = defaultdict(lambda: defaultdict(list))
             kmersByReadType = defaultdict(lambda: defaultdict(lambda: Counter()))
             perfectCounter = defaultdict(lambda: Counter())
+
+            allReadInfos = defaultdict(lambda: defaultdict(list))
 
             for counterPair in readCIGARs:
 
@@ -414,6 +480,14 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 readType = counterPair[1]
                 readCounter = readCIGARs[counterPair]
                 readKmers = cigarKMERs[counterPair]
+
+                allReadInfo = readInfo[counterPair]
+                allReadInfos[readType] = mergeDicts(allReadInfos[readType], allReadInfo)
+
+                allReadInfos[readType]['READ_IDENTITY'].append(allReadInfo['READ_IDENTITY'])
+                allReadInfos[readType]['ALIGNMENT_IDENTITY'].append(allReadInfo['ALIGNMENT_IDENTITY'])
+                allReadInfos[readType]['MATCHED_GC_CONTENT'] += allReadInfo['MATCHED_GC_CONTENT']
+                allReadInfos[readType]['MATCHED_LONGEST_LENGTH'] += allReadInfo['MATCHED_LONGEST_LENGTH']
 
                 perfectCounter[readType] += perfectKMERs[counterPair]
 
@@ -440,7 +514,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
                 for rtype in kmersByReadType[readType]:
 
-                    print("kmer", rtype)
+                    print(rtype)
 
                     obsInfo = {
                         'RUNID': fileName + "_" + str(readType) + "_" + str(rtype),
@@ -452,9 +526,30 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     args.pltcfg.makeTable(kmerDF)
 
 
+
+
+
+
+                """
+                READ IDENTITY, ALIGNMENT IDENTITY, MATCHED GC CONTENT, MAX MATCHED PART
+                """
+
+                xReadID = [x[0] for x in allReadInfos[readType]['READ_IDENTITY']]
+                yReadID = [x[1] for x in allReadInfos[readType]['READ_IDENTITY']]
+                PorePlot.plot_scatter_densities(xReadID, yReadID, "Read Identity vs Read Length ({})".format(str(readType)), "Read Identity", "Read Length [bp]", pltcfg=args.pltcfg)
+
+                xReadID = [x[0] for x in allReadInfos[readType]['ALIGNMENT_IDENTITY']]
+                yReadID = [x[1] for x in allReadInfos[readType]['ALIGNMENT_IDENTITY']]
+                PorePlot.plot_scatter_densities(xReadID, yReadID, "Alignment Identity vs Alignment Length  ({})".format(str(readType)), "Alignment Identity", "Alignment Length [bp]", pltcfg=args.pltcfg)
+
+                xReadID = [x[0] for x in allReadInfos[readType]['MATCHED_GC_CONTENT']]
+                yReadID = [x[1] for x in allReadInfos[readType]['MATCHED_GC_CONTENT']]
+                PorePlot.plot_scatter_densities(xReadID, yReadID, "GC Content vs Aligned Seq Length  ({})".format(str(readType)), "GC Content", "Aligned Sequence Length [bp]", pltcfg=args.pltcfg)
+
+
                 if self.hasArgument('violin', args) and args.violin:
-                    PorePlot.plotViolin(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs: " + str(readType),
+                    PorePlot.plotViolin(totalCounter[readType], sorted([x for x in totalCounter[readType]]), "CIGARs: " + str(readType),
                                         pltcfg=args.pltcfg, shareX = False, shareY=False)
                 else:
-                    PorePlot.plotBoxplot(totalCounter[readType], [x for x in totalCounter[readType]], "CIGARs: " + str(readType),
+                    PorePlot.plotBoxplot(totalCounter[readType], sorted([x for x in totalCounter[readType]]), "CIGARs: " + str(readType),
                                          pltcfg=args.pltcfg)

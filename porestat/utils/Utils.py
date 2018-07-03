@@ -11,8 +11,10 @@ def mergeDicts( dict1, dict2, resultType=dict):
 
         if k in dict3:
 
-            if not type(v) == type(dict3[k]):
-                raise Exception("You try to merge two different objects!")
+            if not type(v) == type(dict3[k]) and type(dict3[k] == list):
+
+                dict3[k].append(v)
+                continue
 
             if type(v) == list:
 
@@ -36,6 +38,13 @@ def mergeDicts( dict1, dict2, resultType=dict):
             elif type(v) == int or type(v) == float:
 
                 dict3[k] = dict3[k] + v
+
+            elif type(v) == tuple:
+                tmp = dict3[k]
+                dict3[k] = list()
+                dict3[k].append(tmp)
+                dict3[k].append(v)
+
 
             else:
 
