@@ -62,6 +62,10 @@ class ReportAnalysis(ParallelPSTInterface):
 
         super(ReportAnalysis, self).__init__( args )
 
+        self.args.pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
+
+
+
         self.dReporters = OrderedDict([
             ('ALIGNMENT', AlignmentStatisticAnalysis(args)),
             #('READ COUNTS/COVERAGE', ReadCountAnalysis(args))
@@ -173,115 +177,28 @@ class ReportAnalysis(ParallelPSTInterface):
 
         if args.output_name == None:
             args.output_name = 'report'
-            print("Output name:   " + str(args.output_name))
+            print("Changed Output name:   " + str(args.output_name))
 
-        if not os.path.exists(args.output):
-            os.makedirs(args.output)
+        for report in self.dReporters:
+            print("Running report: " + str(report))
 
-        self.data_path = makePath(makePath(args.output) + args.output_name)
-        if not os.path.exists(self.data_path):
-            os.makedirs(self.data_path)
+            reporterArgs = self.prepareEnvironment(args)
+            reporterArgs.output = None
+            reporterArgs.output_type = None
+            reporterArgs.pltcfg = args.pltcfg
 
-        import mpld3, shutil
-        d3js_path = mpld3.getD3js()
-        mpld3_path = mpld3.getmpld3js(True)
+            reporterArgs = self.patchArgs(reporterArgs, report)
 
-        d3js_dest = self.data_path + os.path.split(d3js_path)[1]
-        mpld3_dest = self.data_path + os.path.split(mpld3_path)[1]
+            reporterArgs.pltcfg.saveToFile(args.output + "/" + report)
 
-        shutil.copyfile(d3js_path, d3js_dest)
-        shutil.copyfile(mpld3_path, mpld3_dest)
+            reporterArgs.pltcfg.addHTMLPlot("<h1>" + str(report) + "</h1>\n")
 
-        self.html_path = args.output + args.output_name + ".html"
+            reportObj = self.dReporters[report]
 
-        args.pltcfg.d3js = os.path.relpath(d3js_dest, args.output)
-        args.pltcfg.mpld3js = os.path.relpath(mpld3_dest, args.output)
+            reportObj.makeResults(parallelResult[report], oEnvironment, reporterArgs)
+            args.pltcfg = reporterArgs.pltcfg
 
-        print("Relative js path: " + args.pltcfg.d3js)
-
-
-        args.pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
-
-        justLoaded = False
-        if not args.load_parallel_result is None:
-            print("Trying to load result from: " + ", ".join(args.load_parallel_result))
-            justLoaded = True
-
-            for res in args.load_parallel_result:
-
-                if not os.path.isfile(res):
-                    justLoaded = False
-
-
-                with open(res, 'rb') as pickleFile:
-                    loadedResult = pickle.load(pickleFile)
-
-                    if parallelResult == None:
-                        parallelResult = loadedResult
-                    else:
-                        parallelResult = mergeDicts(parallelResult, loadedResult)
-
-                print("Result loaded: " + res)
-
-
-        if args.save_parallel_result != None and not justLoaded:
-
-            with open(args.save_parallel_result, 'wb') as pickleFile:
-                pickle.dump( parallelResult, pickleFile )
-
-            print("Result saved to: " + args.save_parallel_result)
-
-        with open(args.output + args.output_name + ".html", 'w') as htmlFile:
-
-            mpld3js = "<script src=" + args.pltcfg.mpld3js +"></script>\n"
-            d3js = "<script src=" + args.pltcfg.d3js + "></script>\n"
-
-            htmlFile.write(
-                """
-                <html>
-                <head>
-                """
-                +d3js+
-                mpld3js+
-                """
-                </head>
-                <body>
-                """
-            )
-
-            for report in self.dReporters:
-
-                print("Running report: " + str(report))
-
-                reporterArgs = self.prepareEnvironment(args)
-                reporterArgs.output = None
-                reporterArgs.output_type = None
-                reporterArgs.pltcfg = args.pltcfg
-
-                reporterArgs = self.patchArgs(reporterArgs, report)
-
-                reporterArgs.pltcfg.saveToFile(self.data_path + "/" + report)
-
-                htmlFile.write("<h1>" + str(report) + "</h1>\n")
-
-                reportObj = self.dReporters[report]
-
-                reportObj.makeResults(parallelResult[report], oEnvironment, reporterArgs)
-                args.pltcfg = reporterArgs.pltcfg
-
-                createdPlots = args.pltcfg.getCreatedPlots()
-                args.pltcfg.resetCreatedPlots()
-
-                for x in createdPlots:
-
-                    relPath = os.path.relpath( x, args.output )
-                    htmlFile.write(x + "\n")
-
-                    #print(str(report) + "\t" + str(relPath))
-
-                htmlFile.flush()
-
-            htmlFile.write("</body></html>\n")
+        args.pltcfg.prepareHTMLOutput(args.output, args.output_name + ".html", relativeImport=True)
 
 
     def patchArgs(self, args, reporter):

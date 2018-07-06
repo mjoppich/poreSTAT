@@ -17,7 +17,7 @@ from matplotlib.ticker import Formatter
 
 from porestat.utils.OrderedSet import OrderedSet
 from .plotconfig import PlotConfig
-from matplotlib import gridspec
+from matplotlib import gridspec, colors
 import scipy.cluster.hierarchy as sch
 
 
@@ -419,41 +419,47 @@ class PorePlot:
 
 
     @classmethod
-    def plot_scatter_densities(cls, xdata, ydata, xlabel, ylabel, title, addInfos=None, iRoundTo = 3, figSize=(30,30), pltcfg=PlotConfig(), textIsNumber=True):
+    def plot_scatter_densities(cls, xdata, ydata, title, xlabel, ylabel, addInfos=None, iRoundTo = 3, figSize=(30,30), pltcfg=PlotConfig(), textIsNumber=True):
 
         fig, ax = plt.subplots()
 
         x = np.asarray(xdata)
         y = np.asarray(ydata)
 
-        print(x.shape)
-        print(y.shape)
-
-        # Create x,y arrays of normally distributed points
-        npts = 100000
-        x = np.random.standard_normal(npts)
-        y = np.random.standard_normal(npts)
-
-        print(x.shape)
-        print(y.shape)
+        print("Going to display elements", len(xdata), len(ydata), min(xdata), max(xdata), min(ydata), max(ydata))
 
         # Set bin numbers in both axes
-        nxbins = 100
-        nybins = 100
+        nxbins = 50
+        nybins = 50
 
         # Set the cutoff for resolving the individual points
         minperbin = 1
 
         # Make the density histrogram
-        H, yedges, xedges = np.histogram2d(y, x, bins=(nybins, nxbins))
+        H, xedges, yedges = np.histogram2d(x,y, bins=(nxbins, nybins))
         # Reorient the axes
-        H = H[::-1]
+        #H = H[::-1]
+
+        def transformX(xnew):
+            val = ((xnew - extent[0]) / (extent[1] - extent[0])) * nxbins
+            return val
+
+        def transformY(ynew):
+            val = ((ynew - extent[2]) / (extent[3] - extent[2])) * nybins
+            return val
 
         extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+
+        print("extent", extent)
 
         # Figure out which bin each x,y point is in
         xbinsize = xedges[1] - xedges[0]
         ybinsize = yedges[1] - yedges[0]
+
+
+        print("binsize", xbinsize, ybinsize)
+
+
         xi = ((x - xedges[0]) / xbinsize).astype(np.integer)
         yi = nybins - 1 - ((y - yedges[0]) / ybinsize).astype(np.integer)
 
@@ -463,15 +469,74 @@ class PorePlot:
         xi = np.where(xi < nxbins, xi, xim1)
         yi = np.where(yi < nybins, yi, yim1)
 
-        # Get all points with density below the threshold
-        lowdensityx = x[H[yi, xi] <= minperbin]
-        lowdensityy = y[H[yi, xi] <= minperbin]
+        myCounts = np.zeros((nxbins, nybins))
 
-        ax.plot(lowdensityx, lowdensityy, linestyle='None', marker='o', mfc='k', mec='k', ms=3)
-        cp1 = ax.imshow(H, interpolation='nearest', extent=extent, vmin=minperbin)
+        for i in range(0, len(x)):
+
+            binx = xi[i]
+            biny = yi[i]
+
+            myCounts[binx, biny] += 1
+
+        lowdensityx = []
+        lowdensityy = []
+
+        for i in range(0, len(x)):
+
+            elemx = x[i]
+            elemy = y[i]
+
+            binx = xi[i]
+            biny = yi[i]
+
+            if myCounts[binx, biny] <= 1:
+                lowdensityx.append(elemx)
+                lowdensityy.append(elemy)
+
+                print(elemx, elemy, binx, biny)
+
+        cmap = PorePlot.getColorMap("Blues")
+
+        print(lowdensityx)
+        print(lowdensityy)
+
+        lowdensityx = [transformX(xe) for xe in lowdensityx]
+        lowdensityy = [transformY(ye) for ye in lowdensityy]
+
+
+        myCounts = myCounts.transpose()
+        myCounts = myCounts[::-1]
+
+
+        if len(lowdensityx) < 10000:
+
+            print(lowdensityx)
+            print(lowdensityy)
+
+            ax.plot(lowdensityx, lowdensityy, linestyle='None', marker='o', mfc='k', mec='k', ms=3)
+
+        cp1 = ax.imshow(myCounts, interpolation='nearest', origin="lower", norm=colors.LogNorm(), cmap=cmap)
         fig.colorbar(cp1)
 
-        ax.set_title('An Image', size=20)
+        ax.set_title(title, size=20)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+
+        tickCount = 10
+        xTickSize = nxbins/tickCount
+        yTickSize = nybins/tickCount
+
+        xticks = [x * xTickSize for x in range(0, tickCount)]
+        yticks = [x * yTickSize for x in range(0, tickCount)]
+
+        ax.set_xticks(xticks)
+        ax.set_yticks(yticks)
+
+        xvel = extent[1]-extent[0]
+        yvel = extent[3]-extent[2]
+
+        ax.set_xticklabels( [(  extent[0] + (x/nxbins) *xvel ) for x in xticks] )
+        ax.set_yticklabels( [(  extent[2] + (x/nxbins) *yvel ) for x in yticks] )
 
         plugins.connect(fig, plugins.MousePosition(fontsize=14))
 

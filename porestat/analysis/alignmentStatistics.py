@@ -11,7 +11,7 @@ from ..hdf5tool import Fast5TYPE
 from ..plots.poreplot import PorePlot
 
 from ..utils.Files import fileExists
-from ..utils.DataFrame import DataFrame
+from ..utils.DataFrame import DataFrame, DataRow
 
 from ..tools.PTToolInterface import PSToolInterfaceFactory,PSToolException
 from ..utils.Utils import mergeDicts
@@ -201,6 +201,14 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             fastaReq = fastaReq.toHTSeq()
 
 
+            readLengthAlignmentQuality = (0,0)
+            seqQualAlignmentQuality = (0,0)
+            seqQualReadLength = (0,0)
+
+
+
+
+
             for cigarOp in cigarOfRead:
 
                 readSeq = readAlignment.read_as_aligned[cigarOp.query_from:cigarOp.query_to]
@@ -289,7 +297,9 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 'READ_IDENTITY': (readIdentityCount /len(readAlignment.read), len(readAlignment.read)),
                 'ALIGNMENT_IDENTITY': (alignmentIdentityCount/ alignmentLength, alignmentLength),
                 'MATCHED_GC_CONTENT': matchedGCContents,
-                'MATCHED_LONGEST_LENGTH': [matchedLongestLength]
+                'MATCHED_LONGEST_LENGTH': [matchedLongestLength],
+
+                'READ_LENGTH': len(readAlignment.read)
             }
 
         else:
@@ -325,6 +335,11 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
         return existResult
 
+
+    @classmethod
+    def mean(cls, elems):
+
+        return sum(elems) / len(elems)
 
     def makeResults(self, allFilesResult, oEnvironment, args):
 
@@ -378,6 +393,45 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 else:
                     overviewByAligned['UNKNOWN'][read_type] += 1
 
+
+
+            statdf = DataFrame()
+            statdf.addColumns(['Name', 'Value'])
+
+            statdf.addRow( DataRow.fromDict({
+                'Name': 'Overall Identity',
+                'Value': "0"
+            }))
+
+            statdf.addRow( DataRow.fromDict({
+                'Name': 'Aligned Identity',
+                'Value': "0"
+            }))
+
+            statdf.addRow( DataRow.fromDict({
+                'Name': 'Identical bases per 100 aligned bases',
+                'Value': "0"
+            }))
+
+            statdf.addRow( DataRow.fromDict({
+                'Name': 'Inserted bases per 100 aligned bases',
+                'Value': "0"
+            }))
+
+            statdf.addRow( DataRow.fromDict({
+                'Name': 'Deleted bases per 100 aligned bases',
+                'Value': "0"
+            }))
+
+            statdf.addRow( DataRow.fromDict({
+                'Name': 'Substitutions bases per 100 aligned bases',
+                'Value': "0"
+            }))
+
+
+            args.pltcfg.makeTable(statdf)
+
+
             PorePlot.plotBars(overviewByAligned, fileName + ": Alignment Result By Type", "", "Count", pltcfg=args.pltcfg)
 
             if not self.hasArgument('read_type', args) or not args.read_type:
@@ -408,6 +462,11 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     allReadInfos['ALIGNMENT_IDENTITY'].append(allReadInfo['ALIGNMENT_IDENTITY'])
                     allReadInfos['MATCHED_GC_CONTENT'] += allReadInfo['MATCHED_GC_CONTENT']
                     allReadInfos['MATCHED_LONGEST_LENGTH'] += allReadInfo['MATCHED_LONGEST_LENGTH']
+
+                    allReadInfos['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH'] = (self.mean(allReadInfo['READ_MATCHED_GC_CONTENT']), allReadInfo['READ_LENGTH'])
+                    allReadInfos['READ_ALIGN_QUAL_TO_READ_LENGTH'] = (allReadInfo['READ_ALIGN_QUAL'], allReadInfo['READ_LENGTH'])
+                    allReadInfos['SEQ_QUAL_TO_READ_LENGTH'] = (allReadInfo['SEQ_QUAL'], allReadInfo['READ_LENGTH'])
+                    allReadInfos['READ_ALIGN_QUAL_TO_SEQ_QUAL'] = (allReadInfo['READ_ALIGN_QUAL'], allReadInfo['SEQ_QUAL'])
 
                     perfectCounter += perfectKMERs[counterPair]
 

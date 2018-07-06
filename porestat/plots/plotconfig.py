@@ -1,4 +1,6 @@
 import argparse
+import os
+import shutil
 from enum import Enum
 import matplotlib.pyplot as plt
 import mpld3
@@ -193,6 +195,12 @@ class PlotConfig:
 
         return False
 
+    def addHTMLPlot(self, html):
+
+        if self.outputType == PlotSaveTYPE.HTML_STRING:
+
+            self.createdPlots.append(html)
+
 
     def makeTable(self, df):
 
@@ -284,3 +292,83 @@ class PlotConfig:
             plt.show()
 
         plt.close(current_figure)
+
+
+    def prepareHTMLOutput(self, folderPath, fileName, relativeImport=False):
+
+
+        filenames = os.path.splitext(fileName)
+
+        baseFileName = ".".join(filenames[0:len(filenames)-1])
+        filesPath = os.path.join(folderPath, baseFileName)
+
+        os.makedirs(folderPath, exist_ok=True)
+        os.makedirs(filesPath, exist_ok=True)
+
+
+
+        d3js = mpld3.getD3js()
+        mpld3js = mpld3.getmpld3js(True)
+        mathjaxJS = os.path.join(str(os.path.dirname(os.path.realpath(__file__))), "../data/MathJax.js")
+        mathjaxSVGJS = os.path.join(str(os.path.dirname(os.path.realpath(__file__))), "../data/MathJaxSVG.js")
+
+        outD3JS = os.path.join(filesPath, os.path.basename(d3js))
+        outMPLD3JS = os.path.join(filesPath, os.path.basename(mpld3js))
+        outMathJaxJS = os.path.join(filesPath, os.path.basename(mathjaxJS))
+        outMathJaxSVGJS = os.path.join(filesPath, os.path.basename(mathjaxSVGJS))
+
+        shutil.copyfile(d3js, outD3JS)
+        shutil.copyfile(mpld3js, outMPLD3JS)
+        shutil.copyfile(mathjaxJS, outMathJaxJS)
+        shutil.copyfile(mathjaxSVGJS, outMathJaxSVGJS)
+
+        if relativeImport:
+            outD3JS = "./"+os.path.join(baseFileName, os.path.basename(d3js))
+            outMPLD3JS = "./"+os.path.join(baseFileName, os.path.basename(mpld3js))
+            outMathJaxJS = "./"+os.path.join(baseFileName, os.path.basename(mathjaxJS))
+            outMathJaxSVGJS = "./"+os.path.join(baseFileName, os.path.basename(mathjaxSVGJS))
+
+
+        with open(os.path.join(folderPath, fileName), 'w') as htmlFile:
+
+            htmlFile.write(
+                """
+                <html>
+                <head>
+                        
+                    <script type="text/x-mathjax-config">
+                          MathJax.Hub.Config({
+                                extensions: ["tex2jax.js"],
+                                jax: ["input/TeX", "output/HTML-CSS"],
+                                tex2jax: {
+                                    inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+                                    displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+                                    processEscapes: true
+                                },
+                                "HTML-CSS": { fonts: ["TeX"] },
+                                TeX: {
+                                Macros: {
+                                    mathdefault: ["{#1}",1]
+                                }
+                          }
+                          });
+                    </script>   
+                """)
+
+            htmlFile.write("""     
+                <script type="text/javascript" src="{d3jsURL}"></script>
+                <script type="text/javascript" src="{mpld3jsURL}"></script>
+                <script type="text/javascript" src="{mathjaxURL}"></script>
+                <script type="text/javascript" src="{mathjaxSVGURL}"></script>
+                
+                </head>
+                <body>
+                """.format(mpld3jsURL=outMPLD3JS, d3jsURL=outD3JS, mathjaxURL=outMathJaxJS, mathjaxSVGURL=outMathJaxSVGJS))
+
+            for x in self.createdPlots:
+                htmlFile.write(x + "\n")
+
+                htmlFile.flush()
+
+            htmlFile.write("</body></html>\n")
+
