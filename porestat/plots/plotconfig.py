@@ -359,7 +359,6 @@ class PlotConfig:
                 <script type="text/javascript" src="{d3jsURL}"></script>
                 <script type="text/javascript" src="{mpld3jsURL}"></script>
                 <script type="text/javascript" src="{mathjaxURL}"></script>
-                <script type="text/javascript" src="{mathjaxSVGURL}"></script>
                 
                 </head>
                 <body>
@@ -370,5 +369,6 @@ class PlotConfig:
 
                 htmlFile.flush()
 
+            htmlFile.write( "<script type=\"text/javascript\" src=\"{mathjaxSVGURL}\"></script>".format(mathjaxSVGURL=outMathJaxSVGJS))
             htmlFile.write("</body></html>\n")
 

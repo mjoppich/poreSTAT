@@ -493,12 +493,7 @@ class PorePlot:
                 lowdensityx.append(elemx)
                 lowdensityy.append(elemy)
 
-                print(elemx, elemy, binx, biny)
-
         cmap = PorePlot.getColorMap("Blues")
-
-        print(lowdensityx)
-        print(lowdensityy)
 
         lowdensityx = [transformX(xe) for xe in lowdensityx]
         lowdensityy = [transformY(ye) for ye in lowdensityy]
@@ -510,8 +505,17 @@ class PorePlot:
 
         if len(lowdensityx) < 10000:
 
-            print(lowdensityx)
-            print(lowdensityy)
+            print(xlabel, ylabel)
+
+            for i in range(0, len(lowdensityx)):
+                print(lowdensityx[i], lowdensityy[i])
+
+            if xlabel == 'Read Align Quality' and ylabel == 'Read Lenght [bp]':
+                for i in range(0, nxbins):
+                    for j in range(0, nybins):
+                        print(myCounts[i,j], end=" ")
+                    print()
+                    
 
             ax.plot(lowdensityx, lowdensityy, linestyle='None', marker='o', mfc='k', mec='k', ms=3)
 
@@ -535,8 +539,10 @@ class PorePlot:
         xvel = extent[1]-extent[0]
         yvel = extent[3]-extent[2]
 
-        ax.set_xticklabels( [(  extent[0] + (x/nxbins) *xvel ) for x in xticks] )
-        ax.set_yticklabels( [(  extent[2] + (x/nxbins) *yvel ) for x in yticks] )
+        axfmt = "{:6.3f}"
+
+        ax.set_xticklabels( [axfmt.format(  extent[0] + (x/nxbins) *xvel ) for x in xticks] )
+        ax.set_yticklabels( [axfmt.format(  extent[2] + (x/nxbins) *yvel ) for x in yticks] )
 
         plugins.connect(fig, plugins.MousePosition(fontsize=14))
 
