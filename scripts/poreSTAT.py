@@ -1,11 +1,13 @@
 import random, os, sys
 
-from porestat.tools.kmer_coverage import KmerHistogramFactory
 
 sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../")
 
 #import porestat.utils.PickleArgparse as pickArg
 import argparse
+
+from porestat.tools.kmer_coverage import KmerHistogramFactory
+
 
 from porestat.tools.experiment_ls import ExperimentLsFactory
 from porestat.tools.channel_occupancy import ChannelOccupancyFactory

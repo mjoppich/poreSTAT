@@ -1,6 +1,7 @@
 import argparse
 
 import pickle
+import sys
 from collections import defaultdict
 
 from porestat.tools.kmer_coverage import KmerHistogram
@@ -54,6 +55,8 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
         parser.add_argument('-f', '--fasta', dest='fasta_files', nargs='+', type=argparse.FileType('r'), help='read inputs for alignment', required=True)
         parser.add_argument('-r', '--read-info', nargs='+', type=argparse.FileType('r'), help='read summary file', required=False)
 
+        parser.add_argument('-g', '--gtf', type=argparse.FileType('r'), help="gtf file for features", required=False, default=None)
+
         parser.add_argument('--mc', dest="mc", nargs=1, type=int, default=10, required=False)
         parser.add_argument('--errork', dest="errork", nargs=1, type=int, default=5, required=False)
         parser.add_argument('--perfectk', dest="perfectk", nargs=1, type=int, default=21, required=False)
@@ -100,26 +103,30 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
     def readReadInfo(self, args):
 
         if args.read_info == None:
-            raise PSToolException("Read infos not given ... You must run poreSTAT info first")
 
-        for readInfoFile in args.read_info:
+            sys.stderr.write("Read infos not given ... You must run poreSTAT info first")
+            #raise PSToolException("Read infos not given ... You must run poreSTAT info first")
 
-            if not fileExists(readInfoFile.name):
-                raise PSToolException("Read info file does not exist: " + str(readInfoFile))
+        else:
 
-        args.readInfo = None
+            for readInfoFile in args.read_info:
 
-        for readInfoFile in args.read_info:
-            allReadData = DataFrame.parseFromFile(readInfoFile.name, cDelim='\t')
+                if not fileExists(readInfoFile.name):
+                    raise PSToolException("Read info file does not exist: " + str(readInfoFile))
 
-            samIdx = allReadData.addColumn('SAM_READ_NAME')
-            readNameIdx = allReadData.getColumnIndex('READ_NAME')
-            allReadData.applyByRow(samIdx, lambda x: x[readNameIdx].split(' ')[0])
+            args.readInfo = None
 
-            if args.readInfo == None:
-                args.readInfo = allReadData
-            else:
-                args.readInfo.merge( allReadData )
+            for readInfoFile in args.read_info:
+                allReadData = DataFrame.parseFromFile(readInfoFile.name, cDelim='\t')
+
+                samIdx = allReadData.addColumn('SAM_READ_NAME')
+                readNameIdx = allReadData.getColumnIndex('READ_NAME')
+                allReadData.applyByRow(samIdx, lambda x: x[readNameIdx].split(' ')[0])
+
+                if args.readInfo == None:
+                    args.readInfo = allReadData
+                else:
+                    args.readInfo.merge( allReadData )
 
     def readSequences(self, args):
 
@@ -160,7 +167,8 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                  'KMER_STATS_ALIGNED': {},
                  'KMER_PERF_ALIGNED': {},
                  'READ_INFO': {},
-                 "NT_SUBST": Counter()
+                 "NT_SUBST": Counter(),
+                 "READS_COVERAGE": HTSeq.GenomicArray( [], stranded=False )
                  }
 
 
@@ -174,15 +182,30 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
     def handleEntity(self, readAlignment, localEnv, globalEnv):
 
+
+        #if len(localEnv['READ_STATS']) > 1000:
+        #    return localEnv
+
         readName = readAlignment.read.name
-        readInfo = globalEnv.readInfo.findRow('SAM_READ_NAME', readName)
-        if not readInfo == None:
+
+        readInfo = None
+        if self.hasArgument('readInfo', globalEnv) and globalEnv.readInfo != None:
+            readInfo = globalEnv.readInfo.findRow('SAM_READ_NAME', readName)
+
+
+        if readInfo != None:
             readType = Fast5TYPE[ readInfo[ "TYPE" ] ]
             readID = readInfo[ "READ_ID" ]
         else:
-            print("read id none for " + str(readName))
+
+            readID = readAlignment.read.name
+            readType = Fast5TYPE.UNKNOWN
+
+        assert(readID != None)
 
         alignSubst = Counter()
+
+        genomicArray = localEnv['READS_COVERAGE']
 
         if readAlignment.aligned:
 
@@ -218,6 +241,12 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     localEnv['BASE_COMPOSITION'][cigarOp.type][chr(base)] += 1
 
                 if cigarOp.type == 'M':
+
+
+                    if not cigarOp.ref_iv.chrom in genomicArray.chrom_vectors:
+                        genomicArray.add_chrom(cigarOp.ref_iv.chrom)
+
+                    genomicArray[cigarOp.ref_iv] += 1
 
                     fastaSeq = fastaReq[ cigarOp.ref_iv.start:cigarOp.ref_iv.end ]
 
@@ -324,6 +353,9 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
         else:
             localEnv['UNALIGNED_READS'].add(readID)
 
+        localEnv['READS_COVERAGE'] = genomicArray
+
+
         return localEnv
 
     def calculateEditDistance(self, htSeq1, htSeq2):
@@ -361,8 +393,80 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
         return sum(elems) / len(elems)
 
     def makeResults(self, allFilesResult, oEnvironment, args):
+        """
+
+
+
+        :param allFilesResult:
+        :param oEnvironment:
+        :param args:
+        :return:
+        """
+
+        print("Preparing results")
+
+
+        """
+        
+        FASTA REFERENCE INFOS
+        
+        """
+
+        gcContentRef = 0
+        refLength = 0
+
+        for chrom in oEnvironment.fasta:
+            fastaReq = oEnvironment.fasta[chrom]
+            fastaReq = fastaReq.toHTSeq()
+
+            strSeq = str(fastaReq.seq)
+            gcContentRef += self.calc_gc(strSeq) * len(strSeq)
+            refLength += len(strSeq)
+
+
+        """
+        
+        GTF/FEATURE INFOS
+        
+        """
+
+        if args.gtf:
+
+            allFeatureArrays = defaultdict(lambda: HTSeq.GenomicArray( [], stranded=False ) )
+
+            gtf_file = HTSeq.GFF_Reader( args.gtf.name, end_included = True )
+
+
+            for feature in gtf_file:
+
+                if not feature.type in allFeatureArrays:
+
+                    print("Adding feature", feature.type)
+
+                ga = allFeatureArrays[ feature.type ]
+
+                if not feature.iv.chrom in ga.chrom_vectors:
+                    ga.add_chrom(feature.iv.chrom)
+
+                ga[feature.iv] = 1
+
+                allFeatureArrays[feature.type] = ga
+
+            for type in allFeatureArrays:
+                print("GTF Feature Type:", type)
+
+        """
+        
+        CREATING STATS PER samFile
+        
+        """
+
 
         for fileName in allFilesResult:
+
+
+            args.pltcfg.addHTMLPlot("<h2>" + str(fileName) + "</h2>\n")
+
 
             parallelResult = allFilesResult[fileName]
 
@@ -372,23 +476,28 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             perfectKMERs = parallelResult['KMER_PERF_ALIGNED']
 
             ntSubstitutions = parallelResult['NT_SUBST']
+            coverageArray = parallelResult['READS_COVERAGE']
+
 
             alignedIDs = set([x[0] for x in readCIGARs])
 
             unalignedIDs = parallelResult['UNALIGNED_READS']
             additionalUnalignedReads = set()
 
-            for row in args.readInfo:
 
-                readid = row['READ_ID']
+            if self.hasArgument('readInfo', args) and args.readInfo != None:
+                
+                for row in args.readInfo:
 
-                if readid in alignedIDs:
-                    continue
+                    readid = row['READ_ID']
 
-                if readid in unalignedIDs:
-                    continue
+                    if readid in alignedIDs:
+                        continue
 
-                additionalUnalignedReads.add(readid)
+                    if readid in unalignedIDs:
+                        continue
+
+                    additionalUnalignedReads.add(readid)
 
             plotDataDict = {}
             plotDataDict['Aligned'] = len(alignedIDs)
@@ -400,23 +509,28 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             PorePlot.plotBars(plotDict, fileName + ": Alignment Result", "", "Count", pltcfg=args.pltcfg)
 
             overviewByAligned = defaultdict(Counter)
-            for row in args.readInfo:
 
-                readid = row['READ_ID']
-                read_type = row['TYPE']
+            if self.hasArgument('readInfo', args) and args.readInfo != None:
 
-                if readid in alignedIDs:
-                    overviewByAligned['ALIGNED'][read_type] += 1
-                elif readid in unalignedIDs:
-                    overviewByAligned['UNALIGNED'][read_type] += 1
-                elif readid in additionalUnalignedReads:
-                    overviewByAligned['NOT ALIGNED'][read_type] += 1
-                else:
-                    overviewByAligned['UNKNOWN'][read_type] += 1
+                for row in args.readInfo:
+
+                    readid = row['READ_ID']
+                    read_type = row['TYPE']
+
+                    if readid in alignedIDs:
+                        overviewByAligned['ALIGNED'][read_type] += 1
+                    elif readid in unalignedIDs:
+                        overviewByAligned['UNALIGNED'][read_type] += 1
+                    elif readid in additionalUnalignedReads:
+                        overviewByAligned['NOT ALIGNED'][read_type] += 1
+                    else:
+                        overviewByAligned['UNKNOWN'][read_type] += 1
 
 
+            print(overviewByAligned)
 
-            PorePlot.plotBars(overviewByAligned, fileName + ": Alignment Result By Type", "", "Count", pltcfg=args.pltcfg)
+            if len(overviewByAligned) > 0:
+                PorePlot.plotBars(overviewByAligned, fileName + ": Alignment Result By Type", "", "Count", pltcfg=args.pltcfg)
 
 
             totalCounter = defaultdict(list)
@@ -483,10 +597,72 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             substitutedPerAligned = (sum(totalCounter["X"]) / sum(totalCounter['M'])) * 100
 
 
+
+
+            args.pltcfg.addHTMLPlot("<h3>Feature-based Coverage</h3>\n")
+
+            if args.gtf and len(allFeatureArrays) > 0:
+
+
+                fmtStr = "{:.4f}"
+
+                featureDF = DataFrame()
+                featureDF.setTitle("<h3>Alignment Feature Statistics</h3>")
+                featureDF.addColumns(['Name', 'Value'])
+
+
+
+                for type in allFeatureArrays:
+
+                    featureCovered = 0
+                    readsCovered = 0
+
+
+                    fga = allFeatureArrays[type]
+
+                    for featurePart in fga.steps():
+
+                        partCovered = featurePart[0].length
+                        partCount = featurePart[1]
+
+                        if partCount > 0:
+
+                            featureCovered += partCovered
+
+                            #for this part fetch steps in read coverage
+
+                            for readPart in coverageArray[featurePart[0]].steps():
+
+                                readCovered = readPart[0].length
+                                readCount = readPart[1]
+
+                                if readCount > 0:
+                                    readsCovered += readCovered
+
+                    featureDF.addRow(DataRow.fromDict({
+                        'Name': 'Featuretype Coverage ({})'.format(type),
+                        'Value': fmtStr.format(featureCovered/refLength)
+                    }))
+
+                    featureDF.addRow(DataRow.fromDict({
+                        'Name': 'Featuretype Covered By Reads ({})'.format(type),
+                        'Value': fmtStr.format(readsCovered/featureCovered)
+                    }))
+
+                args.pltcfg.makeTable(featureDF)
+
+            else:
+
+                args.pltcfg.addHTMLPlot("<p>No feature annotation supplied.</p>\n")
+
+
+            args.pltcfg.addHTMLPlot("<h3>Alignment Statistics</h3>\n")
+
+
             fmtStr = "{:.4f}"
 
             statdf = DataFrame()
-            statdf.setTitle("Alignment Statistics")
+            statdf.setTitle("<h3>Alignment Statistics</h3>")
             statdf.addColumns(['Name', 'Value'])
 
             statdf.addRow(DataRow.fromDict({
@@ -527,18 +703,6 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 'Value': fmtStr.format(addedGC/addedLength)
             }))
 
-            gcContentRef = 0
-            refLength = 0
-
-            for chrom in oEnvironment.fasta:
-
-                fastaReq = oEnvironment.fasta[chrom]
-                fastaReq = fastaReq.toHTSeq()
-
-                strSeq = str(fastaReq.seq)
-                gcContentRef += self.calc_gc(strSeq) * len(strSeq)
-                refLength += len(strSeq)
-
             statdf.addRow(DataRow.fromDict({
                 'Name': 'Avg GC content of Reference Sequence',
                 'Value': fmtStr.format(gcContentRef/refLength)
@@ -552,7 +716,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             allSubst = sum([ntSubstitutions[x] for x in ntSubstitutions])
 
             substDF = DataFrame()
-            substDF.setTitle("Substitution Statistics (read -> ref)")
+            substDF.setTitle("<h3>Substitution Statistics (read -> ref)</h3>")
             substDF.addColumns(['Substitution', 'Abs Count', 'Rel Subst'])
 
             for subst in ntSubstitutions:
@@ -575,7 +739,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 }
 
                 kmerDF = KmerHistogram.dfSummary(obsInfo, args.mc)
-                kmerDF.setTitle("k-mer histogram: perfectly aligned (k={})".format(args.perfectk))
+                kmerDF.setTitle("<h3>k-mer histogram: perfectly aligned (k={})</h3>".format(args.perfectk))
                 args.pltcfg.makeTable(kmerDF)
 
 
@@ -588,7 +752,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     }
 
                     kmerDF = KmerHistogram.dfSummary(obsInfo, args.mc)
-                    kmerDF.setTitle("k-mer histogram: sequence before CIGAR " + evtype + " (k={})".format(args.errork))
+                    kmerDF.setTitle("<h3>k-mer histogram: sequence before CIGAR " + evtype + " (k={})</h3>".format(args.errork))
                     args.pltcfg.makeTable(kmerDF)
 
 
@@ -713,7 +877,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     'KMERCOUNTS': perfectCounter[readType]
                 }
                 kmerDF = KmerHistogram.dfSummary(obsInfo, args.mc)
-                kmerDF.setTitle("k-mer histogram: perfectly aligned (k={}, {})".format(args.perfectk, str(readType)))
+                kmerDF.setTitle("<h3>k-mer histogram: perfectly aligned (k={}, {})</h3>".format(args.perfectk, str(readType)))
                 args.pltcfg.makeTable(kmerDF)
 
                 for rtype in kmersByReadType[readType]:
@@ -726,7 +890,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                         'KMERCOUNTS': kmersByReadType[readType][rtype]
                     }
                     kmerDF = KmerHistogram.dfSummary(obsInfo, args.mc)
-                    kmerDF.setTitle("k-mer histogram: sequence before CIGAR " + rtype + " (k={}, {})".format(args.errork, str(readType)))
+                    kmerDF.setTitle("<h3>k-mer histogram: sequence before CIGAR " + rtype + " (k={}, {})</h3>".format(args.errork, str(readType)))
                     args.pltcfg.makeTable(kmerDF)
 
                 overallIdentity = (sum(totalCounter[readType]["="]) / totalReadBases[readType]) * 100
@@ -740,7 +904,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 fmtStr = "{:.4f}"
 
                 statdf = DataFrame()
-                statdf.setTitle("Alignment Statistics ({})".format(readType))
+                statdf.setTitle("<h3>Alignment Statistics ({})</h3>".format(readType))
                 statdf.addColumns(['Name', 'Value'])
 
                 statdf.addRow(DataRow.fromDict({

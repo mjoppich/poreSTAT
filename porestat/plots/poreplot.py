@@ -480,6 +480,24 @@ class PorePlot:
 
         lowdensityx = []
         lowdensityy = []
+        htmlDescr = []
+
+
+        def makeHTML(xlabel, ylabel, xvalue, yvalue):
+
+            allLines = []
+
+            for elem, val in [(xlabel, xvalue), (ylabel, yvalue)]:
+
+                if isinstance(val, (float, int)):
+                    allLines.append("<tr><td>{}</td><td>{:.6f}</td></tr>".format(elem, val))
+                else:
+                    allLines.append("<tr><td>{}</td><td>{}</td></tr>".format(elem, val))
+
+            htmlStr = "<table class='tooltip'>"+ " ".join(allLines) +"</table>"
+
+            return htmlStr
+
 
         for i in range(0, len(x)):
 
@@ -489,9 +507,17 @@ class PorePlot:
             binx = xi[i]
             biny = yi[i]
 
-            if myCounts[binx, biny] <= 1:
+            if myCounts[binx, biny] <= 2:
                 lowdensityx.append(elemx)
                 lowdensityy.append(elemy)
+
+                htmlDescr.append(makeHTML(xlabel, ylabel, elemx, elemy))
+
+        for i in range(0, nxbins):
+            for j in range(0, nybins):
+                if myCounts[i,j] <= 2:
+                    myCounts[i,j] = 0
+
 
         cmap = PorePlot.getColorMap("Blues")
 
@@ -502,25 +528,21 @@ class PorePlot:
         myCounts = myCounts.transpose()
         myCounts = myCounts[::-1]
 
+        cp1 = ax.imshow(myCounts, interpolation='nearest', origin="lower", norm=colors.LogNorm(), cmap=cmap)
+        fig.colorbar(cp1)
+
+
+        ax.set_xlim([-1, nxbins])
+        ax.set_ylim([-1, nybins])
+
 
         if len(lowdensityx) < 10000:
 
-            print(xlabel, ylabel)
+            elems = ax.plot(lowdensityx, lowdensityy, linestyle='None', marker='o', mfc='k', mec='k', ms=3)
 
-            for i in range(0, len(lowdensityx)):
-                print(lowdensityx[i], lowdensityy[i])
-
-            if xlabel == 'Read Align Quality' and ylabel == 'Read Lenght [bp]':
-                for i in range(0, nxbins):
-                    for j in range(0, nybins):
-                        print(myCounts[i,j], end=" ")
-                    print()
-                    
-
-            ax.plot(lowdensityx, lowdensityy, linestyle='None', marker='o', mfc='k', mec='k', ms=3)
-
-        cp1 = ax.imshow(myCounts, interpolation='nearest', origin="lower", norm=colors.LogNorm(), cmap=cmap)
-        fig.colorbar(cp1)
+            if pltcfg.usesMPLD3() and len(htmlDescr) > 0:
+                tooltip = MultiAxesPointHTMLTooltip([elems[0]], [htmlDescr], voffset=10, hoffset=10, css=cls.getToolTipCSS())
+                plugins.connect(fig, tooltip)
 
         ax.set_title(title, size=20)
         ax.set_xlabel(xlabel)
@@ -560,9 +582,9 @@ class PorePlot:
                 val = addinfo[elem]
 
                 if isinstance(val, (float, int)):
-                    allLines.append("<tr><td>{}/td><td>{:.6f}</td></tr>".format(elem, val))
+                    allLines.append("<tr><td>{}</td><td>{:.6f}</td></tr>".format(elem, val))
                 else:
-                    allLines.append("<tr><td>{}/td><td>{}</td></tr>".format(elem, val))
+                    allLines.append("<tr><td>{}</td><td>{}</td></tr>".format(elem, val))
 
             htmlStr = "<table class='tooltip'>"+ " ".join(allLines) +"</table>"
 
@@ -797,6 +819,8 @@ class PorePlot:
     @classmethod
     def plotSingleViolin(cls, data, title, ax, vert=True):
 
+        print("Plot Single")
+
         if len(data) == 0:
             plotData = np.array([float('nan'), float('nan')], dtype=float)
             plotPos = [1]
@@ -818,8 +842,12 @@ class PorePlot:
                 plotPos = [1]
                 plotData = np.array(data, dtype=float)
 
-        ax.violinplot(plotData, positions=plotPos, showmeans=True, showextrema=True, showmedians=True, points=100, vert=vert)
+        print("Plot Data there")
+
+        ax.violinplot(plotData, positions=plotPos, showmeans=True, showextrema=True, showmedians=True, points=100, vert=vert, bw_method=0.1)
         ax.set_title(title)
+
+        print("Ploted")
 
     @classmethod
     def plotViolin(cls, someData, labels, title, pltcfg = PlotConfig(), axisManipulation = None, plotDirection=PlotDirectionTYPE.VERTICAL, shareX=None, shareY=None):
@@ -855,6 +883,9 @@ class PorePlot:
                 vert=False
 
         pltcfg.startPlot()
+
+        print("Share XY", shareX, shareY)
+
         fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1], sharex=shareX, sharey=shareY)
 
         if labels == None:
@@ -1040,7 +1071,7 @@ class PorePlot:
 
         runCount = 0
 
-        width = 0.8
+        width = 0.9
         offset = -width/2.0
 
         mpld3Rects = []
@@ -1048,7 +1079,7 @@ class PorePlot:
 
             data = plotData[run]
 
-            rects = ax.bar(runCount+1+offset, data, width, color=colorVector[runCount], label=run)
+            rects = ax.bar(runCount+1, data, width, color=colorVector[runCount], label=run)
             createdAxes[run] = rects
             mpld3Rects.append(rects[0])
 
@@ -1131,7 +1162,9 @@ class PorePlot:
 
         allGroups = list(allGroups)
 
-        width = 0.9 / len(allRuns)  # the width of the bars
+        barWidth = 0.9
+
+        width = barWidth / len(allRuns)  # the width of the bars
 
         ind = np.arange( len(allGroups) )  # the x locations for the groups
 
@@ -1172,7 +1205,9 @@ class PorePlot:
             for i in ind:
                 data.append(plotData[runs][allGroups[i]])
 
-            rects = ax.bar(ind + runCount * width, data, width, color=colorVector[runCount], label=runs)
+            lpos = ind + 0.5 - (barWidth/2.0) + 0.5 * width + runCount * width
+
+            rects = ax.bar(lpos, data, width, color=colorVector[runCount], label=runs)
             createdAxes[runs] = rects
 
             for i in range(0, len(rects)):
@@ -1186,7 +1221,7 @@ class PorePlot:
         ax.set_title(title)
         ax.set_xlabel(xlabel)
 
-        ax.set_xticks(ind + 0.9 / 2.0)
+        ax.set_xticks(ind + 0.5)
         ax.set_xticklabels(allGroups, rotation=xlabelrotation)
 
         ax.grid(gridLines)

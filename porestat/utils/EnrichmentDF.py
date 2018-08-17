@@ -196,7 +196,9 @@ class EnrichmentDF(DataFrame):
                         execStr = rscriptPath+" "+scriptPath+" "+noiseqFile + " "+ outFile
 
                     print(execStr)
-                    sysret = os.system(execStr)-255
+
+                    #sysret = os.system(execStr)-255
+                    sysret = 1
 
                     if sysret != 0:
                         pass
@@ -243,6 +245,19 @@ class EnrichmentDF(DataFrame):
                     compDF.addCondition(l2FCdata, l2FCTitle)
                     compDF.addCondition(rawPdata, rawpTitle)
                     compDF.addCondition(adjPdata, adjpTitle)
+
+                    if method in ['NOISeq']:
+
+                        probTitle = method + "_prob"
+
+                        if methDF.columnExists("prob"):
+                            probidx = methDF.getColumnIndex('prob')
+                            probData = methDF.toDataRow(geneIDidx, probidx)
+
+                            compDF.addCondition(probData, probTitle)
+
+
+
 
                     condVPData[method] = ( l2FCdata.getHeader(), l2FCdata.to_list(), rawPdata.to_list(), adjPdata.to_list() )
 
@@ -314,12 +329,17 @@ class EnrichmentDF(DataFrame):
                 continue # comparison not needed
 
             methods = []
-            for i in range(4, len(compHeader)-1, 3):
+            for i in range(4, len(compHeader)-1):
                 colVal = compHeader[i]
-                method = colVal.replace('_log2FC', '')
-                methods.append(method)
+
+                if colVal.endswith("_log2FC"):
+                    method = colVal.replace('_log2FC', '')
+                    methods.append(method)
 
             (headHTML, bodyHTML) = compDF.export(outFile=None, exType=ExportTYPE.HTML_STRING)
+
+            if 'NOISeq' in methods:
+                bodyHTML = bodyHTML + "<h3>Warning: the calculated p-values are transformed z-scores from probabilities of differential expression</h3>"
 
             pltcfg = PlotConfig()
             pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
@@ -352,7 +372,14 @@ class EnrichmentDF(DataFrame):
                 adjPdata = parseList(compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(adjpTitle)).to_list())
 
                 PorePlot.volcanoPlot(geneNames, l2FCdata, rawPdata, "Volcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "raw pValue", pltcfg)
+
+                if method in ['NOISeq']:
+                    pltcfg.addHTMLPlot("<h3>Warning: the calculated p-values are transformed z-scores from probabilities of differential expression</h3>")
+
                 PorePlot.volcanoPlot(geneNames, l2FCdata, adjPdata, "Volcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "adj pValue", pltcfg)
+
+                if method in ['NOISeq']:
+                    pltcfg.addHTMLPlot("<h3>Warning: the calculated p-values are transformed z-scores from probabilities of differential expression</h3>")
 
             outFilePath = base + cond1 + "_" + cond2 + ".html"
             with open( outFilePath, 'w') as resultHTML:

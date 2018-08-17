@@ -59,10 +59,11 @@ class KmerHistogram(ParallelPSTReportableInterface):
 
         super(KmerHistogram, self).__init__( args )
 
-        if args.k > 10:
-            sys.stderr.write('WARNING: You specified k={k} which can result in a huge memory consumption. Consider lowering your k if this run crashes.'.format(k=args.k))
-            sys.stderr.write(
-                'Try tsxCount ( http://github.com/mjoppich/tsxcount ) for fast and efficient k-mer counting.')
+        if not 'k' in args.__dict__:
+            args.__dict__['k'] = 5
+
+        if not 'mc' in args.__dict__:
+            args.__dict__['mc'] = 10
 
 
     def _makePropDict(self):
@@ -75,6 +76,13 @@ class KmerHistogram(ParallelPSTReportableInterface):
         return propDict
 
     def prepareInputs(self, args):
+
+
+        if args.k > 10:
+            sys.stderr.write('WARNING: You specified k={k} which can result in a huge memory consumption. Consider lowering your k if this run crashes.'.format(k=args.k))
+            sys.stderr.write(
+                'Try tsxCount ( http://github.com/mjoppich/tsxcount ) for fast and efficient k-mer counting.')
+
         return self.manage_folders_reads(args)
 
 
@@ -135,7 +143,7 @@ class KmerHistogram(ParallelPSTReportableInterface):
 
         """
 
-        if args.reference != None:
+        if self.hasArgument('reference', args) and args.reference != None:
 
             refKmerCounts = Counter()
             for record in SeqIO.parse(args.reference, "fasta"):

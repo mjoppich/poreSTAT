@@ -590,7 +590,7 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
 
         bodypart = """
         {% if title %}
-        <h1>{{title}}</h1>
+        {{title}}
         {% endif %}
         <table id="{{html_element_id}}" class="display" cellspacing="0" width="100%">
                 <thead>

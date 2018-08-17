@@ -24,6 +24,9 @@ class ParallelPSTInterface(PSToolInterface):
 
         result = ll.exec( inputs, self.execParallel, environment, self.chunkSize, self.joinParallel)
 
+        iEnd = time.time()
+        eprint("Making Results: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd - iStart))))
+
         self.makeResults(result, environment, self.args)
         iEnd = time.time()
 

@@ -49,7 +49,9 @@ class MapReduce:
 
             time.sleep(0.5)
 
+        print("Pool Join")
         self.pool.join()
+        print("Pool Clear")
         self.pool.clear()
 
         return resultObj

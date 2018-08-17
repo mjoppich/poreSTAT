@@ -38,7 +38,6 @@ class FileStubType(object):
                     raise argparse.ArgumentTypeError("writable_dir:{0} is not a writable dir".format(prospective_dir))
 
 
-
 class FolderType(object):
     def __init__(self, mode):
 

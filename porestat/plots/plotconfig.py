@@ -139,6 +139,13 @@ class PlotConfig:
 
         self.createdPlots = []
 
+        self.centeredStyle = {
+                    'display': "block",
+                    'margin': "auto",
+                    'height': "750px",
+                    'width': "50vw"
+                }
+
     def __str__(self):
 
         allElements = [self.save_to_file, self.save_file, self.saved_plot, self.style, self.transparent_bg, self.createdPlots]
@@ -232,7 +239,7 @@ class PlotConfig:
             if self.outputType == PlotSaveTYPE.HTML:
                 df.export(exactFilename, exType=ExportTYPE.HTML)
 
-    def makePlot(self, noTightLayout=False, figHeight='100%', figWidth='100%'):
+    def makePlot(self, noTightLayout=False, figHeight='100%', figWidth='100%', centeredStyle=None):
 
         current_figure = plt.gcf()
 
@@ -241,12 +248,21 @@ class PlotConfig:
 
 
         if self.outputType == PlotSaveTYPE.HTML_STRING:
+
+
+            if centeredStyle == None:
+                centeredStyle = self.centeredStyle
+
+
+
             outString = mpld3.fig_to_html(current_figure,
                                           template_type='notebook',
                                           d3_url=self.d3js,
                                           mpld3_url=self.mpld3js,
                                           figHeight=figHeight,
-                                          figWidth=figWidth)
+                                          figWidth=figWidth,
+                                          styles=centeredStyle
+                                          )
             self.createdPlots.append(outString)
             plt.close(current_figure)
             return
@@ -335,13 +351,19 @@ class PlotConfig:
                 """
                 <html>
                 <head>
+                    
+                    <style>
+                    * {
+                        font-family: "Arial", Verdana, sans-serif;
+                        }
+                    </style>
                         
                     <script type="text/x-mathjax-config">
                           MathJax.Hub.Config({
                                 extensions: ["tex2jax.js"],
                                 jax: ["input/TeX", "output/HTML-CSS"],
                                 tex2jax: {
-                                    inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+                                    inlineMath: [ ['$','$'] ],
                                     displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
                                     processEscapes: true
                                 },

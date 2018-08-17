@@ -176,7 +176,20 @@ class LengthHistogram(ParallelPSTReportableInterface):
         if self.hasArgument('violin', args) and not args.violin:
             PorePlot.plotHistogram(plotData, None, 'Length Histogram for ', xlabel="Read Length", ylabel="Read Count", pltcfg=args.pltcfg)
         else:
-            PorePlot.plotViolin(plotData, None, 'Length Histogram', pltcfg=args.pltcfg, plotDirection=PlotDirectionTYPE.HORIZONTAL)
+
+            oldStyle = args.pltcfg.centeredStyle
+            newstyle = oldStyle.copy()
+
+            if 'height' in newstyle:
+                newstyle.pop('height', None)
+
+            args.pltcfg.centeredStyle = newstyle
+
+            print(args.pltcfg.centeredStyle)
+
+            PorePlot.plotBoxplot(plotData, None, 'Length Histogram', pltcfg=args.pltcfg, plotDirection=PlotDirectionTYPE.HORIZONTAL)
+
+            args.pltcfg.centeredStyle = oldStyle
 
 
 

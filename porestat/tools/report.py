@@ -1,3 +1,4 @@
+import argparse
 import os
 
 from porestat.tools.experiment_ls import ExperimentLs
@@ -45,6 +46,9 @@ class ReportFactory(PSToolInterfaceFactory):
         parser.add_argument('-q', '--read-type', nargs='+', dest='read_type', action=Fast5TYPEAction, default=None)
         parser.add_argument('-u', '--user-run', dest='user_run', action='store_true', default=False)
 
+        parser.add_argument('--reference', dest='reference', type=argparse.FileType('r'), help='fasta reference for kmer distribution', default=None)
+
+
         parser.add_argument('--save-parallel-result', type=str, default=None)
         parser.add_argument('--load-parallel-result', nargs='+', type=str, default=None, help='specify any saved pickle files to combine for report')
 
@@ -86,7 +90,9 @@ class ReportAnalysis(ParallelPSTInterface):
                 'separate_subplots': True
             }),
             ('KMER DISTRIBUTION', {
-                'violin': True
+                'violin': False,
+                'k': 5,
+                'mc': 10
             })
 
         ])
@@ -218,6 +224,15 @@ class ReportAnalysis(ParallelPSTInterface):
                 +d3js+
                 mpld3js+
                 """
+                
+                <style>
+                * {
+                    font-family: "Arial", Verdana, sans-serif;
+                    }
+                </style>
+                </head>
+                
+                
                 </head>
                 <body>
                 """

@@ -105,49 +105,51 @@ class DemangleFiles(ParallelPSTInterface):
 
         foundReads = []
 
-        f5folder = Fast5Directory(data)
-        iFilesInFolder = 0
+        for folder in data:
 
-        moveStatistic = Counter()
-        returnMoves = {}
+            f5folder = Fast5Directory(folder)
+            iFilesInFolder = 0
 
-        for file in f5folder.collect():
+            moveStatistic = Counter()
+            returnMoves = {}
 
-            iFilesInFolder += 1
+            for file in f5folder.collect():
 
-            fileExperiment = file.runID()
-            fileUserRunName = file.user_filename_input()
-            fileReadType = file.type
+                iFilesInFolder += 1
 
-            srcPath = file.filename
+                fileExperiment = file.runID()
+                fileUserRunName = file.user_filename_input()
+                fileReadType = file.type
 
-            if environment.read_type != None:
+                srcPath = file.filename
 
-                if not fileReadType in environment.read_type:
-                    continue
+                if environment.read_type != None:
 
-            if environment.experiments != None:
+                    if not fileReadType in environment.read_type:
+                        continue
 
-                if not fileExperiment in environment.experiments:
-                    continue
+                if environment.experiments != None:
 
-            ######### Start assembling output path
-            destPath = environment.output
+                    if not fileExperiment in environment.experiments:
+                        continue
 
-            if environment.user_run == True:
-                destPath = makePath(destPath + fileUserRunName)
+                ######### Start assembling output path
+                destPath = environment.output
 
-            else:
-                destPath = makePath(destPath + str(fileExperiment))
+                if environment.user_run == True:
+                    destPath = makePath(destPath + fileUserRunName)
 
-            moveStatistic[destPath] += 1
+                else:
+                    destPath = makePath(destPath + str(fileExperiment))
 
-            if destPath == None:
-                print(destPath)
+                moveStatistic[destPath] += 1
 
-            returnMoves[ srcPath ] = destPath
+                if destPath == None:
+                    print(destPath)
 
-        print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
+                returnMoves[ srcPath ] = destPath
+
+            print("Folder done: " + f5folder.path + " [Files: " + str(iFilesInFolder) + "]")
 
         return returnMoves
 
