@@ -138,6 +138,7 @@ class PlotConfig:
         self.mpld3js = mpld3.getmpld3js(True)
 
         self.createdPlots = []
+        self.createdPlotsIDCount = 0
 
         self.centeredStyle = {
                     'display': "block",
@@ -215,7 +216,10 @@ class PlotConfig:
 
         if self.outputType == PlotSaveTYPE.HTML_STRING:
 
-            (header, body) = df.export(None, exType=ExportTYPE.HTML_STRING, html_element_id="dftable_" + str(len(self.createdPlots)))
+            print("Preparing Table", self.createdPlotsIDCount)
+            (header, body) = df.export(None, exType=ExportTYPE.HTML_STRING, html_element_id="dftable_" + str(self.createdPlotsIDCount))
+
+            self.createdPlotsIDCount += 1
 
             self.createdPlots.append(header + body)
 

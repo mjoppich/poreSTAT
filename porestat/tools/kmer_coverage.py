@@ -225,13 +225,23 @@ class KmerHistogram(ParallelPSTReportableInterface):
             plotData = newPlotData
 
 
+        histData = {}
+        for runid in plotData:
+
+            runCounter = Counter()
+
+
+
+            histData[runid] = runCounter
+
+
 
 
         if self.hasArgument('violin', args) and args.violin:
             PorePlot.plotViolin(plotData, None, 'Kmer Histogram', pltcfg=args.pltcfg, plotDirection=PlotDirectionTYPE.HORIZONTAL)
         else:
-            PorePlot.plotHistogram(plotData, None, 'Kmer Histogram for ', xlabel="k-mer Frequency", ylabel="k-mer count", pltcfg=args.pltcfg, plotDirection=PlotDirectionTYPE.VERTICAL)
-            PorePlot.plotCumHistogram(plotData, None, 'Kmer Histogram for ', xlabel="k-mer Frequency", bins=-1,
+            PorePlot.plotHistogram(plotData, None, 'Kmer Histogram (k='+str(self.args.k)+')', xlabel="k-mer count", ylabel="k-mer Frequency", pltcfg=args.pltcfg, plotDirection=PlotDirectionTYPE.VERTICAL)
+            PorePlot.plotCumHistogram(plotData, None, 'Kmer Histogram (k='+str(self.args.k)+')', xlabel="k-mer Frequency", bins=100,
                                    ylabel="Number k-mers", pltcfg=args.pltcfg, xLogAxis=False, normed=False, plotDirection=PlotDirectionTYPE.VERTICAL)
 
 

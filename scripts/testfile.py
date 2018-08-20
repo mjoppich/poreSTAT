@@ -1,26 +1,65 @@
-from collections import Counter
+import itertools
+import random
+import matplotlib
 
+import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
 
-import mpld3
-from mpld3 import plugins
-from porestat.plots.poreplot import PorePlot
+import seaborn as sns
 
-from porestat.plots.plotconfig import PlotConfig, PlotSaveTYPE
+df = pd.DataFrame()
 
-import matplotlib.colors as colors
+def makelist(elemCount):
 
-pltcfg = PlotConfig()
-pltcfg.saveToFile("/mnt/c/Users/mjopp/Desktop/mpltest.html")
-pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
+    retlist = []
 
-plotData = {'NOT ALIGNED': Counter({'UNKNOWN': 8637}), 'ALIGNED': Counter({'BASECALL_1D': 15882, 'BASECALL_2D': 5876, 'BASECALL_1D_COMPL': 331}), 'UNALIGNED': Counter({'BASECALL_1D': 1981, 'BASECALL_2D': 1598, 'BASECALL_1D_COMPL': 477})}
+    while len(retlist) < elemCount:
+        retlist.append( random.randint(10, 1000000) )
+
+    return retlist
+
+toDF = {}
+
+toDF['X'] = makelist(989420)
+toDF['Y'] = makelist(10000)
 
 
-PorePlot.plotBars(plotData, title="blubb", xlabel="x", ylabel="y", pltcfg = pltcfg)
 
-pltcfg.mpld3js = "mpld3.v0.3.1.dev1.js"
-pltcfg.d3js = "d3.v3.min.js"
+df=pd.DataFrame.from_dict(toDF,orient='index').T.dropna()
 
-pltcfg.prepareHTMLOutput("/mnt/c/Users/mjopp/Desktop/", "test.html", relativeImport=True)
+from matplotlib.pyplot import figure, show
+from scipy.stats import gaussian_kde
+from numpy.random import normal
+from numpy import arange
+#ax = sns.distplot( df['x'] )
+#sns.violinplot(data=df, orient='h')
+
+#plt.show()
+
+
+def violin_plot(ax,data,pos, bp=False):
+    '''
+    create violin plots on an axis
+    '''
+    dist = max(pos)-min(pos)
+    w = min(0.15*max(dist,1.0),0.5)
+    for d,p in zip(data,pos):
+        k = gaussian_kde(d) #calculates the kernel density
+        m = k.dataset.min() #lower bound of violin
+        M = k.dataset.max() #upper bound of violin
+        x = arange(m,M,(M-m)/100.) # support for violin
+        v = k.evaluate(x) #violin profile (density curve)
+        v = v/v.max()*w #scaling the violin to the available space
+        ax.fill_betweenx(x,p,v+p,facecolor='y',alpha=0.3)
+        ax.fill_betweenx(x,p,-v+p,facecolor='y',alpha=0.3)
+    if bp:
+        ax.boxplot(data,notch=1,positions=pos,vert=1)
+
+
+if __name__=="__main__":
+    pos = range(5)
+    data = [normal(size=10000000) for i in pos]
+    fig=figure()
+    ax = fig.add_subplot(111)
+    violin_plot(ax,data,pos,bp=1)
+    show()

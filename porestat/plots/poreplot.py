@@ -5,13 +5,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import re
+
+import pandas
 from mpld3 import plugins
 from mpld3.plugins import PointHTMLTooltip
 from numpy import genfromtxt
 import os
 import math
 
-from collections import Counter
+from collections import Counter, OrderedDict
 import datetime as dt
 from matplotlib.ticker import Formatter
 
@@ -19,6 +21,7 @@ from porestat.utils.OrderedSet import OrderedSet
 from .plotconfig import PlotConfig
 from matplotlib import gridspec, colors
 import scipy.cluster.hierarchy as sch
+import seaborn as sns
 
 
 class TimestampDateFormatter(Formatter):
@@ -819,8 +822,6 @@ class PorePlot:
     @classmethod
     def plotSingleViolin(cls, data, title, ax, vert=True):
 
-        print("Plot Single")
-
         if len(data) == 0:
             plotData = np.array([float('nan'), float('nan')], dtype=float)
             plotPos = [1]
@@ -842,12 +843,55 @@ class PorePlot:
                 plotPos = [1]
                 plotData = np.array(data, dtype=float)
 
-        print("Plot Data there")
-
         ax.violinplot(plotData, positions=plotPos, showmeans=True, showextrema=True, showmedians=True, points=100, vert=vert, bw_method=0.1)
         ax.set_title(title)
 
-        print("Ploted")
+    @classmethod
+    def plotViolinSNS(cls, someData, labels, title, pltcfg=PlotConfig(), xTitle=None, yTitle=None,axisManipulation=None,
+                   plotDirection=PlotDirectionTYPE.VERTICAL, shareX=None, shareY=None):
+
+        if type(someData) == list:
+            someData = {title: someData}
+        else:
+
+            if plotDirection == PlotDirectionTYPE.VERTICAL:
+                orientation='v'
+            else:
+                orientation = 'h'
+
+        pltcfg.startPlot()
+
+
+        fig, ax = plt.subplots()
+
+        if labels == None:
+            labels = [x for x in someData]
+
+        pdData = OrderedDict()
+
+        for i in range(0, len(labels)):
+
+            x = labels[i]
+            strX = str(x)
+            pdData[strX] = someData[x]
+
+
+        pandasDF = pandas.DataFrame.from_dict(pdData,orient='index').T.dropna()
+
+        sns.violinplot(data=pandasDF, orient=orientation, ax=ax)
+
+        if xTitle != None:
+            ax.set_xlabel(xTitle)
+
+        if yTitle != None:
+            ax.set_ylabel(yTitle)
+
+        for tick in ax.xaxis.get_major_ticks():
+            tick.label.set_rotation(65)
+
+        fig.suptitle(title)
+        pltcfg.makePlot()
+
 
     @classmethod
     def plotViolin(cls, someData, labels, title, pltcfg = PlotConfig(), axisManipulation = None, plotDirection=PlotDirectionTYPE.VERTICAL, shareX=None, shareY=None):
@@ -883,8 +927,6 @@ class PorePlot:
                 vert=False
 
         pltcfg.startPlot()
-
-        print("Share XY", shareX, shareY)
 
         fig, ax = plt.subplots(nrows=shape[0], ncols=shape[1], sharex=shareX, sharey=shareY)
 

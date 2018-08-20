@@ -71,19 +71,6 @@ class ReportAnalysis(ParallelPSTInterface):
 
         super(ReportAnalysis, self).__init__( args )
 
-        self.dReporters = OrderedDict([
-            ('OVERVIEW', ExperimentLs(args)),
-            ('OCCUPANCY', ChannelOccupancy(args)),
-            ('YIELD', YieldPlot(args)),
-            ('LENGTH', LengthHistogram(args)),
-            ('NUCLEOTIDES', NucleotideDistribution(args)),
-            ('QUALITY DISTRIBUTION', QualityDistribution(args)),
-            ('QUALITY BY POSITION', QualityPosition(args)),
-            ('KMER DISTRIBUTION', KmerHistogram(args))
-        ])
-
-        #self.dReporters = OrderedDict([('OVERVIEW', ExperimentLs(args)), ('QUALITY BY POSITION', QualityPosition(args))])
-
         self.dReportersArgs = OrderedDict([
 
             ('YIELD', {
@@ -93,9 +80,30 @@ class ReportAnalysis(ParallelPSTInterface):
                 'violin': False,
                 'k': 5,
                 'mc': 10
+            }),
+            ('KMER DISTRIBUTION/Assembly', {
+                'violin': False,
+                'k': 7,
+                'mc': 10
             })
 
         ])
+
+        self.dReporters = OrderedDict([
+            ('OVERVIEW', ExperimentLs(args)),
+            ('OCCUPANCY', ChannelOccupancy(args)),
+            ('YIELD', YieldPlot(args)),
+            ('LENGTH', LengthHistogram(args)),
+            ('NUCLEOTIDES', NucleotideDistribution(args)),
+            ('QUALITY DISTRIBUTION', QualityDistribution(args)),
+            ('QUALITY BY POSITION', QualityPosition(args)),
+            ('KMER DISTRIBUTION', KmerHistogram( self.patchArgs(self._makeArguments(args), 'KMER DISTRIBUTION'))),
+            ('KMER DISTRIBUTION/Assembly', KmerHistogram( self.patchArgs(self._makeArguments(args), 'KMER DISTRIBUTION/Assembly')))
+        ])
+
+        #self.dReporters = OrderedDict([('OVERVIEW', ExperimentLs(args)), ('QUALITY BY POSITION', QualityPosition(args))])
+
+
 
         args.output = makePath(args.output)
 
@@ -245,10 +253,9 @@ class ReportAnalysis(ParallelPSTInterface):
                 reporterArgs = self.prepareEnvironment(args)
                 reporterArgs.output = None
                 reporterArgs.output_type = None
-                reporterArgs.pltcfg = args.pltcfg
-
                 reporterArgs = self.patchArgs(reporterArgs, report)
 
+                reporterArgs.pltcfg = args.pltcfg
                 reporterArgs.pltcfg.saveToFile(self.data_path + "/" + report)
 
                 htmlFile.write("<h1>" + str(report) + "</h1>\n")
@@ -257,6 +264,7 @@ class ReportAnalysis(ParallelPSTInterface):
 
                 reportObj.makeResults(parallelResult[report], oEnvironment, reporterArgs)
                 args.pltcfg = reporterArgs.pltcfg
+
 
                 createdPlots = args.pltcfg.getCreatedPlots()
                 args.pltcfg.resetCreatedPlots()

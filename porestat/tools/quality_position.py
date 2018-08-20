@@ -1,10 +1,11 @@
+import sys
 from collections import OrderedDict, defaultdict
 
 import math
 
 import time
 
-from porestat.plots.poreplot import PorePlot
+from porestat.plots.poreplot import PorePlot, PlotDirectionTYPE
 
 from porestat.plots.plotconfig import PlotConfig, PlotSaveTYPE
 
@@ -239,14 +240,26 @@ class QualityPosition(ParallelPSTReportableInterface):
             explodedData = []
             for counterData in allDataPlot:
 
+                elemCounts = [counterData[q] for q in counterData if counterData[q] > 20]
+
+                if len(elemCounts) > 0:
+                    scaleFactor = min(elemCounts)
+                else:
+                    scaleFactor = 1
+
+                print("min values", scaleFactor, [(ord(q), q) for q in counterData], [int(counterData[q]/scaleFactor) for q in counterData])
+
+
                 dataVal = []
                 for q in counterData:
-                    dataVal = dataVal + [ord(q)] * counterData[q]
+                    dataVal = dataVal + [ord(q)] * int(counterData[q]/scaleFactor)
 
                     minQual = ord(q) if (minQual == None) or (minQual > ord(q)) else minQual
                     maxQual = ord(q) if (maxQual == None) or (maxQual < ord(q)) else maxQual
 
-                explodedData.append(dataVal)
+                explodedData.append(sorted(dataVal))
+
+                print(min(dataVal), max(dataVal))
             
             allPlotData[runid] = explodedData
             allRunIDs.append(runid)
@@ -274,8 +287,19 @@ class QualityPosition(ParallelPSTReportableInterface):
         for runid in runIDs:
 
             for i in range(0, len(allPlotData[runid])):
-                lengthsByStep[ steps[i] ][ runid ] = allPlotData[runid][i]
+                lengthsByStep[ runid ][ steps[i] ] = allPlotData[runid][i]
 
+
+        for runid in runIDs:
+
+            for x in lengthsByStep[runid]:
+                maxval = min(100, len(lengthsByStep[runid][x]))
+                print(x, len(lengthsByStep[runid][x]), lengthsByStep[runid][x][0:maxval])
+
+            PorePlot.plotViolinSNS(lengthsByStep[runid], None, 'Quality at Position ('+runid+")", pltcfg=pltcfg,
+                                plotDirection=PlotDirectionTYPE.VERTICAL, xTitle="Read Length Range", yTitle="Read Quality Scores")
+
+        """
 
         pltcfg.startPlot()
 
@@ -307,6 +331,7 @@ class QualityPosition(ParallelPSTReportableInterface):
 
         pltcfg.makePlot(figHeight=None)
 
+        """
 
 
 

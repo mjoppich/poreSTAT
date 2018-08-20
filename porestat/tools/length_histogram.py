@@ -187,7 +187,7 @@ class LengthHistogram(ParallelPSTReportableInterface):
 
             print(args.pltcfg.centeredStyle)
 
-            PorePlot.plotBoxplot(plotData, None, 'Length Histogram', pltcfg=args.pltcfg, plotDirection=PlotDirectionTYPE.HORIZONTAL)
+            PorePlot.plotViolinSNS(plotData, None, 'Length Histogram', pltcfg=args.pltcfg, plotDirection=PlotDirectionTYPE.VERTICAL)
 
             args.pltcfg.centeredStyle = oldStyle
 
