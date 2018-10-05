@@ -333,6 +333,28 @@ public:
         return false;
     }
 
+
+    /**
+     *
+     * @param pRead bam1_t pointer
+     * @return phread quality sequence (PHRED33)
+     */
+    std::vector<uint8_t> getIQualitySequence(bam1_t* pRead)
+    {
+        uint8_t* pQuality = bam_get_qual(pRead);
+
+        std::vector<uint8_t> vReturn;
+        vReturn.resize( pRead->core.l_qseq );
+
+        for (uint32_t i = 0; i < vReturn.size(); ++i)
+        {
+            vReturn[i] = pQuality[i];
+        }
+
+        return vReturn;
+
+    }
+
     /**
      *
      * @param pRead bam1_t pointer
@@ -379,7 +401,7 @@ public:
 
     }
 
-    virtual void startAllParallel(int iChunkSize, void* pData)
+    virtual void startAllParallel(int iChunkSize, void* pData, size_t iMaxReads=-1)
     {
         uint32_t iReads = 0;
         std::vector<bam1_t*>* pReads = new std::vector<bam1_t*>();
@@ -414,8 +436,15 @@ public:
                     bam_copy1(pRead, pRes);
                     pReads->push_back( pRead );
 
-                    if (pReads-> size() > iChunkSize)
+                    if ((iMaxReads != -1) && (iReads > iMaxReads))
                     {
+                        break;
+                    }
+
+                    if (pReads->size() > iChunkSize)
+                    {
+
+                        iReads += pReads->size();
 
                         {
 
@@ -452,8 +481,6 @@ public:
 
                     }
 
-
-                    ++iReads;
                 }
 
 #pragma omp taskwait
@@ -635,7 +662,7 @@ public:
 
     GenomicRegion* getSpannedRegion(bam1_t* pRead)
     {
-        uint32_t iLeftStart = pRead->core.pos;
+        uint32_t iLeftStart = this->getReadStart(pRead);
         uint32_t iCIGARitems = pRead->core.n_cigar;
         uint32_t* pCIGARs = bam_get_cigar(pRead);
 
@@ -813,7 +840,7 @@ public:
         std::vector<GenomicRegion*> vRegions;// = new std::vector<GenomicRegion>();
 
 //        uint32_t iMatch = 0;
-        uint32_t iRefPosition = getReadStart(pRead);
+        uint32_t iRefPosition = this->getReadStart(pRead);
         uint32_t iQueryPosition = 0;
         int32_t iReadLength = pRead->core.l_qseq;
 
@@ -852,6 +879,9 @@ public:
             }
 
             */
+
+           uint32_t iQueryStart = iQueryPosition;
+           uint32_t iRefStart = iRefPosition;
 
             if (iCIGARop == 0) // MATCH M
             {
@@ -913,6 +943,7 @@ public:
                 iQueryPosition += iCIGARlen;
             }
 
+            pCurrentRegion->pReadRegion = new GenomicRegion(iQueryStart, iQueryPosition);
 
             if (bGetReadSequence)
             {
@@ -954,7 +985,12 @@ public:
         }
 
         if (pCurrentRegion != NULL)
+        {
+        
+
             vRegions.push_back( (GenomicRegion*) pCurrentRegion);
+
+        }
 
         for (size_t i = 0; i < vRegions.size(); ++i)
         {

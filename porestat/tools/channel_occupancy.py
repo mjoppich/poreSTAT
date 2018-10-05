@@ -213,4 +213,16 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
         for channelID in channelDict:
             channel2rl[channelID] = [x[1] for x in channelDict[channelID]]
 
+        oldStyle = args.pltcfg.centeredStyle
+        newstyle = oldStyle.copy()
+
+        newstyle['height']="1000px"
+
+        args.pltcfg.centeredStyle = newstyle
+
+        print(args.pltcfg.centeredStyle)
+
         PorePlot.plotLoadOut(channel2rl, runKey, pltcfg=args.pltcfg)
+
+        args.pltcfg.centeredStyle = oldStyle
+

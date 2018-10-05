@@ -34,6 +34,9 @@ include_directories(${HTSlib_INCLUDE_DIR})
 include_directories(${CMAKE_SOURCE_DIR})
 
 set (SOURCE AlignmentLibrary.cpp )
+set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/lib )
+
 add_library(foo MODULE ${SOURCE} ${lib_SRC} ${lib_H})
 
 TARGET_LINK_LIBRARIES(foo hts z)
+

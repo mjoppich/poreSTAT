@@ -67,7 +67,11 @@ size_t FASTAreader::removeNewLines(char* pBuffer, size_t iBufferSize) {
 }
 
 void FASTAreader::parseIndexFile() {
+
+
     std::vector<std::string>* pLines = Utils::readByLine( m_pIndexFile );
+
+    std::cout << pLines->size() << std::endl;
 
     uint32_t iLineLength = 0;
 
@@ -133,6 +137,7 @@ std::string *FASTAreader::readFromFile(size_t iPositionInFile, size_t iChars) {
 
     free(aBuffer);
     fclose ( pFile );
+
     return pReturn;
 
 }

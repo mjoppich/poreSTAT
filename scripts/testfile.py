@@ -1,65 +1,64 @@
-import itertools
-import random
-import matplotlib
+from time import strftime, gmtime
 
-import pandas as pd
-import matplotlib.pyplot as plt
+import pysam
+from Bio import SeqIO
 
-import seaborn as sns
+refSeqs = {}
 
-df = pd.DataFrame()
+with open("/mnt/c/igem/ecoli/ecoli.phage.fasta", "rU") as handle:
+    for record in SeqIO.parse(handle, "fasta"):
 
-def makelist(elemCount):
+        refSeqs[record.id] = str(record.seq)
 
-    retlist = []
+samfile = pysam.AlignmentFile("/mnt/c/igem/ecoli/ecoli.phage.sam", "r")
 
-    while len(retlist) < elemCount:
-        retlist.append( random.randint(10, 1000000) )
+stats = {}
 
-    return retlist
+for x in samfile.header.references:
+    print(x, samfile.header.get_reference_length(x), x in refSeqs)
 
-toDF = {}
+    cov = [0] * samfile.header.get_reference_length(x)
+    mm = [0] * samfile.header.get_reference_length(x)
 
-toDF['X'] = makelist(989420)
-toDF['Y'] = makelist(10000)
-
+    stats[x] = (cov, mm)
 
 
-df=pd.DataFrame.from_dict(toDF,orient='index').T.dropna()
+readIdx = 0
+totalIdx = 0
+for aln in samfile:
 
-from matplotlib.pyplot import figure, show
-from scipy.stats import gaussian_kde
-from numpy.random import normal
-from numpy import arange
-#ax = sns.distplot( df['x'] )
-#sns.violinplot(data=df, orient='h')
+    totalIdx += 1
 
-#plt.show()
+    if aln.is_unmapped:
+        continue
 
+    readIdx += 1
 
-def violin_plot(ax,data,pos, bp=False):
-    '''
-    create violin plots on an axis
-    '''
-    dist = max(pos)-min(pos)
-    w = min(0.15*max(dist,1.0),0.5)
-    for d,p in zip(data,pos):
-        k = gaussian_kde(d) #calculates the kernel density
-        m = k.dataset.min() #lower bound of violin
-        M = k.dataset.max() #upper bound of violin
-        x = arange(m,M,(M-m)/100.) # support for violin
-        v = k.evaluate(x) #violin profile (density curve)
-        v = v/v.max()*w #scaling the violin to the available space
-        ax.fill_betweenx(x,p,v+p,facecolor='y',alpha=0.3)
-        ax.fill_betweenx(x,p,-v+p,facecolor='y',alpha=0.3)
-    if bp:
-        ax.boxplot(data,notch=1,positions=pos,vert=1)
+    if readIdx % 10000 == 0:
+        print(strftime("%H:%M:%S", gmtime()), "Scanning read", readIdx, "Total Count", totalIdx)
+
+    refSeq = refSeqs[aln.reference_name]
+    allPairs = aln.get_aligned_pairs(matches_only=True)
+
+    ms = stats[aln.reference_name]
+
+    for readPos, seqPos in allPairs:
+        ms[0][seqPos] += 1
+
+        if aln.seq[readPos] != refSeq[seqPos]:
+            ms[1][seqPos] += 1
 
 
-if __name__=="__main__":
-    pos = range(5)
-    data = [normal(size=10000000) for i in pos]
-    fig=figure()
-    ax = fig.add_subplot(111)
-    violin_plot(ax,data,pos,bp=1)
-    show()
+with open("/mnt/c/igem/ecoli/ecoli.phage.coverage.bed", 'w') as fout:
+
+    for x in stats:
+        cov = stats[x][0]
+        for i in range(0, len(cov)):
+            fout.write("\t".join([str(x), str(i), str(i+1), str(cov[i])]) + "\n")
+
+with open("/mnt/c/igem/ecoli/ecoli.phage.bed", 'w') as fout:
+
+    for x in stats:
+        mm = stats[x][1]
+        for i in range(0, len(mm)):
+            fout.write("\t".join([str(x), str(i), str(i+1), str(mm[i])]) + "\n")

@@ -1,3 +1,4 @@
+import HTSeq
 import argparse
 
 import pickle
@@ -19,28 +20,263 @@ from ..utils.Utils import mergeDicts
 from ..utils.Stats import calcN50
 
 from collections import Counter
-import HTSeq
 
-class MinimalSeq:
+import ctypes
+from collections import Counter
 
-    def __init__(self, seq, name, desc):
+lib = ctypes.cdll.LoadLibrary('../clib/lib/libfoo.so')
 
-        self.seq = seq
-        self.name = name
-        self.desc = desc
 
-        self.htseq = None
+class COUNTER_PAIR(ctypes.Structure):
+    _fields_ = [
+        ("key", ctypes.c_char_p),
+        ("value", ctypes.c_uint32)
+    ]
 
-    def toHTSeq(self):
 
-        if self.htseq == None:
+class SEQ_COVERAGE(ctypes.Structure):
+    _fields_ = [
+        ("seq", ctypes.c_char_p),
+        ("start", ctypes.c_uint32),
+        ("end", ctypes.c_uint32)
+    ]
 
-            htseq = HTSeq.Sequence(self.seq, self.name)
-            htseq.descr = self.desc
 
-            self.htseq = htseq
+class NT_SUBSTITUTION(ctypes.Structure):
+    _fields_ = [
+        ("src", ctypes.c_char),
+        ("tgt", ctypes.c_char),
+        ("count", ctypes.c_uint32)
+    ]
 
-        return self.htseq
+
+class READ_ALIGNMENT(ctypes.Structure):
+    _fields_ = [
+        ("pReadID", ctypes.c_char_p),
+        ("aligned", ctypes.c_bool),
+        ("iReadLength", ctypes.c_uint32),
+        ("iRefLength", ctypes.c_uint32),
+        ("iAlignQual", ctypes.c_uint32),
+        ("fSeqQual_min", ctypes.c_float),
+        ("fSeqQual_median", ctypes.c_float),
+        ("fSeqQual_max", ctypes.c_float),
+        ("iLongestMatched", ctypes.c_uint32),
+        ("fReadGCContent", ctypes.c_float),
+        ("fRefGCContent", ctypes.c_float),
+        ("fReadIdentity", ctypes.c_float),
+        ("fRefIdentity", ctypes.c_float),
+
+        ("PERF_KMER_COUNT", ctypes.c_uint32),
+        ("PERF_KMERS", ctypes.c_void_p),
+
+        ("CIGAR_COUNT", ctypes.c_uint32),
+        ("CIGARS", ctypes.c_char_p),
+        ("CIGAR_VEC_LENGTHS", ctypes.POINTER(ctypes.c_uint32)),
+        ("CIGAR_LENGTHS", ctypes.POINTER(ctypes.POINTER(ctypes.c_uint32))),
+
+        ("MM2KMER_VEC_LENGTHS", ctypes.POINTER(ctypes.c_uint32)),
+        ("MM2KMER_LENGTHS", ctypes.POINTER(ctypes.POINTER(ctypes.c_char_p))),
+
+        ("COV_COUNT", ctypes.c_uint32),
+        ("COVERAGES", ctypes.c_void_p),
+
+        ("NT_SUBST_COUNT", ctypes.c_uint32),
+        ("NT_SUBST", ctypes.c_void_p),
+
+    ]
+
+
+class ReadAlignmentStats:
+
+    def __init__(self):
+
+        self.read_id = None
+        self.aligned = None
+        self.read_type = None
+
+        self.read_length = None
+        self.ref_length = None
+        self.align_quality = None
+        self.seqqual_min = None
+        self.seqqual_median = None
+        self.seqqual_max = None
+        self.longest_matched_stretch = None
+        self.read_gc = None
+        self.ref_gc = None
+        self.read_identity = None
+        self.ref_identity = None
+        self.nt_substitutions = None
+        self.cigar_lengths = None
+        self.perfect_kmers = None
+        self.coverages = None
+        self.mm2kmer = None
+
+class CAlignmentStatistics(object):
+    def __init__(self):
+        lib.AlignmentStatistics_new.argtypes = []
+        lib.AlignmentStatistics_new.restype = ctypes.c_void_p
+
+        lib.AlignmentStatistics_process.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)]
+        lib.AlignmentStatistics_process.restype = ctypes.c_void_p
+
+        lib.AlignmentStatistics_load_fasta.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        lib.AlignmentStatistics_load_fasta.restype = ctypes.c_void_p
+
+        lib.AlignmentStatistics_ReadStats.argtypes = [ctypes.c_void_p]
+        lib.AlignmentStatistics_ReadStats.restype = ctypes.c_void_p
+
+        lib.AlignmentStatistics_ReadStats_size.argtypes = [ctypes.c_void_p]
+        lib.AlignmentStatistics_ReadStats_size.restype = ctypes.c_uint32
+
+        self.obj = lib.AlignmentStatistics_new()
+
+
+    def loadFasta(self, fastaPath):
+
+        fp = fastaPath.encode('utf-8')
+
+        charStr = ctypes.cast(fp, ctypes.c_char_p)
+
+        lib.AlignmentStatistics_load_fasta(self.obj, charStr)
+
+    def processFiles(self, vals):
+
+        vals = [x.encode('utf-8') for x in vals]
+        c_array = (ctypes.c_char_p * len(vals))(*vals)
+
+        charPArray = ctypes.cast(c_array, ctypes.POINTER(ctypes.c_char_p))
+
+        print(type(charPArray))
+
+        retSize = lib.AlignmentStatistics_process(self.obj, ctypes.c_int(len(vals)), charPArray)
+        print(retSize)
+
+        retVecSize = lib.AlignmentStatistics_ReadStats_size(self.obj)
+        print("Vector Size")
+        print(retVecSize)
+
+        retVec = lib.AlignmentStatistics_ReadStats(self.obj)
+
+        s = ctypes.cast(retVec, ctypes.POINTER(READ_ALIGNMENT * retVecSize))
+
+        allElems = [x for x in s.contents]
+
+        readResults = {}
+
+        print("Printing vector elems")
+        for i in range(0, retVecSize):
+
+            elem = allElems[i]
+
+            """
+
+            CIGAR2LEN
+            """
+            cigars = [x for x in elem.CIGARS.decode()[0:elem.CIGAR_COUNT]]
+            vecLengths = [x for x in ctypes.cast(elem.CIGAR_VEC_LENGTHS,
+                                                 ctypes.POINTER(ctypes.c_uint32 * elem.CIGAR_COUNT)).contents]
+            cigarVecs = [x for x in
+                         ctypes.cast(elem.CIGAR_LENGTHS, ctypes.POINTER(ctypes.c_void_p * elem.CIGAR_COUNT)).contents]
+
+            cigar2len = {}
+            for c in range(0, len(cigars)):
+                cigarLen = [x for x in
+                            ctypes.cast(cigarVecs[c], ctypes.POINTER(ctypes.c_uint32 * vecLengths[c])).contents]
+
+                cigar2len[cigars[c]] = cigarLen
+
+            print("CIGAR2LEN")
+            for x in cigar2len:
+                print(x, cigar2len[x])
+
+            """
+
+            PERF KMERS
+            """
+            perfKmers = [x for x in
+                         ctypes.cast(elem.PERF_KMERS, ctypes.POINTER(COUNTER_PAIR * elem.PERF_KMER_COUNT)).contents]
+
+            perfKmerCounter = Counter()
+            for x in perfKmers:
+                perfKmerCounter[x.key.decode()] = x.value
+
+            print("PERF KMER")
+            for x in perfKmerCounter:
+                print(x, perfKmerCounter[x])
+
+            """
+
+            CIGAR2LEN
+            """
+            mmLengths = [x for x in ctypes.cast(elem.MM2KMER_VEC_LENGTHS,
+                                                ctypes.POINTER(ctypes.c_uint32 * elem.CIGAR_COUNT)).contents]
+            mm2kmers = [x for x in
+                        ctypes.cast(elem.MM2KMER_LENGTHS, ctypes.POINTER(ctypes.c_void_p * elem.CIGAR_COUNT)).contents]
+
+            mm2kmer = {}
+            for c in range(0, len(cigars)):
+                mmKmers = [x.decode() for x in
+                           ctypes.cast(mm2kmers[c], ctypes.POINTER(ctypes.c_char_p * mmLengths[c])).contents]
+
+                mm2kmer[cigars[c]] = mmKmers
+
+            print("MM2KMER")
+            for x in mm2kmer:
+                print(x, mm2kmer[x])
+
+            """
+
+            COVERAGES
+            """
+            covIntervals = [x for x in
+                            ctypes.cast(elem.COVERAGES, ctypes.POINTER(SEQ_COVERAGE * elem.COV_COUNT)).contents]
+
+            # TODO add this to global array
+
+            """
+
+            NT SUBSTITUTION
+            """
+            ntSubst = [x for x in
+                       ctypes.cast(elem.NT_SUBST, ctypes.POINTER(NT_SUBSTITUTION * elem.NT_SUBST_COUNT)).contents]
+
+            substCounter = Counter()
+            for x in ntSubst:
+                substCounter[(x.src.decode(), x.tgt.decode())] = x.count
+
+            print("NT SUBST")
+            for x in substCounter:
+                print(x, substCounter[x])
+
+            print(allElems[i].pReadID)
+
+            readStat = ReadAlignmentStats()
+
+            readStat.read_id = elem.pReadID.decode()
+            readStat.aligned = elem.aligned
+            readStat.read_length = elem.iReadLength
+            readStat.ref_length = elem.iRefLength
+            readStat.align_quality = elem.iAlignQual
+            readStat.seqqual_min = elem.fSeqQual_min
+            readStat.seqqual_median = elem.fSeqQual_median
+            readStat.seqqual_max = elem.fSeqQual_max
+            readStat.longest_matched_stretch = elem.iLongestMatched
+            readStat.read_gc = elem.fReadGCContent
+            readStat.ref_gc = elem.fRefGCContent
+            readStat.read_identity = elem.fReadIdentity
+            readStat.ref_identity = elem.fRefIdentity
+            readStat.nt_substitutions = substCounter
+            readStat.cigar_lengths = cigar2len
+            readStat.perfect_kmers = perfKmerCounter
+            readStat.coverages = covIntervals
+            readStat.mm2kmer = mm2kmer
+
+            readResults[readStat.read_id] = readStat
+
+
+        return readResults
+
+
 
 class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
 
@@ -128,21 +364,6 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 else:
                     args.readInfo.merge( allReadData )
 
-    def readSequences(self, args):
-
-        for fastaFile in args.fasta_files:
-
-            if not fileExists(fastaFile.name):
-                raise PSToolException("Fasta file does not exist: " + str(fastaFile))
-
-
-        if not self.hasArgument('fasta', args) or args.fasta == None:
-            args.fasta = {}
-
-            for fastaFile in args.fasta_files:
-
-                for seq in HTSeq.FastaReader( fastaFile ):
-                    args.fasta[seq.name] = MinimalSeq(seq.seq, seq.name, seq.descr)
 
     def _makePropDict(self):
 
@@ -161,15 +382,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
         return [x for x in args.sam]
 
     def _createLocalEnvironment(self):
-        return { 'BASE_COMPOSITION': defaultdict(Counter),
-                 'UNALIGNED_READS': set(),
-                 'READ_STATS': {},
-                 'KMER_STATS_ALIGNED': {},
-                 'KMER_PERF_ALIGNED': {},
-                 'READ_INFO': {},
-                 "NT_SUBST": Counter(),
-                 "READS_COVERAGE": HTSeq.GenomicArray( [], stranded=False )
-                 }
+        return None
 
 
     def calc_gc(self, readSeq):
@@ -180,211 +393,51 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
         return gcCount / len(readSeq)
 
 
-    def handleEntity(self, readAlignment, localEnv, globalEnv):
+    def getReadInfo(self, readName):
 
-
-        #if len(localEnv['READ_STATS']) > 1000:
-        #    return localEnv
-
-        readName = readAlignment.read.name
-
-        readInfo = None
-        if self.hasArgument('readInfo', globalEnv) and globalEnv.readInfo != None:
-            readInfo = globalEnv.readInfo.findRow('SAM_READ_NAME', readName)
-
-
+        readInfo = self.args.readInfo.findRow('SAM_READ_NAME', readName)
         if readInfo != None:
             readType = Fast5TYPE[ readInfo[ "TYPE" ] ]
             readID = readInfo[ "READ_ID" ]
-        else:
 
-            readID = readAlignment.read.name
-            readType = Fast5TYPE.UNKNOWN
+        return readType,readID
 
-        assert(readID != None)
 
-        alignSubst = Counter()
+    def addCoverage(self, chrom, start, end):
 
-        genomicArray = localEnv['READS_COVERAGE']
+        if not chrom in self.genomicArray.chrom_vectors:
+            self.genomicArray.add_chrom(chrom)
 
-        if readAlignment.aligned:
+        self.genomicArray[HTSeq.GenomicInterval( chrom, start, end, "." )] += 1
 
-            readInterval = readAlignment.iv
-            cigarOfRead = readAlignment.cigar
 
-            cigarOp2Length = self._makePropDict()
-            alignedKmers = defaultdict(lambda: Counter())
-            perfKmers = Counter()
+    def execParallel(self, data, environment):
+        """
 
-            readIdentityCount = 0
-            alignmentIdentityCount = 0
-            alignmentLength = readAlignment.iv.end-readAlignment.iv.start
+        :param data: input files
+        :param environment: usually NONE
+        :return: None
+        """
+        statMaker = CAlignmentStatistics()
 
-            matchedGCContents = []
-            refMatchedGCContents = []
-            matchedLongestLength = None
+        for fastaFile in self.args.fasta:
+            statMaker.loadFasta(fastaFile.name)
 
-            fastaReq = globalEnv.fasta[readInterval.chrom]
-            fastaReq = fastaReq.toHTSeq()
 
+        alignResults = {}
 
-            readLength = len(readAlignment.read)
-            alignQual = readAlignment.aQual
-            seqQual = (min(readAlignment.read.qual), self.mean(readAlignment.read.qual), max(readAlignment.read.qual))
-            refLength = alignmentLength
+        for samFile in data:
+            readStats = statMaker.processFiles([samFile])
 
-            for cigarOp in cigarOfRead:
+            for readID in readStats:
+                readStats[readID].read_type, _ = self.getReadInfo(readID)
 
-                readSeq = readAlignment.read_as_aligned[cigarOp.query_from:cigarOp.query_to]
+            alignResults[samFile] = readStats
 
-                for base in readSeq.seq:
-                    localEnv['BASE_COMPOSITION'][cigarOp.type][chr(base)] += 1
 
-                if cigarOp.type == 'M':
+        return alignResults
 
 
-                    if not cigarOp.ref_iv.chrom in genomicArray.chrom_vectors:
-                        genomicArray.add_chrom(cigarOp.ref_iv.chrom)
-
-                    genomicArray[cigarOp.ref_iv] += 1
-
-                    fastaSeq = fastaReq[ cigarOp.ref_iv.start:cigarOp.ref_iv.end ]
-
-                    editDistance = self.calculateEditDistance( readSeq, fastaSeq )
-
-
-                    gc_content = self.calc_gc(str(readSeq.seq))
-                    matchedGCContents.append( (gc_content, len(readSeq)) )
-
-                    ref_gc_content = self.calc_gc(str(fastaSeq))
-                    refMatchedGCContents.append((ref_gc_content, len(fastaSeq)))
-
-
-                    readIdentityCount += len(readSeq) - editDistance
-                    alignmentIdentityCount += len(readSeq) - editDistance
-
-
-                    if len(readSeq) != len(fastaSeq):
-                        print(readSeq, fastaSeq, "strange lengths")
-                    else:
-
-                        fseq = str(readSeq)
-                        aseq = str(fastaSeq)
-
-                        equals = 0
-                        mismatches = 0
-
-                        for i in range(0, len(fseq)):
-
-                            if fseq[i] == aseq[i]:
-                                equals += 1
-
-                                if mismatches > 0:
-                                    cigarOp2Length['Xd'].append(mismatches)
-                                    mismatches = 0
-
-                            else:
-
-                                #mismatch
-                                refNT = aseq[i]
-                                readNT = fseq[i]
-
-                                alignSubst[(readNT, refNT)] += 1
-
-                                mismatches += 1
-
-                                if equals > 0:
-                                    cigarOp2Length['Md'].append(equals)
-
-                                    if i -5 >= 0:
-                                        kmerBeforeMM = fseq[i-5:i]
-                                        alignedKmers['Md'][kmerBeforeMM] += 1
-                                        
-                                        
-                                    if equals >= 21:
-                                        kmerseq = fseq[i-equals:i]
-                                        foundkmers = KmerHistogram.calcKmers(kmerseq, 21)
-                                        perfKmers += foundkmers
-
-
-
-                                    equals = 0
-
-                        if equals > 0:
-                            cigarOp2Length['Md'].append(equals)
-
-                        if mismatches > 0:
-                            cigarOp2Length['Xd'].append(mismatches)
-
-                    cigarOp2Length['M'].append(cigarOp.size)
-                    cigarOp2Length['X'].append(editDistance)
-                    cigarOp2Length['='].append(cigarOp.size - editDistance)
-
-                else:
-
-                    kmerStart = cigarOp.query_from - 6
-                    kmerEnd = cigarOp.query_from -1
-
-                    if kmerStart >= 0:
-                        kmerBeforeError = str(readAlignment.read_as_aligned[kmerStart:kmerEnd])
-                        alignedKmers[cigarOp.type][kmerBeforeError] += 1
-
-                    cigarOp2Length[ cigarOp.type ].append(cigarOp.size)
-
-            localEnv['READ_STATS'][(readID, readType)] = cigarOp2Length
-            localEnv['KMER_STATS_ALIGNED'][(readID, readType)] = alignedKmers
-            localEnv['KMER_PERF_ALIGNED'][(readID, readType)] = perfKmers
-
-            localEnv['NT_SUBST'] += alignSubst
-
-            localEnv['READ_INFO'][(readID, readType)] = {
-                'READ_IDENTITY': (readIdentityCount /len(readAlignment.read), len(readAlignment.read)),
-                'ALIGNMENT_IDENTITY': (alignmentIdentityCount/ alignmentLength, alignmentLength),
-                'READ_MATCHED_GC_CONTENT': matchedGCContents,
-                'REF_MATCHED_GC_CONTENT': refMatchedGCContents,
-                'MATCHED_LONGEST_LENGTH': [matchedLongestLength],
-
-                'READ_LENGTH': readLength,
-                'REF_LENGTH': refLength,
-                'SEQ_QUAL': seqQual,
-                'ALIGN_QUAL': alignQual,
-            }
-
-        else:
-            localEnv['UNALIGNED_READS'].add(readID)
-
-        localEnv['READS_COVERAGE'] = genomicArray
-
-
-        return localEnv
-
-    def calculateEditDistance(self, htSeq1, htSeq2):
-
-        seq1 = htSeq1.seq
-        seq2 = htSeq2.seq
-
-        diff = 0
-        for i in range(0, min(len(seq1), len(seq2))):
-            if seq1[i] != seq2[i]:
-                diff += 1
-
-        return diff
-
-
-    def joinParallel(self, existResult, newResult, oEnvironment):
-
-        if existResult == None:
-            existResult = {}
-
-
-        for file, data in newResult:
-
-            if file in existResult:
-                existResult[file] = mergeDicts(existResult[file], data)
-            else:
-                existResult[file] = data
-
-        return existResult
 
 
     @classmethod
@@ -406,6 +459,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
         print("Preparing results")
 
 
+
         """
         
         FASTA REFERENCE INFOS
@@ -415,13 +469,16 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
         gcContentRef = 0
         refLength = 0
 
-        for chrom in oEnvironment.fasta:
-            fastaReq = oEnvironment.fasta[chrom]
-            fastaReq = fastaReq.toHTSeq()
+        fastaSeqs = {}
+        for fastaFile in self.args.fasta:
 
-            strSeq = str(fastaReq.seq)
-            gcContentRef += self.calc_gc(strSeq) * len(strSeq)
-            refLength += len(strSeq)
+            for seq in HTSeq.FastaReader(fastaFile):
+                fastaSeqs[seq.name] = str(seq.seq)
+
+                strSeq = str(seq.seq)
+                gcContentRef += self.calc_gc(strSeq) * len(strSeq)
+                refLength += len(strSeq)
+
 
 
         """
@@ -467,27 +524,38 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
             args.pltcfg.addHTMLPlot("<h2>" + str(fileName) + "</h2>\n")
 
+            allReads = allFilesResult[fileName]
+
+            alignedIDs = set()
+            unalignedIDs = set()
+
+            allAlignedReads = {}
+            for x in allReads:
+
+                elem = allReads[x]
+
+                if elem.aligned == True:
+                    allAlignedReads[x] = elem
+                    alignedIDs.add(elem.read_id)
+                else:
+                    unalignedIDs.add(elem.read_id)
+
+
+
 
             parallelResult = allFilesResult[fileName]
 
-            readCIGARs = parallelResult['READ_STATS']
-            readInfo = parallelResult['READ_INFO']
-            cigarKMERs = parallelResult['KMER_STATS_ALIGNED']
-            perfectKMERs = parallelResult['KMER_PERF_ALIGNED']
-
-            ntSubstitutions = parallelResult['NT_SUBST']
-            coverageArray = parallelResult['READS_COVERAGE']
-
-
-            alignedIDs = set([x[0] for x in readCIGARs])
-
-            unalignedIDs = parallelResult['UNALIGNED_READS']
+            #readCIGARs = parallelResult['READ_STATS']
+            #readInfo = parallelResult['READ_INFO']
+            #cigarKMERs = parallelResult['KMER_STATS_ALIGNED']
+            #perfectKMERs = parallelResult['KMER_PERF_ALIGNED']
+            #ntSubstitutions = parallelResult['NT_SUBST']
+            #coverageArray = parallelResult['READS_COVERAGE']
             additionalUnalignedReads = set()
 
+            if self.hasArgument('readInfo', self.args) and self.args.readInfo != None:
 
-            if self.hasArgument('readInfo', args) and args.readInfo != None:
-                
-                for row in args.readInfo:
+                for row in self.args.readInfo:
 
                     readid = row['READ_ID']
 
@@ -510,7 +578,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
             overviewByAligned = defaultdict(Counter)
 
-            if self.hasArgument('readInfo', args) and args.readInfo != None:
+            if self.hasArgument('readInfo', self.args) and args.readInfo != None:
 
                 for row in args.readInfo:
 

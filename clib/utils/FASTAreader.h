@@ -32,6 +32,8 @@
 #include "Sequence.h"
 #include "SequenceUtils.h"
 
+#include <htslib/faidx.h>
+
 /**
  * \brief Can open and extract sequences from a FASTA file
  *
@@ -50,6 +52,13 @@ public:
 
         m_pIndexToPosition = new std::map<std::string, size_t>();
         m_pIndexToSeqLength = new std::map<std::string, size_t>();
+
+
+        if (pIndexFile == NULL)
+        {
+            fai_build(pFileName->c_str());
+            m_pIndexFile = new std::string((*pFileName) + ".fai");
+        }
 
         this->parseIndexFile();
 
@@ -85,6 +94,16 @@ public:
 
         return pReturn;
 
+    }
+
+    std::string getFileName()
+    {
+        return std::string(m_pFileName->c_str());
+    }
+
+    std::string getIndexFileName()
+    {
+        return std::string(m_pIndexFile->c_str());
     }
 
     size_t getPosition(const std::string* pIndex);

@@ -1,5 +1,11 @@
+import time
+
+import pysam
+
 import HTSeq
 
+from porestat.analysis.ParallelAlignment import MapReduceAlignment
+from porestat.utils import eprint
 from ..tools.ParallelPTTInterface import ParallelPSTInterface
 
 
@@ -11,28 +17,20 @@ class ParallelAlignmentPSTReportableInterface(ParallelPSTInterface):
     def _createLocalEnvironment(self):
         return {}
 
-    def handleEntity(self, fileObj, localEnv, globalEnv):
+    def handleEntity(self, headers, samStrings, envs):
         pass
 
-    def execParallel(self, data, environment):
+    def exec(self):
 
-        retData = []
-        for alignFile in data:
+        iStart = time.time()
+        inputs = self.prepareInputs(self.args)
+        iEnd = time.time()
+        eprint("Preparing Inputs: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd - iStart))))
 
-            if alignFile.name.endswith(".bam"):
-                opener = HTSeq.BAM_Reader
-            else:
-                opener = HTSeq.SAM_Reader
+        llResults = self.execParallel(inputs, None)
+        iEnd = time.time()
+        eprint("Exec Parallel: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd - iStart))))
 
-            iProcessedAlignments = 0
-            localEnv = self._createLocalEnvironment()
-
-            for readAlignment in opener(alignFile):
-                localEnv = self.handleEntity(readAlignment, localEnv, environment)
-                iProcessedAlignments += 1
-
-            print("In File " + str(alignFile.name) + " " + str(iProcessedAlignments) + " have been processed")
-
-            retData.append( (alignFile.name, localEnv) )
-
-        return retData
+        self.makeResults(llResults, None, self.args)
+        iEnd = time.time()
+        eprint("Results Time: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd-iStart))))

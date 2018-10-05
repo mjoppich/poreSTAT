@@ -3,6 +3,8 @@ import os
 import time
 
 import HTSeq
+from porestat.analysis.ParallelAlignmentPSTReportableInterface import ParallelAlignmentPSTReportableInterface
+
 from porestat.utils.Parallel import MapReduce
 
 from porestat.utils.ArgParseExt import FileStubType, FolderType
@@ -63,7 +65,7 @@ class ReportFactory(PSToolInterfaceFactory):
         return ReportAnalysis(simArgs)
 
 
-class ReportAnalysis(ParallelPSTInterface):
+class ReportAnalysis(ParallelAlignmentPSTReportableInterface):
 
     def __init__(self, args):
 
@@ -117,78 +119,31 @@ class ReportAnalysis(ParallelPSTInterface):
             reportObj = self.dReporters[report]
             self.reporterEnvironments[report] = reportObj.prepareEnvironment(args)
 
-        return self._makeArguments(args)
+        localEnv = {}
+        for report in self.dReporters:
+            reportObj = self.dReporters[report]
+            localEnv[report] = reportObj._createLocalEnvironment()
+
+        return self._makeArguments(args), localEnv
 
 
-    def exec(self):
+    def handleEntity(self, samHeader, stringReads, envs ):
 
-        iStart = time.time()
-        inputs = self.prepareInputs(self.args)
-        environment = self.prepareEnvironment(self.args)
-
-        ll = MapReduce(4)
-
-        result = self.execParallel(inputs, environment)
-
-        iEnd = time.time()
-        eprint("Making Results: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd - iStart))))
-
-        self.makeResults(result, environment, self.args)
-        iEnd = time.time()
-
-        eprint("Execution Time: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd-iStart))))
-
-    def execParallel(self, inputFiles, environment):
-
-        retTuples = []
-        for alignedFile in inputFiles:
-
-            print("Processing File:", alignedFile.name)
-
-            if alignedFile.name.endswith(".bam"):
-                opener = HTSeq.BAM_Reader
-            else:
-                opener = HTSeq.SAM_Reader
-
-            localEnv = {}
-            for report in self.dReporters:
-                reportObj = self.dReporters[report]
-                localEnv[report] = reportObj._createLocalEnvironment()
-
-            """
-            
-            create proc pool here
-            
-            """
-
-            ll = MapReduce(2)
-
-            samfile = pysam.AlignmentFile(alignedFile, 'r')
-
-            result = ll.exec(samfile.fetch(), self.handleEntity, (localEnv, alignedFile, environment), self.chunkSize, self.joinParallel)
-
-            retTuples.append((alignedFile.name, localEnv))  # (data, localEnv)
-
-        print("Exec Parallel Returns")
-        return retTuples
-
-    def handleEntity(self, readAlignments, envs ):
-
-        localEnv = envs[0]
-        alignedFile = envs[1]
+        alignmentFileName = envs[0]
+        globalEnv = envs[1]
+        localEnv = envs[2]
 
 
-        for samReadAlignment in readAlignments:
+        for samReadAlignment in stringReads:
 
-            readAlignment = HTSeq.SAM_Alignment.from_pysam_AlignedRead(samReadAlignment)
+            aln = pysam.AlignedSegment.fromstring(str, samReadAlignment, samHeader)
 
             for report in self.dReporters:
-                if alignedFile in self.filesPerReport[report]:
+                if alignmentFileName in self.filesPerReport[report]:
                     reportObj = self.dReporters[report]
-                    localEnv[report] = reportObj.handleEntity(readAlignment, localEnv[report],
-                                                              self.reporterEnvironments[report])
+                    localEnv[report] = reportObj.handleEntity(aln, localEnv[report], self.reporterEnvironments[report])
 
-        return [(alignedFile, localEnv)]
+        return [(alignmentFileName, localEnv)]
 
 
     def joinParallel(self, existResult, newResult, oEnvironment):

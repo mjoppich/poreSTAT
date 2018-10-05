@@ -18,6 +18,14 @@ public:
         this->m_iCIGARLength = iCIGARLength;
     }
 
+    ~ReadRegion()
+    {
+        if (this->pReadRegion != NULL)
+        {
+            delete this->pReadRegion;
+        }
+    }
+
     char getCIGAR()
     {
         return m_cCIGAR;
@@ -70,6 +78,8 @@ public:
     {
         return m_sDebug;
     }
+
+    GenomicRegion* pReadRegion = NULL;
 
 protected:
 

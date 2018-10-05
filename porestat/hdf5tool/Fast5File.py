@@ -189,7 +189,7 @@ class Fast5File:
                 if basecallAttrib == None:
                     continue
 
-                basecall1dpath = '/Analyses/' + basecallAttrib
+                basecall1dpath = basecallAttrib #basecall1dpath = '/Analyses/' + basecallAttrib
 
                 self.sequence_paths[Fast5TYPE.BASECALL_1D] = self.join_paths( basecall1dpath , "BaseCalled_template" )
                 self.sequence_paths[Fast5TYPE.BASECALL_1D_COMPL] = self.join_paths( basecall1dpath , "BaseCalled_complement" )
@@ -299,6 +299,44 @@ class Fast5File:
                 fastq_seq = fastq_seq.decode("utf-8")
 
             return FASTQ.parseFromStr(fastq_seq)
+
+        except Exception as e:
+
+            return None
+
+    def _read_raw_signal(self):
+
+        try:
+            allevs=[]
+            readNames = [x for x in self.hdf5file['Raw/Reads']]
+
+            for readName in readNames:
+                hdf_elem = self.hdf5file['Raw/Reads/'+readName]
+                evs = hdf_elem['Signal'][()]
+
+                allevs.append(evs)
+
+            return allevs
+
+
+
+        except Exception as e:
+
+            return []
+
+    def _read_events(self, readType):
+
+        try:
+
+            if readType == None:
+                return None
+
+            pathToFQ = self.sequence_paths[readType]
+
+            hdf_elem = self.hdf5file[pathToFQ]
+            fastq_seq = hdf_elem['Events'][()]
+
+            return fastq_seq
 
         except Exception as e:
 
@@ -439,7 +477,10 @@ class Fast5File:
 
         print(self.filename)
         print(self.type)
+
         self.hdf5file.visit(printName)
+
+#>tig00000001 len=4527241 reads=33593 covStat=14412.82 gappedBases=no class=contig suggestRepeat=no suggestCircular=no
 
     def sequenceLength(self):
 

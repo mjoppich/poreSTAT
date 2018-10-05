@@ -4,6 +4,27 @@
 
 AlignmentStatistics::AlignmentStatistics()
 {
+    this->readStats = new std::vector<PythonReadStats>();
+}
+
+void AlignmentStatistics::loadFASTA(char* pFastaFile)
+{
+    if (this->pReader != NULL)
+    {
+        delete this->pReader;
+    }
+
+    if (this->m_pFASTAFile != NULL)
+    {
+        delete this->m_pFASTAFile;
+    }
+
+    this->m_pFASTAFile = new std::string(pFastaFile);
+
+    std::cout << "Loading fasta file:" << *(this->m_pFASTAFile) << std::endl;
+
+    this->pReader = new FASTAreader(this->m_pFASTAFile, NULL);
+    
 }
 
 void AlignmentStatistics::processFiles(int n_samples, char** pFilenames)
@@ -16,19 +37,22 @@ void AlignmentStatistics::processFiles(int n_samples, char** pFilenames)
         std::cout << i << "\t" << pFilenames[i] << std::endl;
 
         std::string sFileName(pFilenames[i]);
-        AlignmentStatisticProcessor* pReader = new AlignmentStatisticProcessor(&sFileName, NULL);
-
-        std::vector<std::string>* pSeqNames = pReader->getSeqNames();
+        AlignmentStatisticProcessor* pSAMreader = new AlignmentStatisticProcessor(&sFileName, NULL, this->pReader);
+        std::vector<std::string>* pSeqNames = pSAMreader->getSeqNames();
 
         for (size_t si = 0; si < pSeqNames->size(); ++si)
         {
             std::cout << pSeqNames->at(si) << std::endl;
         }
 
-        pReader->startAllParallel(10, NULL);
+        this->readStats->clear();
+        pSAMreader->startAllParallel(100, this->readStats, 100);
 
-        std::cout << pReader->seenReads << std::endl;
+
+        std::cout << pSAMreader->seenReads << std::endl;
+
+        delete pSAMreader;
     }
 
-    
+    std::cout << "Processing finished" << std::endl;
 }

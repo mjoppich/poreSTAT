@@ -876,9 +876,10 @@ class PorePlot:
             pdData[strX] = someData[x]
 
 
-        pandasDF = pandas.DataFrame.from_dict(pdData,orient='index').T.dropna()
+        pandasDF = pandas.DataFrame.from_dict(pdData,orient='index').T
 
-        sns.violinplot(data=pandasDF, orient=orientation, ax=ax)
+
+        sns.violinplot(data=pandasDF, orient=orientation, ax=ax, scale='area', inner='box', order=labels, dropna=True)
 
         if xTitle != None:
             ax.set_xlabel(xTitle)

@@ -1,5 +1,6 @@
 import random, os, sys
 
+from porestat.tools.squiggle import SquigglePlotFactory
 
 sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../")
 
@@ -57,7 +58,8 @@ if __name__ == '__main__':
         LengthHistogramFactory(parser, subparsers, 'histo'),
         YieldPlotFactory(parser, subparsers, 'yield'),
         DemangleFilesFactory(parser, subparsers, 'demangle'),
-        KmerHistogramFactory(parser, subparsers, 'kmer')
+        KmerHistogramFactory(parser, subparsers, 'kmer'),
+        SquigglePlotFactory(parser, subparsers, 'squiggle')
 
     ]
 

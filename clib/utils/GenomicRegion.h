@@ -102,6 +102,7 @@ public:
 
     virtual ~GenomicRegion() {
 
+
     }
 
     /**
@@ -675,6 +676,7 @@ public:
         return pReturn;
 
     }
+
 
 protected:
 

@@ -48,12 +48,18 @@ public:
 
     static std::vector< std::string >* readByLine(std::string* pFilename) {
 
+        if (pFilename == NULL)
+        {
+            return NULL;
+        }
+
         std::ifstream oInputStream;
         std::string sLine;
         oInputStream.open(pFilename->c_str());
 
         if (oInputStream.eof() == true)
             return NULL;
+
 
         std::vector< std::string >* pVec = new std::vector< std::string >();
 
