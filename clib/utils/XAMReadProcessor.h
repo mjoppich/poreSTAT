@@ -795,7 +795,7 @@ public:
 
         char* pReadName = bam_get_qname(pRead);
 
-        return std::string(pReadName, pRead->core.l_qname-1);
+        return std::string(pReadName);
     }
 
     std::string getReadSequence(bam1_t* pRead)

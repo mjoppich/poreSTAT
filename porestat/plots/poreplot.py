@@ -531,8 +531,9 @@ class PorePlot:
         myCounts = myCounts.transpose()
         myCounts = myCounts[::-1]
 
-        cp1 = ax.imshow(myCounts, interpolation='nearest', origin="lower", norm=colors.LogNorm(), cmap=cmap)
-        fig.colorbar(cp1)
+        if np.amax(myCounts) != 0:
+            cp1 = ax.imshow(myCounts, interpolation='nearest', origin="lower", norm=colors.LogNorm(), cmap=cmap)
+            fig.colorbar(cp1)
 
 
         ax.set_xlim([-1, nxbins])
@@ -877,8 +878,6 @@ class PorePlot:
 
 
         pandasDF = pandas.DataFrame.from_dict(pdData,orient='index').T
-
-
         sns.violinplot(data=pandasDF, orient=orientation, ax=ax, scale='area', inner='box', order=labels, dropna=True)
 
         if xTitle != None:

@@ -1,7 +1,7 @@
 #include <vector>
 #include <map>
 #include "../utils/FASTAreader.h"
-
+#include <assert.h>     /* assert */
 
 #include "../utils/XAMReadProcessor.h"
 #include "../utils/GenomicRegion.h"
@@ -102,6 +102,7 @@ protected:
         AlignedReadStats* pReadStats = new AlignedReadStats();
         std::string sReadName = this->getReadName(pRead);
         pReadStats->sReadID = sReadName;
+        //std::cout << "sreadname " << sReadName << std::endl;
         pReadStats->aligned = false;
 
         if (this->readIsMapped(pRead))
@@ -109,8 +110,6 @@ protected:
             this->seenReads += 1;
             pReadStats->aligned = true;
 
-            AlignedReadStats* pReadStats = new AlignedReadStats();
-            
             std::string sAlignedSeqName = this->getSeqName(pRead->core.tid);
 
             pReadStats->iAlignQual = this->getAlignQuality(pRead);
@@ -137,6 +136,10 @@ protected:
             uint32_t iRefGCBases = 0;
             uint32_t iMatchedRegionsBases=0;
             uint32_t iReadMatched = 0;
+
+            uint32_t iReadMatches = 0;
+            uint32_t iReadMismatches = 0;
+            uint32_t iReadM = 0;
 
             /*
              * TODO this might break if read does not start with M
@@ -165,29 +168,21 @@ protected:
                     if (pMRegion->getCIGAR() == 'M')
                     {
 
+                        iReadM += pMRegion->getCIGARLength();
+
                         std::string sRefRegion;
                         std::string sReadRegion;
-
-                        #pragma omp critical
-                        {
-
-
-
-                        std::cout << pMRegion->getStart() << " " << pMRegion->getLength() << " " << sAlignedSeqName << std::endl;
-                        std::cout << pMRegion->pReadRegion->getStart() << " " << pMRegion->pReadRegion->getLength() << " " << this->getReadID(pRead) << std::endl;
-
 
                         sRefRegion = this->pFASTAReader->retrieveSequence(pMRegion, sAlignedSeqName);
                         sReadRegion = sReadSeq.substr(pMRegion->pReadRegion->getStart(), pMRegion->pReadRegion->getLength()-1);
 
-                        std::cout << sRefRegion << std::endl;
-                        std::cout << sReadRegion << std::endl;
+                        char* pSeqC = (char*) malloc(sizeof(char) * (sAlignedSeqName.size()+1));
+                        sAlignedSeqName.copy(pSeqC, sAlignedSeqName.size());
+                        pSeqC[sAlignedSeqName.size()] = '\0';
 
-
-                        };
-
+                        //std::cout << "coverage seq " << pSeqC << " " << sAlignedSeqName << std::endl;
                         // add coverage
-                        pReadStats->seqCoverages.push_back(SeqCoverage(sAlignedSeqName.c_str(), pMRegion->getStart(), pMRegion->getEnd()));
+                        pReadStats->seqCoverages.push_back(SeqCoverage(pSeqC, pMRegion->getStart(), pMRegion->getEnd()));
 
                         iLongestMatched = std::max(pMRegion->pReadRegion->getLength(), iLongestMatched);
 
@@ -211,7 +206,6 @@ protected:
 
                                 if (mismatched > 0)
                                 {
-                                    pReadStats->cigar2len.add( pReadStats->mismatchCIGAR, mismatched );
                                     mismatched = 0;
                                 }
 
@@ -223,7 +217,6 @@ protected:
 
                                 if (equals > 0)
                                 {
-                                    pReadStats->cigar2len.add( pReadStats->exactMatchCIGAR, equals );
 
                                     if (j >= 5)
                                     {
@@ -246,7 +239,25 @@ protected:
 
                         }
 
+                        //assert(iMatches+iMisMatches == pMRegion->getCIGARLength());
 
+                        pReadStats->cigar2len.add(pReadStats->exactMatchCIGAR, iMatches);
+                        pReadStats->cigar2len.add(pReadStats->mismatchCIGAR, iMisMatches);
+
+                        iReadMatches += iMatches;
+                        iReadMismatches += iMisMatches;
+
+                        //std::cout << "to python" << pReadStats->cigar2len.keyString() << std::endl;
+
+
+                        /*
+#pragma omp critical
+                        {
+                            std::cout << "Matches " << iMatches << " Mismatches " << iMisMatches << " Cigar Len"
+                                      << pMRegion->getCIGARLength() << std::endl;
+                        }
+
+                        */
 
                     }
 
@@ -263,6 +274,45 @@ protected:
 
             pReadStats->fReadIdentity = (float) iReadMatched / (float) pReadStats->iReadLength;
             pReadStats->fRefIdentity = (float) iReadMatched / (float) pReadStats->iRefLength;
+
+            /*
+            if (pReadStats->sReadID == "ce27fd97-4547-4096-8d11-29b090889111_Basecall_1D_template")
+            {
+                std::cout << pReadStats->sReadID << " M " << iReadM << std::endl;
+                std::cout << pReadStats->sReadID << " E " << iReadMatches << std::endl;
+                std::cout << pReadStats->sReadID << " Z " << iReadMismatches << std::endl;
+
+                uint32_t icount = 0;
+
+                std::vector<uint32_t>*pvec = pReadStats->cigar2len.getVector('M');
+                for (size_t j = 0; j < pvec->size(); ++j)
+                {
+                    icount += pvec->at(j);
+                }
+
+                std::cout << icount << std::endl;
+
+                icount = 0;
+
+                pvec = pReadStats->cigar2len.getVector('E');
+                for (size_t j = 0; j < pvec->size(); ++j)
+                {
+                    icount += pvec->at(j);
+                }
+
+                std::cout << icount << std::endl;
+
+                icount = 0;
+
+                pvec = pReadStats->cigar2len.getVector('Z');
+                for (size_t j = 0; j < pvec->size(); ++j)
+                {
+                    icount += pvec->at(j);
+                }
+
+                std::cout << icount << std::endl;
+            }
+            */
 
             #pragma omp critical
             {

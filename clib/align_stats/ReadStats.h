@@ -28,6 +28,20 @@ public:
         return this->mMap.at(key).size();
     }
 
+    std::string keyString()
+    {
+        std::string sret = "";
+
+        typename std::map<K, std::vector<V> >::iterator it = this->mMap.begin();
+
+        while (it != this->mMap.end())
+        {
+            sret.push_back(it->first);
+        }
+
+        return sret;
+    }
+
     std::vector<V>* getVector(K key)
     {
         if (!this->hasKey(key))
@@ -188,7 +202,7 @@ struct NTSubstitution
 
 struct PythonReadStats
 {
-    const char* pReadID;
+    char* pReadID;
     bool aligned;
 
     uint32_t iReadLength;
@@ -225,6 +239,9 @@ struct PythonReadStats
 
 };
 
+#include <iostream>
+
+
 class AlignedReadStats
 {
 public:
@@ -236,7 +253,10 @@ public:
     {
         PythonReadStats oRet;
 
-        oRet.pReadID = this->sReadID.c_str();
+        oRet.pReadID = (char*) malloc(sizeof(char)*(this->sReadID.size()+1));
+        strncpy(oRet.pReadID, this->sReadID.c_str(), this->sReadID.size());
+        oRet.pReadID[this->sReadID.size()] = '\0';
+
         oRet.aligned = this->aligned;
 
         oRet.iReadLength = this->iReadLength;
@@ -265,8 +285,9 @@ public:
         }
 
 
-        oRet.CIGAR_COUNT = this->cigar2len.size();
+        oRet.CIGAR_COUNT = (uint32_t) this->cigar2len.size();
         oRet.CIGARS = (char*) malloc(sizeof(char) * oRet.CIGAR_COUNT);
+
         oRet.CIGAR_VEC_LENGTHS = (uint32_t*) malloc(sizeof(uint32_t) * oRet.CIGAR_COUNT);
         oRet.CIGAR_LENGTHS = (uint32_t**) malloc(sizeof(uint32_t*) * oRet.CIGAR_COUNT);
 
@@ -276,9 +297,25 @@ public:
         for (; oCLit != this->cigar2len.end(); ++oCLit)
         {
             char cCIGAR = oCLit->first;
-            oRet.CIGARS[iArrIdx] = cCIGAR;
+                oRet.CIGARS[iArrIdx] = cCIGAR;
             oRet.CIGAR_VEC_LENGTHS[iArrIdx] = (uint32_t) oCLit->second.size();
             oRet.CIGAR_LENGTHS[iArrIdx] = (uint32_t*) malloc(sizeof(uint32_t)*oCLit->second.size());
+
+            /*
+            if (this->sReadID == "ce27fd97-4547-4096-8d11-29b090889111_Basecall_1D_template")
+            {
+                if ((cCIGAR == 'M') || (cCIGAR == 'Z') || (cCIGAR == 'E'))
+                {
+                    uint64_t iCount = 0;
+                    for (size_t i = 0; i < oCLit->second.size(); ++i)
+                    {
+                        iCount += oCLit->second[i];
+                    }
+
+                    std::cout << this->sReadID << " " << cCIGAR << " " << iCount << std::endl;
+                }
+            }
+            */
 
             for (size_t i = 0; i < oCLit->second.size(); ++i)
             {
