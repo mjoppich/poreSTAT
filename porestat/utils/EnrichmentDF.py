@@ -1,6 +1,6 @@
-from collections import defaultdict
+from collections import defaultdict, Counter
 
-from porestat.utils.Numbers import toNumber
+from porestat.utils.Numbers import toNumber, toFloat
 
 from ..analysis.similarity_analysis import SimilarityAnalysis
 from .DataFrame import DataFrame, DataRow, ExportTYPE
@@ -47,75 +47,87 @@ class EnrichmentDF(DataFrame):
         newColIdx = self.addColumn(condName, None)
 
         setFoundKeys = set()
+        cDataHeader = condData.getHeader()
 
         for i in range(0, len(self.data)):
             row = self.data[i]
             rowID = row[ self.idCol ]
 
-            if rowID in condData.getHeader():
+            if rowID in cDataHeader:
                 lrow = list(row)
                 lrow[newColIdx] = condData[rowID]
                 self.data[i] = tuple(lrow)
                 setFoundKeys.add(rowID)
 
-        for geneID in condData.getHeader():
+        for geneID in cDataHeader:
             if not geneID in setFoundKeys:
 
-                lrow = [None] * len(self.column2idx)
+                lrow = [self.idx2default[i] for i in range(0, len(self.column2idx))]
                 lrow[0] = geneID
                 lrow[newColIdx] = condData[geneID]
 
                 self.data.append(tuple(lrow))
 
 
-    def writeEnrichmentBrowserFiles(self, prepData, exprFile, pdataFile, fdataFile):
+    def writeEnrichmentBrowserFiles(self, prepData, replicates, exprFile, pdataFile, fdataFile):
 
         self.writeExpressionFile(exprFile, prepData)
-        self.writepDataFile(pdataFile, prepData)
+        self.writepDataFile(pdataFile, replicates)
         self.writefDataFile(fdataFile, prepData)
 
 
 
-    def prepareEBData(self, cond1, cond2):
+    def prepareEBData(self, cond1Samples, cond2Samples):
 
-        header = ['gene', cond1, cond2]
+        assert (type(cond1Samples) == list)
+        assert (type(cond2Samples) == list)
+
+        header = ['gene'] + cond1Samples + cond2Samples
         prepData = [tuple(header)]
 
-        cond1Idx = self.getColumnIndex(cond1)
-        cond2Idx = self.getColumnIndex(cond2)
+
+        condSample2Idx = {}
+
+        for cond1Sample in cond1Samples:
+            condSample2Idx[cond1Sample] = self.getColumnIndex(cond1Sample)
+
+        for cond2Sample in cond2Samples:
+            condSample2Idx[cond2Sample] = self.getColumnIndex(cond2Sample)
+
 
         for row in self:
 
-            count1 = int(row[cond1Idx])
-            count2 = int(row[cond2Idx])
-
             gene = row[0]
+            baseRow = [gene]
 
-            if count1 == None or count2 == None:
-                continue
+            for sampleName in cond1Samples+cond2Samples:
 
-            prepData.append( (gene, count1, count2) )
+                count = int(row[condSample2Idx[sampleName]])
+
+                if count != None:
+                    baseRow.append(count)
+
+            if len(baseRow) == len(cond1Samples) + len(cond2Samples) + 1:
+                prepData.append( tuple(baseRow) )
 
         return prepData
 
 
-    def writepDataFile(self, file, prepData):
+    def writepDataFile(self, file, replicates):
 
         with open(file, 'w') as pdataFile:
 
-            conds = prepData[0][1:]
-            cnt = 0
-            for cond in conds:
-                pdataFile.write(cond + "\t" + str(cnt) + "\n")
-                cnt += 1
+            for ridx, replicate in enumerate(replicates):
+                for sample in replicates[replicate]:
+                    pdataFile.write(sample + "\t" + str(ridx) + "\n")
 
 
     def writefDataFile(self, file, prepData):
 
         with open(file, 'w') as fdataFile:
-
+            sampleCount = len(prepData[0])
             for line in prepData[1:]:
-                fdataFile.write( line[0] + "\t" + line[0] + "\n")
+                fdataFile.write( "\t".join( [line[0]] * sampleCount) + "\n")
 
     def writeExpressionFile(self, file, prepData):
 
@@ -128,13 +140,11 @@ class EnrichmentDF(DataFrame):
 
     @property
     def supported_de_methods(self):
-        return ['NOISeq', 'DESeq', 'lGFOLD']
+        return ['NOISeq', 'DESeq', 'msEmpiRe', 'lGFOLD']
 
 
-    def runDEanalysis(self, outputFolder, rscriptPath="/usr/bin/Rscript", prefix= "", conditions=None, methods=['NOISeq', 'DESeq']):
+    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['NOISeq', 'msEmpiRe', 'DESeq'], rscriptPath="/usr/bin/Rscript"):
 
-        if conditions == None:
-            conditions = self.getHeader()[1:]
 
         filePrefix = prefix
         if prefix != None and prefix != "" and prefix[len(prefix)-1] != "_":
@@ -162,20 +172,21 @@ class EnrichmentDF(DataFrame):
 
 
         createdComparisons = []
+        conditions = [x for x in replicates]
 
         for i in range(0, len(conditions)):
             cond1 = conditions[i]
             for j in range(i+1, len(conditions)):
                 cond2 = conditions[j]
 
-                prepData = self.prepareEBData(cond1, cond2)
+                prepData = self.prepareEBData(replicates[cond1], replicates[cond2])
 
                 with open(noiseqFile, 'w') as fout:
 
                     for elem in prepData:
-                        fout.write("\t".join([str(x) for x in elem])  +"\n")
+                        fout.write("\t".join([elem[0]] + [str(x) for x in reversed(elem[1:])])  +"\n")
 
-                self.writeEnrichmentBrowserFiles(prepData, exprFile, pdataFile, fdataFile)
+                self.writeEnrichmentBrowserFiles(prepData, replicates, exprFile, pdataFile, fdataFile)
 
                 condResult = {}
 
@@ -189,15 +200,23 @@ class EnrichmentDF(DataFrame):
                         execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile
                             #raise PSToolException("Unable to run enrichment analsyis. " + str(execStr))
 
+                    elif method in ['msEmpiRe']:
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/empire_diffreg.R"
+
+                        execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+noiseqFile+" "+method+" " + outFile
+
                     elif method in ['NOISeq']:
+
+                        sample4condition = [conditions[i]] * len(replicates[cond2]) + [conditions[j]] * len(replicates[cond1])
+                        print(sample4condition)
 
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/noiseq_diffreg.R"
 
-                        execStr = rscriptPath+" "+scriptPath+" "+noiseqFile + " "+ outFile
+                        execStr = rscriptPath+" "+scriptPath+" "+noiseqFile + " "+ outFile + " " + " ".join(sample4condition)
 
                     print(execStr)
 
-                    #sysret = os.system(execStr)-255
+                    #sysret = os.system(execStr)
                     sysret = 1
 
                     if sysret != 0:
@@ -206,15 +225,18 @@ class EnrichmentDF(DataFrame):
                     methDF = DataFrame.parseFromFile(outFile)
                     condResult[method] = methDF
 
-                geneNames = self.getColumnIndex('id')
-                cond1Counts = self.toDataRow(geneNames, self.getColumnIndex(cond1))
-                cond2Counts = self.toDataRow(geneNames, self.getColumnIndex(cond2))
 
-
+                # TODO this must be done for all samples!
                 compDF = EnrichmentDF()
                 evCol = compDF.addColumn('evidence', prefix) # TODO this is just a quick hack!
-                compDF.addCondition(cond1Counts, cond1)
-                compDF.addCondition(cond2Counts, cond2)
+
+                geneNames = self.getColumnIndex('id')
+
+                for sampleName in replicates[cond1] + replicates[cond2]:
+                    condSampleCounts = self.toDataRow(geneNames, self.getColumnIndex(sampleName))
+                    compDF.addCondition(condSampleCounts, sampleName)
+
+
 
                 condVPData = {}
                 usedMethod = []
@@ -224,6 +246,8 @@ class EnrichmentDF(DataFrame):
 
                     if methDF == None:
                         continue
+
+                    print("Combining Method", method)
 
                     usedMethod.append(method)
 
@@ -237,11 +261,12 @@ class EnrichmentDF(DataFrame):
                     rawPValidx = methDF.getColumnIndex('RAW.PVAL') if methDF.columnExists('RAW.PVAL') else methDF.getColumnIndex('ADJ.PVAL')
                     adjPValidx = methDF.getColumnIndex('ADJ.PVAL')
 
-
+                    print("Combining Method to data row", method)
                     l2FCdata = methDF.toDataRow( geneIDidx, log2FCidx)
                     rawPdata = methDF.toDataRow( geneIDidx, rawPValidx)
                     adjPdata = methDF.toDataRow( geneIDidx, adjPValidx)
 
+                    print("Combining Method adding cond", method)
                     compDF.addCondition(l2FCdata, l2FCTitle)
                     compDF.addCondition(rawPdata, rawpTitle)
                     compDF.addCondition(adjPdata, adjpTitle)
@@ -258,11 +283,9 @@ class EnrichmentDF(DataFrame):
 
 
 
-
+                    print("cond VP Data ready")
                     condVPData[method] = ( l2FCdata.getHeader(), l2FCdata.to_list(), rawPdata.to_list(), adjPdata.to_list() )
 
-
-                addInfo = compDF.addColumn("EnsemblBacteria")
 
                 def addInfoFunc(x):
                     gene = x[0]
@@ -277,18 +300,23 @@ class EnrichmentDF(DataFrame):
                     x[addInfo] = link
                     return tuple(x)
 
-                compDF.applyToRow( addInfoFunc )
+                #print("Applying add info")
+                #addInfo = compDF.addColumn("EnsemblBacteria")
+                #compDF.applyToRow( addInfoFunc )
+                
+                cond1FName = cond1.replace("/", "_").replace("\\", "_").replace(".", "_")
+                cond2FName = cond2.replace("/", "_").replace("\\", "_").replace(".", "_")
 
-                outname = base + cond1 + "_" + cond2 + ".tsv"
+                outname = base + cond1FName + "_" + cond2FName + ".tsv"
 
-                createdComparisons.append(outname)
+                createdComparisons.append( (cond1, cond2, outname) )
 
                 compDF.export(outFile=outname, exType=ExportTYPE.TSV)
 
         return createdComparisons
 
 
-    def printResult(self, outputFolder, prefix, conditions, files):
+    def printResult(self, outputFolder, prefix, conditionPair2File, replicates):
 
         filePrefix = prefix
         if prefix != None and prefix != "" and prefix[len(prefix)-1] != "_":
@@ -314,19 +342,16 @@ class EnrichmentDF(DataFrame):
         shutil.copyfile(mpld3_path, mpld3_dest)
 
         fileOutPuts = {}
+        allMethods = set()
 
-        for file in files:
+        for cond1, cond2 in conditionPair2File:
+
+            file = conditionPair2File[(cond1, cond2)]
 
             compDF = DataFrame.parseFromFile(file)
             # 0 evidence, 1 gene, 2 cond1, 3 cond2, 4+ methods
 
             compHeader = compDF.getHeader()
-
-            cond1 = compHeader[2]
-            cond2 = compHeader[3]
-
-            if not (cond1 in conditions and cond2 in conditions):
-                continue # comparison not needed
 
             methods = []
             for i in range(4, len(compHeader)-1):
@@ -335,11 +360,12 @@ class EnrichmentDF(DataFrame):
                 if colVal.endswith("_log2FC"):
                     method = colVal.replace('_log2FC', '')
                     methods.append(method)
+                    allMethods.add(method)
 
             (headHTML, bodyHTML) = compDF.export(outFile=None, exType=ExportTYPE.HTML_STRING)
 
             if 'NOISeq' in methods:
-                bodyHTML = bodyHTML + "<h3>Warning: the calculated p-values are transformed z-scores from probabilities of differential expression</h3>"
+                bodyHTML = bodyHTML + "<h3>Warning: the NOISeq calculated p-values are transformed z-scores from probabilities of differential expression</h3>"
 
             pltcfg = PlotConfig()
             pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
@@ -352,18 +378,18 @@ class EnrichmentDF(DataFrame):
             l2FCs = []
             l2fcSuffix = "_log2FC"
 
+            def parseList(x):
+                ret = [None] * len(x)
+                for i in range(0, len(x)):
+                    if x[i] != 'None':
+                        ret[i] = float(x[i])
+
+                return ret
+
             for method in methods:
                 l2FCTitle = method + l2fcSuffix
                 rawpTitle = method + "_RAW.PVAL"
                 adjpTitle = method + "_ADJ.PVAL"
-
-                def parseList(x):
-                    ret = [None] * len(x)
-                    for i in range(0, len(x)):
-                        if x[i] != 'None':
-                            ret[i] = float(x[i])
-
-                    return ret
 
                 l2FCs.append(l2FCTitle)
 
@@ -381,7 +407,60 @@ class EnrichmentDF(DataFrame):
                 if method in ['NOISeq']:
                     pltcfg.addHTMLPlot("<h3>Warning: the calculated p-values are transformed z-scores from probabilities of differential expression</h3>")
 
-            outFilePath = base + cond1 + "_" + cond2 + ".html"
+
+
+
+            for methodI in range(0,len(methods)):
+                for methodJ in range(methodI+1,len(methods)):
+
+
+                    il2FCTitle = methods[methodI] + l2fcSuffix
+                    jl2FCTitle = methods[methodJ] + l2fcSuffix
+
+                    il2FCdata = compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(il2FCTitle)).to_dict()
+                    jl2FCdata = compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(jl2FCTitle)).to_dict()
+
+                    idata = []
+                    jdata = []
+
+                    unionIdx = set([x for x in jl2FCdata] + [x for x in il2FCdata])
+
+                    for val in unionIdx:
+
+                        if val in il2FCdata and val in jl2FCdata:
+
+                            ielem = il2FCdata[val]
+                            jelem = jl2FCdata[val]
+
+                            if ielem == None or ielem == "None" or jelem == None or jelem=="None":
+                                continue
+
+                            idata.append(float(ielem))
+                            jdata.append(float(jelem))
+
+
+                    print(method, "i/jdata", len(idata), len(jdata))
+
+                    PorePlot.plotscatter(idata, jdata, "log2FC comparison " + methods[methodI] + " vs " + methods[methodJ], "log2 FC ("+methods[methodI] + ")", "log2 FC ("+methods[methodJ] + ")", None, pltcfg)
+
+            if all([x in methods for x in ['NOISeq', 'msEmpiRe', 'DESeq']]):
+
+                method2calls = defaultdict(set)
+                for method in ['NOISeq', 'msEmpiRe', 'DESeq']:
+                    adjpTitle = method + "_RAW.PVAL"
+                    adjPdata = compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(adjpTitle)).to_pairs()
+
+                    for geneid, pval in adjPdata:
+
+                        fpval = toFloat(pval)
+
+                        if fpval != None and fpval < 0.05:
+
+                            method2calls[method].add(geneid)
+
+                PorePlot.plotVennDiagram(method2calls, title="Overlap of DE methods for adj. pval 0.05", pltcfg=pltcfg)
+
+            outFilePath = base + cond1.replace("/", "_").replace(".", "_") + "_" + cond2.replace("/", "_").replace(".", "_") + ".html"
             with open( outFilePath, 'w') as resultHTML:
 
                 mpld3js = "<script src=" + pltcfg.mpld3js + "></script>\n"
@@ -390,35 +469,74 @@ class EnrichmentDF(DataFrame):
                 outStr = "<html><head>" + headHTML +"\n" + d3js + mpld3js + "</head><body><p>" + "\n".join(pltcfg.getCreatedPlots()) + "</p>" + bodyHTML + "</body></html>"
                 resultHTML.write( outStr )
 
-                fileOutPuts[(cond1, cond2)] = tuple([compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(cond1)),
-                                               compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(cond2)),
-                                               outFilePath] + [compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(lfcm)) for lfcm in l2FCs],)
+
+                cond2genecount = {}
+                for cond in [cond1, cond2]:
+                    condSamples = replicates[cond]
+                    gene2count = defaultdict(lambda: 0.0)
+
+                    for sample in condSamples:
+
+                        dr = compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(sample))
+
+                        genes = dr.getHeader()
+                        print(genes[:10])
+
+                        for gene in genes:
+                            gene2count[gene] += dr[gene]
+
+                    if len(condSamples)>0:
+                        for gene in gene2count:
+                            gene2count[gene] = gene2count[gene] / len(condSamples)
+
+                    cond2genecount[cond] = DataRow.fromDict(gene2count)
+
+                simScore = SimilarityAnalysis.calcSimilarity(cond2genecount[cond1], cond2genecount[cond2])
+
+                retStuff = {
+                    "path": outFilePath,
+                    "sim_score": simScore
+                }
+                for method in methods:
+
+                    methodL2FC = method + l2fcSuffix
+
+                    if not methodL2FC in l2FCs:
+                        continue
+
+                    l2FCCol = compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(methodL2FC))
+                    avgL2FC = self.calcAvgL2FC(l2FCCol)
+
+                    retStuff[method] = avgL2FC
+
+                fileOutPuts[(cond1, cond2)] = retStuff
 
 
         # making overview!
         overviewDF = DataFrame()
-        overviewDF.addColumns(['Condition1', 'Condition2', 'Similarity', 'Comparison HTML', 'Similarity (avg log2 FC) ' + methods[0], 'Similarity (avg log2 FC) ' + methods[1]])
 
+        overviewCols = ['Condition1', 'Condition2', 'Similarity', 'Comparison HTML'] + ['Similarity (avg log2 FC) ' + method for method in allMethods]
+
+        overviewDF.addColumns( overviewCols )
+
+        allMethods = sorted(allMethods)
         avgL2FCByMethod = defaultdict(lambda : defaultdict())
 
         for condPair in fileOutPuts:
 
             condData = fileOutPuts[condPair]
-            relHTMLFile = os.path.relpath(condData[2], basePath)
+            relHTMLFile = os.path.relpath(condData["path"], basePath)
 
-            simScore = SimilarityAnalysis.calcSimilarity(condData[0], condData[1])
-
-            avgL2FCByMethod[methods[0]][(condPair[0], condPair[1])] = self.calcAvgL2FC(condData[3])
-            avgL2FCByMethod[methods[1]][(condPair[0], condPair[1])] = self.calcAvgL2FC(condData[4])
 
             condPairData = {
                 'Condition1': condPair[0],
                 'Condition2': condPair[1],
-                'Similarity': simScore,
-                'Similarity (avg log2 FC) ' + methods[0]: avgL2FCByMethod[methods[0]][(condPair[0], condPair[1])],
-                'Similarity (avg log2 FC) ' + methods[1]: avgL2FCByMethod[methods[1]][(condPair[0], condPair[1])],
+                'Similarity': condData["sim_score"],
                 'Comparison HTML': "<a target='_blank' href='"+relHTMLFile+"'>Comparison</a>"
             }
+
+            for midx, method in enumerate(allMethods):
+                condPairData['Similarity (avg log2 FC) ' + method] = condData.get(method, 0)
 
             overviewDF.addRow( DataRow.fromDict(condPairData) )
 
@@ -439,10 +557,14 @@ class EnrichmentDF(DataFrame):
 
         for x in datarow.to_list():
 
-            xn = toNumber(x)
+            if x == 'None':
+                xn = None
+            else:
+                xn = toNumber(x)
 
             if xn == None:
-                print("Not a number in calcAvgL2FC", str(xn))
+                #print("Not a number in calcAvgL2FC", str(xn))
+                pass
 
 
             if xn != None:

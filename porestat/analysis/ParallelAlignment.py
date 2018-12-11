@@ -95,6 +95,7 @@ class MapReduceAlignment:
         self.pool.join()
         print("Pool Clear")
         self.pool.clear()
+        print("Pool Closed")
 
         return resultObj
 

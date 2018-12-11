@@ -25,7 +25,11 @@ from collections import Counter
 import ctypes
 from collections import Counter
 
-lib = ctypes.cdll.LoadLibrary('../clib/lib/libfoo.so')
+import os
+
+baseFolder = str(os.path.dirname(os.path.realpath(__file__)))
+
+lib = ctypes.cdll.LoadLibrary(baseFolder+'/../../clib/lib/libfoo.so')
 
 
 class COUNTER_PAIR(ctypes.Structure):

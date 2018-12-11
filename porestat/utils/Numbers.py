@@ -6,10 +6,10 @@ def toFloat(sText, nDefault=None):
     :return: int value of sText or None if not a number
     """
     if type(sText) is int:
-        return sText
+        return float(sText)
 
     if type(sText) is float:
-        return int(sText)
+        return float(sText)
 
     if (len(sText) == 0):
         return nDefault

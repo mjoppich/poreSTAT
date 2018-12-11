@@ -23,18 +23,11 @@ class ReadCountAnalysisFactory(PSToolInterfaceFactory):
 
     def _addParser(self, subparsers, which):
         parser = subparsers.add_parser(which, help=which+' help')
-        parser.add_argument('-s', '--sam', nargs='+', type=str, required=True, help='alignment files')
+        parser.add_argument('-s', '--sam', nargs='+', type=argparse.FileType('r'), required=True, help='alignment files')
         parser.add_argument('-g', '--gff', type=argparse.FileType("r"), required=True, help='gene annotation')
-        parser.add_argument('-r', '--read-info', nargs='+', type=str, help='read summary file', required=False)
+        parser.add_argument('-r', '--read-info', nargs='+', type=argparse.FileType('r'), help='read summary file', required=False)
         parser.add_argument('--plot', dest='plot', action='store_true', default=False)
-
-        def fileOpener( filename ):
-
-            open(filename, 'w').close()
-
-            return filename
-
-        parser.add_argument('-o', '--output', type=fileOpener, help='output location, default: std out', default=sys.stdout)
+        parser.add_argument('-o', '--output', type=argparse.FileType('w'), help='output location, default: std out', default=sys.stdout)
 
         parser = PlotConfig.addParserArgs(parser)
 
@@ -82,32 +75,25 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
     def readReadInfo(self, args):
 
-        for readInfoFile in args.read_info:
-
-            if not fileExists(readInfoFile):
-                raise PSToolException("Read info file does not exist: " + str(readInfoFile))
-
         self.readInfo = {}
 
-        for readInfoFile in args.read_info:
-            allReadData = DataFrame.parseFromFile(readInfoFile, cDelim='\t')
+        if args.read_info != None:
+            for readInfoFile in args.read_info:
+                allReadData = DataFrame.parseFromFile(readInfoFile, cDelim='\t')
 
-            for row in allReadData:
-                readName = row["READ_NAME"]
-                readType = row["TYPE"]
-                readRun = row["USER_RUN_NAME"]
-                readLength = int(row["READ_LENGTH"])
+                for row in allReadData:
+                    readName = row["READ_NAME"]
+                    readType = row["TYPE"]
+                    readRun = row["USER_RUN_NAME"]
+                    readLength = int(row["READ_LENGTH"])
 
-                self.readInfo[readName] = (readType, readRun, readLength)
+                    self.readInfo[readName] = (readType, readRun, readLength)
 
     def prepareInputs(self, args):
         self.readReadInfo(args)
         self.readGenomeAnnotation(args)
 
-        for x in args.sam:
-            if not fileExists(x):
-                PSToolException("sam file does not exist: " + str(x))
-
+        # TODO fix write out not overwriting header ...
         self.writeLinesToOutput(args.output, "\t".join(['gene', 'coverage', 'coverage_rank', 'read_counts', 'read_counts_rank']) + "\n", mode='w')
 
 

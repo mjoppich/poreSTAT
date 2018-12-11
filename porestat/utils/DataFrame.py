@@ -264,6 +264,15 @@ class DataRow(DefaultDataColumnAccess, DataSeries):
     def to_pairs(self):
         return [ (x, self.__getitem__(x)) for x in self.column2idx ]
 
+
+    def to_dict(self):
+        ret = {}
+
+        for x in self.column2idx:
+            ret[x] = self.__getitem__(x)
+
+        return ret
+
     @classmethod
     def fromDict(cls, dictionary):
 
@@ -292,11 +301,15 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         DataSeries.__init__(self, []) # for each row
 
         self.title = None
+        self.filepath = None
 
     def setTitle(self, value):
 
         self.title = value
 
+    def setFilepath(self, value):
+
+        self.filepath = value
 
     def __getitem__(self, item):
 

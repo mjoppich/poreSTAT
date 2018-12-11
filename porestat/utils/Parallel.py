@@ -53,6 +53,7 @@ class MapReduce:
         self.pool.join()
         print("Pool Clear")
         self.pool.clear()
+        print("Pool closed")
 
         return resultObj
 

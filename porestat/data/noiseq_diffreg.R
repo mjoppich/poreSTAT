@@ -1,5 +1,5 @@
-if (length(commandArgs()) != 7) message("usage: Rscript noiseq_diffreg.R <exprs.file> <out.file>")
-stopifnot(length(commandArgs()) == 7)
+if (length(commandArgs()) != 7) message("usage: Rscript noiseq_diffreg.R <exprs.file> <out.file> ... conditions ...")
+stopifnot(length(commandArgs()) >= 7)
 
 message("Loading NOISeq")
 message("R paths")
@@ -32,30 +32,46 @@ for (rPackage in requiredPackages) {
         message("Running biocLite for ", rPackage, "in", rUserLib)
         biocLite(rPackage, lib=rUserLib,    lib.loc=.libPaths())
     }
-
 }
 
+allArgs = commandArgs()
+print(allArgs)
 
 infile <- commandArgs()[6]
 outfile <- commandArgs()[7]
 
+conditionData = allArgs[8:length(allArgs)]
+print(conditionData)
 
 df = read.csv(infile, header=TRUE, sep="\t", check.names=FALSE)
 df2 <- df[, -1]
 rownames(df2) = df[, 1]
 
 
-sampleNames = print(colnames(df2))
+sampleNames = colnames(df2)
 print(sampleNames)
 
 
-myfactors = data.frame( Samples=colnames(df2))
+myfactors = data.frame( Samples=colnames(df2), Conditions=conditionData )
+
+print(myfactors)
+
 mydata = readData(df2, factors=myfactors)
 
-myresults <- noiseq(mydata, factor="Samples",k=NULL,norm="uqua",pnr=0.5,nss=5, v = 0.02,lc=0, replicates="no")
+print(mydata)
 
-der = degenes(myresults, q=0.2, M=NULL)
+if (length(conditionData) == 2)
+{
+    print("no replicates")
+    myresults <- noiseq(mydata, factor="Samples",k=NULL,norm="uqua",pnr=0.2, nss=5, v = 0.02, replicates="no")
+} else {
+    print("with replicates")
+    myresults <- noiseq(mydata, factor="Conditions",k=NULL,norm="uqua",pnr=0.2, replicates="technical", conditions=conditionData)
+}
 
+
+
+der = degenes(myresults, q=0.0, M=NULL)
 dfr = setDT(der, keep.rownames = TRUE)[]
 
 #> colnames(der)
@@ -73,17 +89,21 @@ colnames(dfr)[1] <- "GENE.ID"
 colnames(dfr)[4] <- "log2FC"
 
 
-dfr$RAW.PVAL = 2*pnorm(-abs(scale(dfr$prob)))
+
+dfr$RAW.PVAL = 2*pnorm(-abs(scale(dfr$ranking)))
 adjPVals = p.adjust(dfr$RAW.PVAL, method='BH', n=length(dfr$RAW.PVAL))
 dfr$ADJ.PVAL = adjPVals
 
+uCond = unique(conditionData)
 
-for (i in 1:length(sampleNames))
+for (i in 1:length(uCond))
 {
-    colnames(dfr)[i+1] = sampleNames[i]
+    colnames(dfr)[i+1] = uCond[i]
 }
 
 print(colnames(dfr))
 
-
 write.table(dfr, file=outfile, quote=FALSE, sep='\t', row.names=FALSE, col.names=colnames(dfr))
+
+
+DE.plot(myresults, q = 0.8, graphic = "MD", log.scale = TRUE)

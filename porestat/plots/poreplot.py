@@ -7,6 +7,7 @@ import matplotlib as mpl
 import re
 
 import pandas
+from matplotlib_venn import venn3
 from mpld3 import plugins
 from mpld3.plugins import PointHTMLTooltip
 from numpy import genfromtxt
@@ -574,6 +575,27 @@ class PorePlot:
 
         pltcfg.makePlot(noTightLayout=True)
 
+
+    @classmethod
+    def plotVennDiagram(cls, datadict, title, pltcfg=PlotConfig()):
+
+        allSets = []
+        allDescr= []
+
+        for x in datadict:
+            allSets.append(datadict[x])
+            allDescr.append(x)
+
+            print("Venn Diag", x, len(datadict[x]))
+
+        pltcfg.startPlot()
+
+        venn3(allSets, allDescr)
+        plt.title(title)
+        plt.axis('off')
+
+        pltcfg.makePlot()
+
     @classmethod
     def plotscatter(cls, xdata, ydata, title, xlabel, ylabel, addInfos=None, pltcfg = PlotConfig()):
 
@@ -596,8 +618,8 @@ class PorePlot:
 
         htmlDescr = []
 
-        for i in range(0, len(xdata)):
-            if addInfos != None:
+        if addInfos != None:
+            for i in range(0, len(xdata)):
                 htmlDescr.append( makeHTML( addInfos[i] ))
 
         pltcfg.startPlot()
