@@ -1,5 +1,7 @@
 from collections import defaultdict, Counter
 
+from matplotlib_venn._venn3 import compute_venn3_subsets
+
 from porestat.utils.Numbers import toNumber, toFloat
 
 from ..analysis.similarity_analysis import SimilarityAnalysis
@@ -143,7 +145,7 @@ class EnrichmentDF(DataFrame):
         return ['NOISeq', 'DESeq', 'msEmpiRe', 'lGFOLD']
 
 
-    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['NOISeq', 'msEmpiRe', 'DESeq'], rscriptPath="/usr/bin/Rscript"):
+    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['NOISeq', 'msEmpiRe', 'DESeq'], rscriptPath="/usr/bin/Rscript", noDErun=False):
 
 
         filePrefix = prefix
@@ -216,7 +218,8 @@ class EnrichmentDF(DataFrame):
 
                     print(execStr)
 
-                    #sysret = os.system(execStr)
+                    if not noDErun:
+                        sysret = os.system(execStr)
                     sysret = 1
 
                     if sysret != 0:
@@ -381,7 +384,7 @@ class EnrichmentDF(DataFrame):
             def parseList(x):
                 ret = [None] * len(x)
                 for i in range(0, len(x)):
-                    if x[i] != 'None':
+                    if x[i] != 'None' and x[i] != 'NA':
                         ret[i] = float(x[i])
 
                 return ret
@@ -447,7 +450,7 @@ class EnrichmentDF(DataFrame):
 
                 method2calls = defaultdict(set)
                 for method in ['NOISeq', 'msEmpiRe', 'DESeq']:
-                    adjpTitle = method + "_RAW.PVAL"
+                    adjpTitle = method + "_ADJ.PVAL"
                     adjPdata = compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(adjpTitle)).to_pairs()
 
                     for geneid, pval in adjPdata:
@@ -456,7 +459,39 @@ class EnrichmentDF(DataFrame):
 
                         if fpval != None and fpval < 0.05:
 
+                            if method == 'msEmpiRe' and not geneid in method2calls["DESeq"] and not geneid in method2calls["NOISeq"]:
+                                print(geneid, pval, fpval)
+
                             method2calls[method].add(geneid)
+
+
+                def compute_venn3_sets(a,b,c):
+
+                    def set_size(x):
+                        return x
+
+                    if not (type(a) == type(b) == type(c)):
+                        raise ValueError("All arguments must be of the same type")
+
+                    return (set_size(a - (b | c)),  # TODO: This is certainly not the most efficient way to compute.
+                            set_size(b - (a | c)),
+                            set_size((a & b) - c),
+                            set_size(c - (a | b)),
+                            set_size((a & c) - b),
+                            set_size((b & c) - a),
+                            set_size(a & b & c))
+
+
+                allsets = []
+                alllabels = []
+
+                for method in sorted([x for x in method2calls]):
+                    allsets.append(method2calls[method])
+                    alllabels.append(method2calls[method])
+
+                allss = compute_venn3_sets(*allsets)
+                print(alllabels)
+                print("c-(b|a)", len(allss[3]))
 
                 PorePlot.plotVennDiagram(method2calls, title="Overlap of DE methods for adj. pval 0.05", pltcfg=pltcfg)
 
@@ -557,7 +592,7 @@ class EnrichmentDF(DataFrame):
 
         for x in datarow.to_list():
 
-            if x == 'None':
+            if x == 'None' or x == 'NA':
                 xn = None
             else:
                 xn = toNumber(x)

@@ -1,8 +1,10 @@
 import random, os, sys
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../")
+
+
 
 from porestat.tools.squiggle import SquigglePlotFactory
 
-sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../")
 
 #import porestat.utils.PickleArgparse as pickArg
 import argparse

@@ -252,14 +252,17 @@ class QualityPosition(ParallelPSTReportableInterface):
 
                 dataVal = []
                 for q in counterData:
-                    dataVal = dataVal + [ord(q)] * int(counterData[q]/scaleFactor)
+
+                    cdQ = counterData[q]
+                    dataVal = dataVal + [ord(q)] * int(cdQ/scaleFactor)
 
                     minQual = ord(q) if (minQual == None) or (minQual > ord(q)) else minQual
                     maxQual = ord(q) if (maxQual == None) or (maxQual < ord(q)) else maxQual
 
                 explodedData.append(sorted(dataVal))
 
-                print(min(dataVal), max(dataVal))
+                if len(dataVal) > 0:
+                    print(min(dataVal), max(dataVal))
             
             allPlotData[runid] = explodedData
             allRunIDs.append(runid)

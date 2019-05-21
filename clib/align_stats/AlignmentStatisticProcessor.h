@@ -35,6 +35,122 @@ public:
     }
 
 
+    virtual void startAllParallel(size_t iChunkSize, void* pData, size_t iMaxReads=-1)
+    {
+        uint32_t iReads = 0;
+        std::vector<bam1_t*>* pReads = new std::vector<bam1_t*>();
+
+        std::vector<PythonReadStats>* pResultStats = (std::vector<PythonReadStats>*) pData;
+
+
+        htsFile* pXAMFile = m_pXAMFile->getFileHandle();
+        bam_hdr_t* pHeader = m_pXAMFile->getHeader();
+
+        std::cout << "Preparing SAM FILE" << std::endl;
+
+        bam1_t* pRes = bam_init1();
+
+
+
+
+        int iActiveTasks = 0;
+
+#pragma omp parallel num_threads(m_iNumThreads) shared(iActiveTasks)
+        {
+
+#pragma omp master
+            {
+
+                int iThreads = omp_get_num_threads();
+
+                std::cout << "Starting up OPENMP with " << omp_get_num_threads() << " threads. Hello from master thread " << omp_get_thread_num() << std::endl;
+
+                std::cerr << "Got a sequence file" << std::endl;
+
+
+                while ( sam_read1(pXAMFile, pHeader, pRes)  >= 0)
+                {
+
+                    bam1_t* pRead = bam_init1();
+                    bam_copy1(pRead, pRes);
+                    pReads->push_back( pRead );
+
+                    if ((iMaxReads != -1) && (iReads > iMaxReads))
+                    {
+                        break;
+                    }
+
+                    if (pReads->size() > iChunkSize)
+                    {
+
+                        iReads += pReads->size();
+#pragma omp critical
+                        {
+                            std::cout << "Processed reads: " << iReads << std::endl;
+                        }
+                        {
+
+                            // wait until a task has finished
+                            while(iActiveTasks > iThreads + 1)
+                            {
+                                //std::cout << "Waiting for task to finish " << omp_get_thread_num() << " because " << iActiveTasks << std::endl;
+                                delay(100);
+                            }
+                        }
+
+
+#pragma omp critical
+                        {
+                            ++iActiveTasks;
+                        }
+
+
+#pragma omp task shared(iActiveTasks)
+                        {
+#pragma omp critical
+                            std::cout << "Currently tasking in task " << omp_get_thread_num() << std::endl;
+                            std::vector<PythonReadStats> oLocalRes;
+                            oLocalRes.reserve(pReads->size());
+
+                            for (size_t i = 0; i < pReads->size(); ++i)
+                            {
+                                this->process(pReads->at(i), 0, &oLocalRes);
+                            }
+
+                            this->deleteReads(pReads);
+
+#pragma omp critical
+                            {
+
+                                pResultStats->insert(pResultStats->end(), oLocalRes.begin(), oLocalRes.end());
+
+                                --iActiveTasks;
+                            }
+
+
+                        }
+
+                        pReads = new std::vector<bam1_t*>();
+
+
+                    }
+
+                }
+
+#pragma omp taskwait
+            }
+        }
+
+
+
+        bam_destroy1(pRes);
+        sam_close(pXAMFile);
+        //pthread_mutex_unlock(&m_oLock);
+
+    }
+
+
+
     int seenReads = 0;
     size_t seenRegions = 0;
     std::vector<char> vCIGARs;
@@ -44,6 +160,8 @@ public:
     FASTAreader* pFASTAReader;
     
 protected:
+
+
 
     uint32_t getAlignQuality(bam1_t* pRead)
     {
@@ -105,12 +223,14 @@ protected:
         //std::cout << "sreadname " << sReadName << std::endl;
         pReadStats->aligned = false;
 
-        if (this->readIsMapped(pRead))
+        if (this->readIsMapped(pRead) && !(this->readIsSecondary(pRead)))
         {
             this->seenReads += 1;
             pReadStats->aligned = true;
 
             std::string sAlignedSeqName = this->getSeqName(pRead->core.tid);
+
+            //std::cout << sReadName << " " << sAlignedSeqName << std::endl;
 
             pReadStats->iAlignQual = this->getAlignQuality(pRead);
 
@@ -119,6 +239,7 @@ protected:
             pReadStats->fSeqQual_median = vSeqQuals[1];
             pReadStats->fSeqQual_max = vSeqQuals[2];
 
+            //std::cout << sReadName << " " << sAlignedSeqName << " Qualitites done" << std::endl;
 
             std::vector<GenomicRegion*> allAlignedRegions = this->getRegions(pRead, &(this->vCIGARs));
 
@@ -153,14 +274,19 @@ protected:
             pReadStats->iRefLength = iRefEnd-iRefStart;
 
             uint32_t iRetRes = allAlignedRegions.size();
+            pReadStats->seqCoverages.reserve(allAlignedRegions.size());
 
             if (iRetRes)
             {
+
+                //std::cout << sReadName << " " << sAlignedSeqName << " iRetRes" << std::endl;
+
                 std::string sReadSeq = this->getReadSequence(pRead);
+                //std::cout << sReadName << " " << sAlignedSeqName << std::endl;
 
                 for (uint32_t i = 0; i < iRetRes; ++i)
                 {
-                    
+                   
                     ReadRegion* pMRegion = (ReadRegion*)allAlignedRegions.at(i);
 
                     pReadStats->cigar2len.add( pMRegion->getCIGAR(), pMRegion->getCIGARLength() );
@@ -182,7 +308,7 @@ protected:
 
                         //std::cout << "coverage seq " << pSeqC << " " << sAlignedSeqName << std::endl;
                         // add coverage
-                        pReadStats->seqCoverages.push_back(SeqCoverage(pSeqC, pMRegion->getStart(), pMRegion->getEnd()));
+                        pReadStats->seqCoverages.push_back(SeqCoverage(pRead->core.tid, pMRegion->getStart(), pMRegion->getEnd()));
 
                         iLongestMatched = std::max(pMRegion->pReadRegion->getLength(), iLongestMatched);
 
@@ -198,7 +324,12 @@ protected:
 
                         for (uint32_t j = 0; j < sReadRegion.size(); ++j)
                         {
-                            if (sReadRegion[j] == sRefRegion[j])
+                            char cRead = sReadRegion[j];
+                            // because some references use atgc aswell to express uncertainty ... :|
+                            char cRef = toupper(sRefRegion[j]);
+
+
+                            if (cRead == cRef)
                             {
                                 ++equals;
                                 ++iMatches;
@@ -212,7 +343,7 @@ protected:
                             } else {
                                 ++iMisMatches;
 
-                                std::pair<char, char> subst(sReadRegion[j], sRefRegion[j]);
+                                std::pair<char, char> subst(cRead, cRef);
                                 pReadStats->ntSubst.add( subst, 1 );
 
                                 if (equals > 0)
@@ -221,7 +352,7 @@ protected:
                                     if (j >= 5)
                                     {
                                         std::string sKmerBeforeMM = sReadRegion.substr(j-5, 5);
-                                        pReadStats->mm2kmer.add(pReadStats->exactMatchCIGAR, sKmerBeforeMM);
+                                        pReadStats->mm2kmer.add(pReadStats->exactMatchCIGAR, sKmerBeforeMM); // TODO left this out
                                     }
 
                                     if (equals >= 21)
@@ -231,6 +362,10 @@ protected:
 
                                         for (size_t k = 0; k < sKmers.size(); ++k)
                                         {
+                                            if (sKmers.at(k).size() != 21)
+                                            {
+                                                std::cerr << sKmers.at(k) << " error length 32" << std::endl;
+                                            }
                                             pReadStats->perfKmers.add(sKmers.at(k), 1);
                                         }
                                     }
@@ -251,7 +386,7 @@ protected:
 
 
                         /*
-#pragma omp critical
+                        //#pragma omp critical
                         {
                             std::cout << "Matches " << iMatches << " Mismatches " << iMisMatches << " Cigar Len"
                                       << pMRegion->getCIGARLength() << std::endl;
@@ -314,14 +449,13 @@ protected:
             }
             */
 
-            #pragma omp critical
-            {
-                std::vector<PythonReadStats>* pReads = (std::vector<PythonReadStats>*) pData;
-                pReads->push_back(pReadStats->toPython());
-
-            };
+            PythonReadStats oStatsObj = pReadStats->toPython();
+            std::vector<PythonReadStats>* pReads = (std::vector<PythonReadStats>*) pData;
+            pReads->push_back(oStatsObj);
 
         }
+
+        delete pReadStats;
     }
 
 
@@ -336,6 +470,8 @@ private:
         {
             return oRet;
         }
+
+        oRet.reserve(sSeq.size()-iK);
 
         for (size_t i = 0; i < sSeq.size()-iK; ++i)
         {

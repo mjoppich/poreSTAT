@@ -30,9 +30,9 @@ class ReadInfoFactory(PSToolInterfaceFactory):
                             required=False)
 
         def fileOpener( filename ):
+            print("Opening", filename)
             open(filename, 'w').close()
             return filename
-
         parser.add_argument('-o', '--output', type=fileOpener, help='output location, default: std out', default=sys.stdout)
 
         parser.set_defaults(func=self._prepObj)
@@ -117,11 +117,15 @@ class ReadInfo(ParallelPSTInterface):
     def prepareEnvironment(self, args):
 
         env = Environment()
-        env.output = args.output
+
+        if args.output in [sys.stdout, sys.stderr]:
+            env.output = args.output
+        else:
+            env.output = args.output
 
         header = "\t".join(self.dObservations) + self.endl
 
-        self.writeLinesToOutput(env.output, [header], mode='w')
+        self.writeLinesToOutput(self.args.output, [header], mode='w')
 
         return env
 
@@ -140,11 +144,11 @@ class ReadInfo(ParallelPSTInterface):
             allLines.append(toWrite)
 
         if not allLines is None and len(allLines) > 0:
-            self.writeLinesToOutput(environment.output, allLines)
+            self.writeLinesToOutput(self.args.output, allLines)
 
         return None
 
 
 
     def makeResults(self, parallelResult, env, args):
-        self.closeOutput(env.output)
+        self.closeOutput(self.args.output)

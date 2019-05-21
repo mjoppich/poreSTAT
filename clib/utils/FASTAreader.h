@@ -56,7 +56,13 @@ public:
 
         if (pIndexFile == NULL)
         {
-            fai_build(pFileName->c_str());
+            int iFAISuccess = fai_build(pFileName->c_str());
+
+            if (iFAISuccess != 0)
+            {
+                std::cerr << "Error building FAI index for: " << *pFileName << std::endl;
+            }
+
             m_pIndexFile = new std::string((*pFileName) + ".fai");
         }
 

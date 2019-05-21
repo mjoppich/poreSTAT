@@ -589,12 +589,14 @@ class PorePlot:
             print("Venn Diag", x, len(datadict[x]))
 
         pltcfg.startPlot()
-
-        venn3(allSets, allDescr)
-        plt.title(title)
         plt.axis('off')
 
-        pltcfg.makePlot()
+        venn3(allSets, allDescr)
+        ax = plt.gca()
+        ax.set_axis_off()
+        plt.title(title)
+
+        pltcfg.makePlot(noTightLayout=True)
 
     @classmethod
     def plotscatter(cls, xdata, ydata, title, xlabel, ylabel, addInfos=None, pltcfg = PlotConfig()):

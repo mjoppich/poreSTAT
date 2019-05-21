@@ -39,6 +39,7 @@ void AlignmentStatistics::processFiles(int n_samples, char** pFilenames)
         std::string sFileName(pFilenames[i]);
         AlignmentStatisticProcessor* pSAMreader = new AlignmentStatisticProcessor(&sFileName, NULL, this->pReader);
         std::vector<std::string>* pSeqNames = pSAMreader->getSeqNames();
+        pSAMreader->set_num_threads(8);
 
         for (size_t si = 0; si < pSeqNames->size(); ++si)
         {
@@ -46,7 +47,7 @@ void AlignmentStatistics::processFiles(int n_samples, char** pFilenames)
         }
 
         this->readStats->clear();
-        pSAMreader->startAllParallel(100, this->readStats);
+        pSAMreader->startAllParallel(1000, this->readStats);
 
 
         std::cout << "proc reads" << this->readStats->size() << " " << pSAMreader->seenReads << std::endl;
@@ -62,6 +63,6 @@ void AlignmentStatistics::processFiles(int n_samples, char** pFilenames)
     }
 
     std::cout << "Processing finished" << std::endl;
-    std::cout << std::string(this->readStats->at(0).COVERAGES[0].seq) << std::endl;
+    std::cout << this->readStats->at(0).COVERAGES[0].seqid << std::endl;
 
 }

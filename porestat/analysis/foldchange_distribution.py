@@ -115,7 +115,7 @@ class FoldChangeAnalysis(ParallelPSTInterface):
     def makeResults(self, parallelResult, oEnvironment, args):
 
 
-        if not args.counts == None and not args.noanalysis:
+        if not args.counts == None:
 
 
             """
@@ -156,7 +156,7 @@ class FoldChangeAnalysis(ParallelPSTInterface):
 
                 print("Running for conditions: " + str(vConds))
 
-                createdComparisons[valueSource] += self.condData.runDEanalysis( args.output, prefix = valueSource, rscriptPath=args.rscript.name, methods=args.methods, replicates=replicates)
+                createdComparisons[valueSource] += self.condData.runDEanalysis( args.output, prefix = valueSource, rscriptPath=args.rscript.name, methods=args.methods, replicates=replicates, noDErun=args.noanalysis)
 
             self.prepareHTMLOut(createdComparisons, replicates, args)
 

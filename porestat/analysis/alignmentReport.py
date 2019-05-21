@@ -187,7 +187,7 @@ class ReportAnalysis(ParallelAlignmentPSTReportableInterface):
         for report in self.dReporters:
             print("Running report: " + str(report))
 
-            reporterArgs = self.prepareEnvironment(args)
+            reporterArgs, localEnv = self.prepareEnvironment(args)
             reporterArgs.output = None
             reporterArgs.output_type = None
             reporterArgs.pltcfg = args.pltcfg

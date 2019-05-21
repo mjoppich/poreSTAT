@@ -55,7 +55,9 @@ class ParallelPSTInterface(PSToolInterface):
             file.close()
 
         else:
-            outFile.writelines(lines)
+            for line in lines:
+                outFile.write(line)
+
             outFile.flush()
 
     def closeOutput(self, outFile):

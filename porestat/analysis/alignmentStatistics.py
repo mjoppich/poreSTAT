@@ -1,3 +1,5 @@
+import pysam
+
 import HTSeq
 import argparse
 
@@ -40,15 +42,15 @@ class COUNTER_PAIR(ctypes.Structure):
 
 class SeqCoverage:
 
-    def __init__(self, seq, start, end):
+    def __init__(self, seqid, start, end):
 
-        self.seq = seq.decode()
+        self.seqid = seqid
         self.start = start
         self.end = end
 
 class SEQ_COVERAGE(ctypes.Structure):
     _fields_ = [
-        ("seq", ctypes.c_char_p),
+        ("seqid", ctypes.c_uint32),
         ("start", ctypes.c_uint32),
         ("end", ctypes.c_uint32)
     ]
@@ -153,6 +155,14 @@ class CAlignmentStatistics(object):
 
     def processFiles(self, vals):
 
+        sam2header = {}
+
+        for x in vals:
+            reader = pysam.Samfile(x.name, "rb", check_sq=False)
+            samHeader = reader.header
+            sam2header[x.name] = samHeader
+
+
         vals = [x.name.encode('utf-8') for x in vals]
         c_array = (ctypes.c_char_p * len(vals))(*vals)
 
@@ -167,6 +177,8 @@ class CAlignmentStatistics(object):
         s = ctypes.cast(retVec, ctypes.POINTER(READ_ALIGNMENT * retVecSize))
 
         allElems = [x for x in s.contents]
+
+        print("Processing C Results")
 
         readResults = {}
 
@@ -238,7 +250,7 @@ class CAlignmentStatistics(object):
             coverageIntervals = []
 
             for cov in covIntervals:
-                coverageIntervals.append(SeqCoverage(cov.seq, cov.start, cov.end))
+                coverageIntervals.append(SeqCoverage(cov.seqid, cov.start, cov.end))
 
             # TODO add this to global array
 
@@ -279,7 +291,7 @@ class CAlignmentStatistics(object):
 
 
 
-        return readResults
+        return readResults, sam2header
 
 
 
@@ -344,6 +356,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
         self.readInfoIdx = {}
 
         self.genomicArray = HTSeq.GenomicArray( [], stranded=False )
+        self.sam2header = {}
 
         self.args.pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
 
@@ -407,12 +420,16 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
     def getReadInfo(self, readName):
 
-        readInfo = self.args.readInfo.findRow('SAM_READ_NAME', readName)
-        if readInfo != None:
-            readType = Fast5TYPE[ readInfo[ "TYPE" ] ]
-            readID = readInfo[ "READ_ID" ]
+        if self.hasArgument('read_type', self.args) and self.args.read_type:
 
-        return readType,readID
+            readInfo = self.args.readInfo.findRow('SAM_READ_NAME', readName)
+            if readInfo != None:
+                readType = Fast5TYPE[ readInfo[ "TYPE" ] ]
+                readID = readInfo[ "READ_ID" ]
+
+            return readType,readID
+
+        return "Unknown", readName
 
 
     def addCoverage(self, chrom, start, end):
@@ -438,18 +455,29 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
         alignResults = {}
 
+        self.sam2header = {}
+
         for samFile in data:
-            readStats = statMaker.processFiles([samFile])
+            print("Processing samFile", samFile)
+            readStats, sam2header = statMaker.processFiles([samFile])
+            for x in sam2header:
+                self.sam2header[x] = sam2header[x]
+            print("Received data", len(readStats))
 
             for readID in readStats:
                 readStats[readID].read_type, _ = self.getReadInfo(readID)
 
+
+            print("Finished Processing", samFile)
             alignResults[samFile] = readStats
 
 
         return alignResults
 
 
+    def getSeqNameFromId(self, samFileName, seqid):
+
+        return self.sam2header[samFileName].get_reference_name(seqid)
 
 
     @classmethod
@@ -563,12 +591,13 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
                     for cov in elem.coverages:
 
+                        covChr = self.getSeqNameFromId(fileName.name, cov.seqid)
 
-                        if not cov.seq in readCoverage.chrom_vectors:
-                            readCoverage.add_chrom(cov.seq)
+                        if not covChr in readCoverage.chrom_vectors:
+                            readCoverage.add_chrom(covChr)
 
                         #print(cov.seq, cov.start, cov.end)
-                        readCoverage[HTSeq.GenomicInterval(cov.seq, cov.start, cov.end+1, ".")] += 1
+                        readCoverage[HTSeq.GenomicInterval(covChr, cov.start, cov.end+1, ".")] += 1
 
 
                 else:
@@ -715,6 +744,8 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     featureCovered = 0
                     readsCovered = 0
 
+                    missingChromsInReadCoverage = set()
+
 
                     fga = allFeatureArrays[type]
 
@@ -728,6 +759,9 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                             featureCovered += partCovered
 
                             #for this part fetch steps in read coverage
+                            if not featurePart[0].chrom in readCoverage.chrom_vectors:
+                                missingChromsInReadCoverage.add(featurePart[0].chrom)
+                                continue
 
                             for readPart in readCoverage[featurePart[0]].steps():
 
@@ -736,6 +770,8 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
                                 if readCount > 0:
                                     readsCovered += readCovered
+
+                    print("Missing Chromosomes in ReadCoverage:",  missingChromsInReadCoverage)
 
                     featureDF.addRow(DataRow.fromDict({
                         'Name': 'Featuretype Coverage ({})'.format(type),
@@ -847,7 +883,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
 
 
-            if not self.hasArgument('read_type', args) or not args.read_type:
+            if self.hasArgument('read_type', args) and args.read_type:
 
                 obsInfo = {
                     'RUNID': fileName.name + "_perfect",

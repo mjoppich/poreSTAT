@@ -76,8 +76,8 @@ dfr = setDT(der, keep.rownames = TRUE)[]
 
 #> colnames(der)
 #[1] "rn"
-#[2] "X170329_2d_sequencing_run_1.1_p12_pooled_mean"
-#[3] "X170330_2d_sequencing_run_chip1_run2_khg.h70_pooled_mean"
+#[2] "s1_pooled_mean"
+#[3] "s2_pooled_mean"
 #[4] "M"
 #[5] "D"
 #[6] "prob"
@@ -104,6 +104,5 @@ for (i in 1:length(uCond))
 print(colnames(dfr))
 
 write.table(dfr, file=outfile, quote=FALSE, sep='\t', row.names=FALSE, col.names=colnames(dfr))
-
 
 DE.plot(myresults, q = 0.8, graphic = "MD", log.scale = TRUE)

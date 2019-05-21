@@ -8,7 +8,7 @@ __author__ = 'joppich'
 
 from .Files import readLines, fileExists
 from .Numbers import toNumber, isNumber
-
+import random
 import argparse
 
 import operator
@@ -57,6 +57,7 @@ class ExportTYPE(Enum):
     XLSX=2
     HTML=3
     HTML_STRING=4
+    LATEX=5
 
 
 class DataSeries:
@@ -225,14 +226,17 @@ class DefaultDataColumnAccess(DefaultColumns, DataColumnAccess):
         return newColIdx
 
 
-    def addColumns(self, names, default=None):
+    def addColumns(self, names, ignoreDuplicates=False, default=None):
+
+
+        if not ignoreDuplicates:
+            for x in names:
+                if self.columnExists(x):
+                    raise DataFrameException("Column already exists: " + x)
 
         for x in names:
-            if self.columnExists(x):
-                raise DataFrameException("Column already exists: " + x)
-
-        for x in names:
-            self.addColumn(x, default)
+            if not self.columnExists(x):
+                self.addColumn(x, default)
 
 
 class DataRow(DefaultDataColumnAccess, DataSeries):
@@ -489,11 +493,122 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         if len(setDifference) > 0:
             raise DataFrameException( 'Row does not contain all needed headers: ' + str(selfheaders))
 
+
+        rowDict = row.to_dict()
+
         newrow = [None] * len(self.column2idx)
         for x in self.column2idx:
-            newrow[ self.column2idx[x] ] = row[x]
+
+            if x in rowDict:
+                newrow[ self.column2idx[x] ] = rowDict[x]
+            else:
+                newrow[ self.column2idx[x]] = self.idx2default[self.column2idx[x]]
 
         self.data.append(tuple(newrow))
+
+
+    def updateRowIndexed(self, idColumn, drows, ignoreMissingCols=False, addIfNotFound=False):
+
+        # create index
+        idColIdx = self.column2idx[idColumn]
+
+        colIndex2Rows = defaultdict(set)
+
+        for i in range(0, len(self.data)):
+            rowT = self.data[i]
+            colIndex2Rows[rowT[idColIdx]].add(i)
+
+        addedRows = 0
+        updatedRows=0
+
+        addedRowGenes = []
+
+        for drow in drows:
+
+            drowDict = drow
+
+            if type(drow) == DataRow:
+                drowDict = drow.to_dict()
+
+            findElement = drowDict[idColumn]
+
+            if findElement in colIndex2Rows:
+
+                rowIdxs = colIndex2Rows[findElement]
+
+
+                for rowIdx in rowIdxs:
+                    rowT = self.data[rowIdx]
+
+                    rowL = list(rowT)
+
+                    for col in drowDict:
+                        colidx = self.getColumnIndex(col)
+                        rowL[colidx] = drowDict[col]
+
+                    rowL = tuple(rowL)
+                    self.data[rowIdx] = rowL
+
+                updatedRows += 1
+
+
+            else:
+                if addIfNotFound:
+                    addedRowGenes.append(drowDict[idColumn])
+                    addedRows += 1
+
+                    if ignoreMissingCols:
+                        rowheaders = set([x for x in drow.column2idx])
+                        selfheaders = set([x for x in self.column2idx])
+                        setDifference = rowheaders.difference(selfheaders)
+
+                        for col in setDifference:
+                            drow.addColumn(col, self.get_default(self.getColumnIndex(col)))
+
+                        self.addRow(drow)
+
+                    else:
+                        self.addRow(drow)
+
+        #print("Updated Rows", updatedRows)
+        #print("Added Rows", addedRows)
+        #print("Index Elems", random.sample([x for x in colIndex2Rows], min(len(colIndex2Rows), 10)))
+        #print("Index Elems Added", random.sample(addedRowGenes, min(len(addedRowGenes), 10)))
+
+    def updateRow(self, findID, idColumn, drow, addIfNotFound=False):
+
+        idColIdx = self.column2idx[idColumn]
+
+        drowDict = drow
+
+        if type(drow) == DataRow:
+            drowDict = drow.to_dict()
+
+        found = False
+
+        #print("length data", len(self.data))
+
+        for i in range(0, len(self.data)):
+
+            rowT = self.data[i]
+
+            if rowT[idColIdx] == findID:
+
+                rowL = list(rowT)
+
+                for col in drowDict:
+                    colidx = self.getColumnIndex(col)
+
+                    rowL[colidx] = drowDict[col]
+
+                self.data[i] = tuple(rowL)
+                found=True
+
+
+        if not found and addIfNotFound:
+            self.addRow(drow)
+
+
 
     def getRow(self, oColumn, oValue, oDefaultValue = None):
 
@@ -593,6 +708,32 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         # Save the file
         wb.save( outFile )
 
+    def _makeLatex(self):
+
+        columns = self.getHeader()
+
+        latexTableRows = []
+
+        latexTableRows.append("\\begin{tabular}{" + "l"*len(columns) + "}")
+        latexTableRows.append(" & ".join(columns) + "\\\\")
+        latexTableRows.append("\\midrule")
+
+        for row in self:
+
+            rowVals = [str(row[self.getColumnIndex(x)]) for x in columns]
+
+            latexTableRows.append(" & ".join(rowVals) + "\\\\ \hline")
+
+
+        latexTableRows.append("\\bottomrule")
+        latexTableRows.append("\\end{tabular}")
+        latexTableRows.append("")
+        latexTableRows.append("")
+        latexTableRows.append("")
+
+        return "\n".join(latexTableRows)
+
+
     def _makeHTMLString(self, html_element_id=None):
 
         headpart = """
@@ -648,16 +789,71 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
                                                         ]
                                                     } );
 
-                    // Apply the search
-                    table.columns().every( function () {
+                    table.columns().every( function (i) {
                         var that = this;
 
+                        
                         $( 'input', this.footer() ).on( 'keyup change', function () {
-                            if ( that.search() !== this.value ) {
-                                that
-                                    .search( this.value )
+
+                            var searchStr = this.value;
+
+                            if ((searchStr.length >= 1) && ((searchStr[0] == '<') || (searchStr[0] == '>')))
+                            {
+                                if (searchStr.length > 1)
+                                {
+                                    var searchNum = searchStr.substring(1,searchStr.length);
+                                    searchNum = +searchNum
+        
+                                    if (searchStr[0] == '<')
+                                    {
+                                    
+        
+                                        $.fn.dataTable.ext.search.push(
+                                            function( settings, data, dataIndex ) {
+    
+                                                var rownum = +data[i];
+                                        
+                                                if (rownum < searchNum)
+                                                {
+                                                    return true;
+                                                }
+                                                
+                                                return false;
+                                            }
+                                        );
+                                    }
+                                    else {
+                                        $.fn.dataTable.ext.search.push(
+                                            function( settings, data, dataIndex ) {
+    
+                                                var rownum = +data[i];
+                                        
+                                                if (rownum > searchNum)
+                                                {
+                                                    return true;
+                                                }
+                                                
+                                                return false;
+                                            }
+                                        );
+                                    }
+
+                                    table.draw();
+                                    
+                                    $.fn.dataTable.ext.search.pop()
+                                }
+
+
+
+
+                            } else {
+                                if ( that.search() !== this.value ) {
+                                that.search( this.value )
                                     .draw();
+                                }
                             }
+
+                            
                         } );
                     } );
 
@@ -725,6 +921,10 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
             outputText = self._makeStr('\t')
         elif exType == ExportTYPE.CSV:
             outputText = self._makeStr(';')
+
+        elif exType == ExportTYPE.LATEX:
+            outputText = self._makeLatex()
+
         elif exType == None:
             outputText = self._makeStr('\t')
 

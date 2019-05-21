@@ -172,14 +172,14 @@ struct CounterPair
 
 struct SeqCoverage
 {
-    SeqCoverage(const char* pseq, uint32_t istart, uint32_t iend)
+    SeqCoverage(uint32_t seqid, uint32_t istart, uint32_t iend)
     {
-        seq = pseq;
-        start = istart;
-        end = iend;
+        this->seqid = seqid;
+        this->start = istart;
+        this->end = iend;
     }
 
-    const char* seq;
+    uint32_t seqid;
     uint32_t start;
     uint32_t end;
 };
@@ -281,7 +281,12 @@ public:
         size_t idx = 0;
         for (; oPCit != this->perfKmers.end(); ++oPCit)
         {
-            oRet.PERF_KMERS[idx++] = CounterPair( oPCit->first.c_str(), oPCit->second );
+            char* pKmer = (char*) malloc(sizeof(char) * (oPCit->first.size()+1) );
+            strncpy(pKmer, oPCit->first.c_str(), oPCit->first.size());
+            pKmer[oPCit->first.size()] = '\0';
+
+            oRet.PERF_KMERS[idx].key = pKmer;
+            oRet.PERF_KMERS[idx++].value = oPCit->second;
         }
 
 
@@ -301,6 +306,7 @@ public:
             oRet.CIGAR_VEC_LENGTHS[iArrIdx] = (uint32_t) oCLit->second.size();
             oRet.CIGAR_LENGTHS[iArrIdx] = (uint32_t*) malloc(sizeof(uint32_t)*oCLit->second.size());
 
+
             /*
             if (this->sReadID == "ce27fd97-4547-4096-8d11-29b090889111_Basecall_1D_template")
             {
@@ -316,6 +322,7 @@ public:
                 }
             }
             */
+
 
             for (size_t i = 0; i < oCLit->second.size(); ++i)
             {

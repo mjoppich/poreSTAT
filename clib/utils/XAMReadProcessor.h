@@ -251,6 +251,11 @@ public:
 
     }
 
+    void set_num_threads(uint8_t iThreads)
+    {
+        this->m_iNumThreads = iThreads+1;
+    }
+
     virtual void startAll()
     {
 
@@ -343,8 +348,11 @@ public:
     {
         uint8_t* pQuality = bam_get_qual(pRead);
 
+        //std::cout << "IQual Seq Length" << pRead->core.l_qseq << std::endl;
+        
         std::vector<uint8_t> vReturn;
         vReturn.resize( pRead->core.l_qseq );
+        
 
         for (uint32_t i = 0; i < vReturn.size(); ++i)
         {
@@ -418,15 +426,17 @@ public:
 
         int iActiveTasks = 0;
 
-#pragma omp parallel
+#pragma omp parallel num_threads(m_iNumThreads) shared(iActiveTasks)
         {
 
-            int iThreads = omp_get_max_threads();
-
-            std::cout << "Starting up OPENMP with " << iThreads << " threads. " << omp_get_thread_num() << std::endl;
-
-#pragma omp single nowait
+#pragma omp master
             {
+
+                int iThreads = omp_get_num_threads();
+
+                std::cout << "Starting up OPENMP with " << omp_get_num_threads() << " threads. Hello from master thread " << omp_get_thread_num() << std::endl;
+
+                std::cerr << "Got a sequence file" << std::endl;
 
 
                 while ( sam_read1(pXAMFile, pHeader, pRes)  >= 0)
@@ -445,19 +455,26 @@ public:
                     {
 
                         iReads += pReads->size();
-
+#pragma omp critical
+                        {
+                            std::cout << "Processed reads: " << iReads << std::endl;
+                        }
                         {
 
                             // wait until a task has finished
                             while(iActiveTasks > iThreads + 1)
                             {
-                                delay(1000);
+                                //std::cout << "Waiting for task to finish " << omp_get_thread_num() << " because " << iActiveTasks << std::endl;
+                                delay(100);
                             }
                         }
 
 
-#pragma omp atomic
-                        ++iActiveTasks;
+#pragma omp critical
+                        {
+                            ++iActiveTasks;
+                        }
+
 
 #pragma omp task shared(iActiveTasks)
                         {
@@ -471,8 +488,11 @@ public:
 
                             this->deleteReads(pReads);
 
-#pragma omp atomic
-                            --iActiveTasks;
+#pragma omp critical
+                            {
+                                --iActiveTasks;
+                            }
+
 
                         }
 
@@ -611,6 +631,9 @@ public:
         sam_close(pXAMFile);
         hts_idx_destroy(pXAMIdx);
         //pthread_mutex_unlock(&m_oLock);
+
+        std::cout << "Start Parallel Terminated" << std::endl;
+
 
 
         return pReturn;
@@ -881,7 +904,7 @@ public:
             */
 
            uint32_t iQueryStart = iQueryPosition;
-           uint32_t iRefStart = iRefPosition;
+           //uint32_t iRefStart = iRefPosition;
 
             if (iCIGARop == 0) // MATCH M
             {
@@ -1137,6 +1160,8 @@ protected:
 
     hts_idx_t* m_pXAMIdx;
     bool m_bTurnReadDirection = true;
+
+    uint8_t m_iNumThreads = 2;
 
 };
 
