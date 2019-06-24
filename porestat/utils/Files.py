@@ -85,7 +85,7 @@ def fileExists(sFileName):
     return os.path.exists(sFileName)
 
 
-def readLines(sFileName, vLines = None, encoding = "utf-8", iSkipLines = 0):
+def readLines(sFileName, vLines = None, encoding = "utf-8", iSkipLines = 0, skipChar=None):
 
     vReturn = []
 
@@ -97,6 +97,10 @@ def readLines(sFileName, vLines = None, encoding = "utf-8", iSkipLines = 0):
     iLineCount = 0
 
     for sLine in oFile:
+
+        if skipChar != None:
+            if sLine.startswith(skipChar):
+                continue
 
         if iSkipLines > 0:
             iSkipLines -= 1

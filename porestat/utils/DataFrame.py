@@ -991,7 +991,7 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         return tuple(vLine)
 
     @classmethod
-    def parseFromFile(cls, sFileName, oHeader=None, cDelim='\t', bConvertTextToNumber=True, encoding="utf-8"):
+    def parseFromFile(cls, sFileName, oHeader=None, skipLines=0, cDelim='\t', bConvertTextToNumber=True, encoding="utf-8", skipChar=None):
 
 
         if type(sFileName) == str:
@@ -1006,7 +1006,7 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
 
         oNewDataFrame = DataFrame()
 
-        vLines = readLines(sFileName=sFileName, encoding=encoding)
+        vLines = readLines(sFileName=sFileName, encoding=encoding, iSkipLines=skipLines, skipChar=skipChar)
 
         iStartLine = 0
 

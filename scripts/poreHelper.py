@@ -9,6 +9,8 @@ from porestat.tools.PTToolInterface import PSToolException
 from porestat.utils import eprint
 from porestat.helper.filter_length import FilterLengthFactory
 from porestat.helper.extract_entries_fasta import FAFQRecordExtractFactory
+from porestat.helper.sequence_merge import FARecordSequenceMergeFactory
+from porestat.helper.revcompl import FaRevComplFactory
 
 from porestat.assemblies.GenomeSimilarity import GenomeSimilarityPlotFactory
 
@@ -33,7 +35,9 @@ if __name__ == '__main__':
     allTools = [
         FilterLengthFactory(parser, subparsers, 'filter_length'),
         FAFQRecordExtractFactory(parser, subparsers, 'seq_extract'),
-        GenomeSimilarityPlotFactory(parser, subparsers, 'simplot')
+        GenomeSimilarityPlotFactory(parser, subparsers, 'simplot'),
+        FARecordSequenceMergeFactory(parser, subparsers, 'seq_merge'),
+        FaRevComplFactory(parser, subparsers, 'rev_compl')
     ]
 
     for tool in allTools:

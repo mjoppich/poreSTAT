@@ -229,14 +229,11 @@ class PorePlot:
     @classmethod
     def getColor(cls, colormap="Viridis", value=0.5):
         cmap = cls.getColorMap(colormap=colormap)
-
         return cmap(value)
 
     @classmethod
     def getColorLin(cls, min, max, val, colormap="viridis"):
-
         value = val / (max-min)
-
         return cls.getColor(colormap=colormap, value=value)
 
     @classmethod
