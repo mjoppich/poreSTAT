@@ -62,6 +62,10 @@ def isNumber(sText):
     :param sText: a text string
     :return: returns TRUE if sText is a number
     """
+
+    if sText == None:
+        return False
+
     if len(sText) == 0:
         return False
 

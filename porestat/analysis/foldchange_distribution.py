@@ -85,7 +85,7 @@ class FoldChangeAnalysis(ParallelPSTInterface):
                     groupName = countFile.name
                     counts[groupName] = []
 
-                df = DataFrame.parseFromFile(countFile.name, ['gene', 'coverage', 'coverage_rank', 'read_counts', 'read_counts_rank'])
+                df = DataFrame.parseFromFile(countFile.name, ['gene', 'coverage', 'coverage_rank', 'read_counts', 'read_counts_rank', 'read_counts_sec', 'read_counts_sec_rank'])
 
                 df.setFilepath(os.path.abspath(countFile.name))
                 counts[groupName].append( df )

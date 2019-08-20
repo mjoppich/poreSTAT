@@ -29,8 +29,12 @@ class GenomeSimilarityPlotFactory(PSToolInterfaceFactory):
 
     def _addParser(self, subparsers, which):
         parser = subparsers.add_parser(which, help=which+' help')
-        parser.add_argument('-fq', '--fastq', type=argparse.FileType('r'), help='number of reads to extract', required=False, default=None)
-        parser.add_argument('-fq2', '--fastq2', type=argparse.FileType('r'), help='number of reads to extract',
+        parser.add_argument('-fqa', '--fastqA', type=argparse.FileType('r'), help='number of reads to extract', required=False, default=None)
+        parser.add_argument('-fqb', '--fastqB', type=argparse.FileType('r'), help='number of reads to extract',
+                            required=False, default=None)
+
+        parser.add_argument('-fqa2', '--fastqA2', type=argparse.FileType('r'), help='number of reads to extract', required=False, default=None)
+        parser.add_argument('-fqb2', '--fastqB2', type=argparse.FileType('r'), help='number of reads to extract',
                             required=False, default=None)
 
         parser.add_argument('-ba', '--bamA', type=argparse.FileType('rb'), help='name of file with sequences (reference)',
@@ -42,7 +46,6 @@ class GenomeSimilarityPlotFactory(PSToolInterfaceFactory):
         parser.add_argument('-b', '--seqB', type=argparse.FileType('r'), help='name of file with sequences (query)', required=True)
         parser.add_argument('-o', '--output', type=argparse.FileType('w'), help='output image', required=True)
         parser.add_argument('-t', '--tmp', type=str, help='path to tmp folder', default=tempfile.gettempdir())
-        parser.add_argument('-ill', '--short', action="store_true", default=False, help="short illumina reads")
 
         parser.set_defaults(func=self._prepObj)
 
@@ -52,11 +55,11 @@ class GenomeSimilarityPlotFactory(PSToolInterfaceFactory):
 
         parser= argparse.ArgumentParser()
 
-        if args.fastq2 != None and not args.fastq != None:
-            parser.error("--fastq2 given, but not --fastq")
+        if args.fastqA == None and args.bamA == None:
+            parser.error("neither fastqA nor bamA given")
 
-        if args.fastq != None and (args.bamA != None or args.bamB != None):
-            parser.error('if --fastq given, you may not give --bamA or --bamB')
+        if args.fastqB == None and args.bamB == None:
+            parser.error("neither fastqB nor bamB given")
 
         simArgs = self._makeArguments(args)
 
@@ -383,15 +386,15 @@ class GenomeSimilarityPlotter(PSToolInterface):
                 return 1
         return 0
 
-    def prepareCoverage(self, seqFile):
+    def prepareCoverage(self, seqFile, fastq1, fastq2):
 
         preset = None#"map-ont"
 
-        if self.args.short or self.args.fastq2 != None:
+        if fastq1 != None and fastq2 != None:
             preset = "sr"
-            print("Short Reads Mode")
-            print(self.args.fastq.name)
-            print(self.args.fastq2.name)
+            print("Short Reads/Paired Mode")
+            print(fastq1.name)
+            print(fastq2.name)
 
         a = mp.Aligner(seqFile.name, n_threads=2, preset=preset, )  # load or build index
         if not a:
@@ -416,12 +419,12 @@ class GenomeSimilarityPlotter(PSToolInterface):
         print("Alignment process 1")
         aligned = 0
 
-        reads1 = mp.fastx_read(self.args.fastq.name)
+        reads1 = mp.fastx_read(fastq1.name)
         reads2 = [None]
         hasReads2 = False
 
-        if self.args.fastq2 != None:
-            reads2 = mp.fastx_read(self.args.fastq2.name)
+        if fastq2 != None:
+            reads2 = mp.fastx_read(fastq2.name)
             hasReads2 = True
 
         readNamesStage2 = set()
@@ -486,11 +489,11 @@ class GenomeSimilarityPlotter(PSToolInterface):
         print("Alignment process 2")
         aligned = 0
 
-        reads1 = mp.fastx_read(self.args.fastq.name)
+        reads1 = mp.fastx_read(fastq1.name)
         reads2 = [None]
 
-        if self.args.fastq2 != None:
-            reads2 = mp.fastx_read(self.args.fastq2.name)
+        if fastq2 != None:
+            reads2 = mp.fastx_read(fastq2.name)
 
         zeroPos2Cov = 0
         for read1, read2 in itertools.zip_longest(reads1, reads2):
@@ -627,7 +630,7 @@ class GenomeSimilarityPlotter(PSToolInterface):
 
                 for hsp in alignment.hsps:
 
-                    if hsp.align_length < 1000:
+                    if hsp.align_length < 500:
                         continue
 
                     if hsp.expect > 0.05:
@@ -722,22 +725,32 @@ class GenomeSimilarityPlotter(PSToolInterface):
         print([x for x in bSeqs])
 
 
-        if self.args.fastq:
-            covDataPrimA, covDataSecA, covDataMergedA, covDataClippedA, alignedA = self.prepareCoverage(self.args.seqA)
-            if self.args.seqA.name == self.args.seqB.name:
+        # process part A
+
+        if self.args.fastqA:
+            covDataPrimA, covDataSecA, covDataMergedA, covDataClippedA, alignedA = self.prepareCoverage(self.args.seqA, self.args.fastqA, self.args.fastqA2)
+
+        else: #bamA
+            covDataPrimA, covDataSecA, covDataMergedA, covDataClippedA, alignedA = self.prepareCoverageFromBam(self.args.bamA)
+
+
+        # process part B
+        if self.args.fastqB:
+
+            if self.args.fastqB.name == self.args.fastqA and self.args.seqA.name == self.args.seqB.name:
+                print("--seqA == --seqA, copying over results")
+                covDataPrimB, covDataSecB, covDataMergedB, covDataClippedB, alignedB = covDataPrimA, covDataSecA, covDataMergedA, covDataClippedA, alignedA
+
+            else:
+                covDataPrimB, covDataSecB, covDataMergedB, covDataClippedB, alignedB = self.prepareCoverage(self.args.seqB, self.args.fastqB, self.args.fastqB2)
+
+        else:
+            if self.args.bamB.name == self.args.bamA and self.args.seqA.name == self.args.seqB.name:
                 print("--seqA == --seqA, copying over results")
                 covDataPrimB, covDataSecB, covDataMergedB, covDataClippedB, alignedB = covDataPrimA, covDataSecA, covDataMergedA, covDataClippedA, alignedA
             else:
-                covDataPrimB, covDataSecB, covDataMergedB, covDataClippedB, alignedB = self.prepareCoverage(self.args.seqB)
-
-        else:
-            covDataPrimA, covDataSecA, covDataMergedA, covDataClippedA, alignedA = self.prepareCoverageFromBam(self.args.bamA)
-
-            if self.args.bamA.name == self.args.bamB.name:
-                print("--bamA == --bamB, copying over results")
-                covDataPrimB, covDataSecB, covDataMergedB, covDataClippedB, alignedB = covDataPrimA, covDataSecA, covDataMergedA, covDataClippedA, alignedA
-            else:
                 covDataPrimB, covDataSecB, covDataMergedB, covDataClippedB, alignedB = self.prepareCoverageFromBam(self.args.bamB)
+
 
         alignments = self.prepareDotPlot()
 

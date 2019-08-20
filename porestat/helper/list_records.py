@@ -4,27 +4,26 @@ import sys
 
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-
 from porestat.hdf5tool import FASTQ
 from porestat.tools.PTToolInterface import PSToolInterfaceFactory, PSToolInterface
 from Bio import SeqIO
 from collections import OrderedDict
+import re
 
-class FaSeqExtractFactory(PSToolInterfaceFactory):
+from porestat.utils.Files import printToFile
+
+
+class FaListRecordsFactory(PSToolInterfaceFactory):
 
     def __init__(self, parser, subparsers, which):
 
-        super(FaSeqExtractFactory, self).__init__(parser, self._addParser(subparsers, which), which)
+        super(FaListRecordsFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
 
 
     def _addParser(self, subparsers, which):
         parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-f', '--fasta', nargs='+', type=argparse.FileType('r'), help='minion read folder', required=True)
-
-        parser.add_argument('-start', '--start', type=int, help="source start")
-        parser.add_argument('-end', '--end', type=int, help="source end")
-
 
         def fileOpener( filename ):
             print("Opening", filename)
@@ -40,7 +39,7 @@ class FaSeqExtractFactory(PSToolInterfaceFactory):
 
         simArgs = self._makeArguments(args)
 
-        return FaSeqExtract(simArgs)
+        return FaListRecords(simArgs)
 
 import os
 
@@ -48,11 +47,11 @@ class Environment(object):
     pass
 
 
-class FaSeqExtract(PSToolInterface):
+class FaListRecords(PSToolInterface):
 
     def __init__(self, args):
 
-        super(FaSeqExtract, self).__init__(args)
+        super(FaListRecords, self).__init__(args)
 
     def acceptFASTQ(self, fastq):
 
@@ -78,21 +77,11 @@ class FaSeqExtract(PSToolInterface):
         if not self.args.output in [sys.stdout, sys.stderr]:
             self.args.output = open(self.args.output, "w")
 
-        revRecords = []
 
         for infile in self.args.fasta:
 
             for record in SeqIO.parse(infile, ftype):
 
-                nrec = record.upper()
-                nrec.seq = record.seq[self.args.start:self.args.end]
-
-                revRecords.append(nrec)
-
-
-
-        SeqIO.write(revRecords, self.args.output, ftype)
-
-
+                print(infile.name, record.id, len(record.seq), sep="\t", file= self.args.output)
 
         return True

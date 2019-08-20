@@ -31,7 +31,10 @@ def printToFile(vVector, sFileName, cInElementSep = None, cElementSep = '\n'):
     :return:
     """
 
-    oScoringFile = open(sFileName, 'w')
+    if type(sFileName) == str:
+        oScoringFile = open(sFileName, 'w')
+    else:
+        oScoringFile = sFileName
 
     iLines = 0
     for elem in vVector:

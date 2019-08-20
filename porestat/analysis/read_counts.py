@@ -111,6 +111,9 @@ class ReadCountAnalysis(ParallelPSTInterface):
         foundReadsNotAligned = set()
 
         readCounts = Counter()
+        readCountsPrimary = Counter()
+        alignmentCount = 0
+        alignmentsPerRead = Counter()
 
         for file in data:
             alignment_file = HTSeq.SAM_Reader( file )
@@ -124,6 +127,11 @@ class ReadCountAnalysis(ParallelPSTInterface):
 
 
                 if alngt.aligned:
+
+                    alignmentCount += 1
+
+                    alignmentsPerRead[alngt.read.name] += 1
+
                     foundReadsAligned.add( alngt.read.name )
                     cigars = alngt.cigar
                     for cigar in cigars:
@@ -137,6 +145,10 @@ class ReadCountAnalysis(ParallelPSTInterface):
                     if len(gene_ids) == 1:
                         gene_id = list(gene_ids)[0]
                         readCounts[gene_id] += 1
+
+                        if alngt.not_primary_alignment == False:
+                            readCountsPrimary[gene_id] += 1
+
                     elif len(gene_ids) == 0:
                         pass
                     else:
@@ -144,11 +156,24 @@ class ReadCountAnalysis(ParallelPSTInterface):
                         for gene_id in gene_ids:
                             readCounts[gene_id] += 1
 
+                        if alngt.not_primary_alignment == False:
+                            for gene_id in gene_ids:
+                                readCountsPrimary[gene_id] += 1
+
 
                 else:
                     foundReadsNotAligned.add( alngt.read.name )
 
 
+        readsPerAlignment = Counter()
+        for x in alignmentsPerRead:
+            ac = alignmentsPerRead[x]
+            readsPerAlignment[ac] += 1
+
+        for ac in sorted([x for x in readsPerAlignment]):
+            print("Reads with", ac, "alignments: ", readsPerAlignment[ac])
+
+        print("Total alignments", alignmentCount)
         print("Found aligned reads: " + str(len(foundReadsAligned)))
         print("Found unaligned reads: " + str(len(foundReadsNotAligned)))
         print("Total reads: " + str(len(foundReadsAligned) + len(foundReadsNotAligned)))
@@ -205,10 +230,13 @@ class ReadCountAnalysis(ParallelPSTInterface):
             allGeneNames.add(x)
         for x in readCounts:
             allGeneNames.add(x)
+        for x in readCountsPrimary:
+            allGeneNames.add(x)
 
         allGeneNames = list(allGeneNames)
         rankedCoverage = stats.rankdata( [ coverages[gene] for gene in allGeneNames ] )
         rankedReadCount = stats.rankdata( [ readCounts[gene] for gene in allGeneNames] )
+        rankedReadCountsPrimary = stats.rankdata([readCountsPrimary[gene] for gene in allGeneNames])
 
         allRankedCovs = []
         for i in range(0, len(allGeneNames)):
@@ -222,13 +250,16 @@ class ReadCountAnalysis(ParallelPSTInterface):
             elem.read_count = readCounts[elem.name]
             elem.read_rank = rankedReadCount[i]
 
+            elem.primary_read_rank = rankedReadCountsPrimary[i]
+            elem.primary_read_count = readCountsPrimary[elem.name]
+
             allRankedCovs.append( elem )
 
 
         allLines = []
         for x in sorted(allRankedCovs, key=lambda x: x.read_count):
 
-            dataStr = "\t".join([ x.name, str(x.coverage), str(x.coverage_rank), str(x.read_count), str(x.read_rank) ])
+            dataStr = "\t".join([ x.name, str(x.coverage), str(x.coverage_rank), str(x.primary_read_count), str(x.primary_read_rank), str(x.read_count), str(x.read_rank) ])
             allLines.append( dataStr + "\n" )
 
         self.writeLinesToOutput(environment.output, allLines)

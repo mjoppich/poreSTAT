@@ -10,6 +10,7 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--exclude', type=str, nargs='+', help="prefix for all variables", default=[], required=False)
     parser.add_argument('-c', '--conf-level', type=float, help="confidence level for pvalue", default=0.05)
     parser.add_argument('-v', '--verbose', help="verbose output", required=False, default=False, action='store_true')
+    parser.add_argument('-fc', '--fc', help="gene,foldchange", required=False, default=False, action='store_true')
 
     args = parser.parse_args()
 
@@ -76,6 +77,7 @@ if __name__ == '__main__':
                     continue
 
                 allArgsConf = True
+                includeFCs = set()
                 for x in args.include:
 
                     if x in method2colidx:
@@ -84,11 +86,16 @@ if __name__ == '__main__':
 
                         if (melem == 'None' or melem == "NA") or float(melem) >= args.conf_level:
                             allArgsConf = False
+                        else:
+                            includeFCs.add(float(aline[method2fc[x]]))
 
                 if not allArgsConf:
                     continue
 
-                print(aline[0])
+                if args.fc:
+                    print(aline[0], min(includeFCs), sep="\t")
+                else:
+                    print(aline[0], sep="\t")
 
                 if args.verbose:
                     for x in method2colidx:

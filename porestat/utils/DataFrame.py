@@ -187,6 +187,12 @@ class DataColumnAccess:
         colIdx = self.getColumnIndex(name)
         DataSeries.remove_data(self, colIdx)
 
+        del self.column2idx[name]
+
+        for x in self.column2idx:
+            if self.column2idx[x] > colIdx:
+                self.column2idx[x] = self.column2idx[x]-1
+
 
 
 class DefaultColumns():
@@ -197,7 +203,7 @@ class DefaultColumns():
 
         if 'global_default' in kwargs:
             self.hasDefault = True
-            self.idx2default = defaultdict(lambda x: kwargs['global_default'])
+            self.idx2default = defaultdict(lambda: kwargs['global_default'])
         else:
             self.idx2default = {}
 
@@ -470,6 +476,25 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
             vReturn.append(self[i, iColumnIndex])
 
         return vReturn
+
+    def selectColumns(self, colDict):
+
+        for x in colDict:
+            if not x in self.column2idx:
+                raise DataFrameException("Unknown column " + x + "\nAvailable columns: " + str([x for x in self.getHeader()]))
+
+        outDF = DataFrame()
+        outDF.addColumns([colDict[x] for x in colDict])
+
+        for row in self:
+
+            drDict = {}
+            for x in colDict:
+                drDict[colDict[x]] = row[x]
+
+            outDF.addRow( DataRow.fromDict(drDict))
+
+        return outDF
 
     def setColumn(self, oColumn, vNewValues):
 
@@ -966,7 +991,7 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         return (dDesc2Idx, dIdx2Desc)
 
     @classmethod
-    def createLineTuple(cls, sLine, oHeader, cDelim, vNumberHeader=None, oEmptyValue=None):
+    def createLineTuple(cls, sLine, oHeader, cDelim, vNumberHeader=None, oEmptyValue=None, replacements=None):
 
         sLine = sLine.strip()
 
@@ -985,13 +1010,19 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
                 # if oRes == None:
                 #    print("some error " + str(aLine))
 
+
         while len(vLine) < len(oHeader):
             vLine.append(oEmptyValue)
+
+        if replacements != None:
+            for i in range(0, len(vLine)):
+                if vLine[i] in replacements:
+                    vLine[i] = replacements[vLine[i]]
 
         return tuple(vLine)
 
     @classmethod
-    def parseFromFile(cls, sFileName, oHeader=None, skipLines=0, cDelim='\t', bConvertTextToNumber=True, encoding="utf-8", skipChar=None):
+    def parseFromFile(cls, sFileName, oHeader=None, skipLines=0, cDelim='\t', bConvertTextToNumber=True, encoding="utf-8", skipChar=None, replacements=None):
 
 
         if type(sFileName) == str:
@@ -1038,10 +1069,15 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
                 vLine = list(aLine)
 
                 for e in range(0, len(vLine)):
+
+                    if replacements != None:
+                        if vLine[e] in replacements:
+                            vLine[e] = replacements[vLine[e]]
+
                     if isNumber(vLine[e]):
                         vNumberHeader[e] = True
 
-            lineTuple = cls.createLineTuple(sLine, oHeader, cDelim, vNumberHeader, None)
+            lineTuple = cls.createLineTuple(sLine=sLine, oHeader=oHeader, cDelim=cDelim, vNumberHeader=vNumberHeader, oEmptyValue=None, replacements=replacements)
 
             oNewDataFrame.data.append(lineTuple)
 

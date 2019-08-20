@@ -35,7 +35,7 @@ message(.libPaths())
 
 
 
-requiredPackages = c('EnrichmentBrowser')
+requiredPackages = c('statmod', 'EnrichmentBrowser')
 for (rPackage in requiredPackages) {
     if (! require(rPackage, character.only = TRUE))
     {
@@ -70,7 +70,7 @@ message("Removing genes with low read count ...")
 #eset <- eset[rowSums(exprs(eset), na.rm = TRUE) > ncol(eset),]
 
 message("DE analysis ...")
-eset <- de.ana(eset, de.method = de.method, padj.method = "none")
+eset <- de.ana(eset, de.method = de.method, padj.method = "BH")
 
 write.table(rowData(eset, use.names=T), file=out.file, row.names=F, quote=F, sep="\t")
 

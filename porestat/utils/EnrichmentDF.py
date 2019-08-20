@@ -142,10 +142,10 @@ class EnrichmentDF(DataFrame):
 
     @property
     def supported_de_methods(self):
-        return ['NOISeq', 'DESeq', 'msEmpiRe', 'lGFOLD']
+        return ['NOISeq', 'DESeq', 'msEmpiRe', 'limma', 'edgeR']
 
 
-    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['NOISeq', 'msEmpiRe', 'DESeq'], rscriptPath="/usr/bin/Rscript", noDErun=False):
+    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['NOISeq', 'msEmpiRe', 'DESeq'], rscriptPath="/usr/bin/Rscript", noDErun=False, enhanceSymbol=None):
 
 
         filePrefix = prefix
@@ -196,7 +196,7 @@ class EnrichmentDF(DataFrame):
                     outFile = outFileBase + "_" + method
 
                     execStr = None
-                    if method in ['DESeq']:
+                    if method in ['DESeq', 'limma', 'edgeR']:
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/de_rseq.R"
 
                         execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile
@@ -302,6 +302,21 @@ class EnrichmentDF(DataFrame):
 
                     x[addInfo] = link
                     return tuple(x)
+
+                if enhanceSymbol != None:
+
+                    def addGeneSymbol(x, gscol):
+                        gene = x[0]
+                        genesym = enhanceSymbol.get(gene, "")
+
+                        x[gscol] = genesym
+
+                        return tuple(x)
+
+
+                    gsCol = compDF.addColumn("gene_symbol")
+                    compDF.applyToRow( lambda x: addGeneSymbol(x, gsCol) )
+
 
                 #print("Applying add info")
                 #addInfo = compDF.addColumn("EnsemblBacteria")
@@ -448,19 +463,19 @@ class EnrichmentDF(DataFrame):
 
             if all([x in methods for x in ['NOISeq', 'msEmpiRe', 'DESeq']]):
 
-                method2calls = defaultdict(set)
+                method2calls = {}#defaultdict(set)
                 for method in ['NOISeq', 'msEmpiRe', 'DESeq']:
                     adjpTitle = method + "_ADJ.PVAL"
                     adjPdata = compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(adjpTitle)).to_pairs()
-
+                    method2calls[method] = set()
                     for geneid, pval in adjPdata:
 
                         fpval = toFloat(pval)
 
                         if fpval != None and fpval < 0.05:
 
-                            if method == 'msEmpiRe' and not geneid in method2calls["DESeq"] and not geneid in method2calls["NOISeq"]:
-                                print(geneid, pval, fpval)
+                            #if method == 'msEmpiRe' and not geneid in method2calls["DESeq"] and not geneid in method2calls["NOISeq"]:
+                            #    print(geneid, pval, fpval)
 
                             method2calls[method].add(geneid)
 

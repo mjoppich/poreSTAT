@@ -24,9 +24,7 @@ message("Adding R user Path")
 message("Complete lib Paths")
 message(.libPaths())
 
-
-
-requiredPackages = c('devtools', 'Biobase', 'msEmpiRe')
+requiredPackages = c('devtools', 'Biobase', 'data.table', 'msEmpiRe')
 for (rPackage in requiredPackages) {
     if (! require(rPackage, character.only = TRUE))
     {
@@ -80,10 +78,9 @@ write.table(p_data, file=tmpout, row.names=FALSE, quote=FALSE, sep="\t")
 
 print(tmpout)
 
-
 print("Reading files")
 #loading data from installed data sets
-data <- msEmpiRe::read.standard(fdat.file, tmpout, prot.id.generator=function(pep) pep)
+data <- msEmpiRe::read.standard(fdat.file, tmpout, prot.id.generator=function(pep) pep, signal_pattern="mnt")
 
 
 print("Extracting Conditions1")
@@ -178,8 +175,25 @@ data = filderDetectionRate(data, conditions, rate=3)
 print(data)
 
 
+print(normalizePath(out.file))
+print(dirname(normalizePath(out.file)))
+
 #normalize
-data <- msEmpiRe::normalize(data)
+data <- msEmpiRe::normalize(data, out.dir=dirname(normalizePath(out.file)))
+
+datamat = exprs(data)
+
+print(head(datamat))
+
+datamat = as.data.frame.matrix(datamat)
+print(paste0(out.file, ".norm"))
+
+
+print(typeof(datamat))
+
+datamat["id"] = rownames(datamat)
+
+write.table(datamat, file=paste0(out.file, ".norm"), row.names=F, quote=F, sep="\t")
 
 
 #analyse

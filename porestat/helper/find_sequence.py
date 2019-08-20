@@ -4,27 +4,27 @@ import sys
 
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-
 from porestat.hdf5tool import FASTQ
 from porestat.tools.PTToolInterface import PSToolInterfaceFactory, PSToolInterface
 from Bio import SeqIO
 from collections import OrderedDict
+import re
 
-class FaSeqExtractFactory(PSToolInterfaceFactory):
+from porestat.utils.Files import printToFile
+
+
+class FaFindSequenceFactory(PSToolInterfaceFactory):
 
     def __init__(self, parser, subparsers, which):
 
-        super(FaSeqExtractFactory, self).__init__(parser, self._addParser(subparsers, which), which)
+        super(FaFindSequenceFactory, self).__init__(parser, self._addParser(subparsers, which), which)
 
 
 
     def _addParser(self, subparsers, which):
         parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-f', '--fasta', nargs='+', type=argparse.FileType('r'), help='minion read folder', required=True)
-
-        parser.add_argument('-start', '--start', type=int, help="source start")
-        parser.add_argument('-end', '--end', type=int, help="source end")
-
+        parser.add_argument('-seq', '--seq', type=str, help="sequence to find")
 
         def fileOpener( filename ):
             print("Opening", filename)
@@ -40,7 +40,7 @@ class FaSeqExtractFactory(PSToolInterfaceFactory):
 
         simArgs = self._makeArguments(args)
 
-        return FaSeqExtract(simArgs)
+        return FaSeqSearch(simArgs)
 
 import os
 
@@ -48,11 +48,11 @@ class Environment(object):
     pass
 
 
-class FaSeqExtract(PSToolInterface):
+class FaSeqSearch(PSToolInterface):
 
     def __init__(self, args):
 
-        super(FaSeqExtract, self).__init__(args)
+        super(FaSeqSearch, self).__init__(args)
 
     def acceptFASTQ(self, fastq):
 
@@ -79,20 +79,22 @@ class FaSeqExtract(PSToolInterface):
             self.args.output = open(self.args.output, "w")
 
         revRecords = []
+        searchSeq = Seq(self.args.seq)
 
         for infile in self.args.fasta:
 
             for record in SeqIO.parse(infile, ftype):
+                allpos = re.finditer(str(searchSeq), str(record.seq))
 
-                nrec = record.upper()
-                nrec.seq = record.seq[self.args.start:self.args.end]
+                for pos in allpos:
+                    revRecords.append( "{refseq}\t{start}\t{end}\t+".format(refseq = record.id, start=pos.start(), end=pos.end()))
 
-                revRecords.append(nrec)
+                allpos = re.finditer(str(searchSeq.reverse_complement()), str(record.seq))
+                for pos in allpos:
+                    revRecords.append(
+                        "{refseq}\t{start}\t{end}\t+".format(refseq=record.id, start=pos.start(), end=pos.end())
+                    )
 
-
-
-        SeqIO.write(revRecords, self.args.output, ftype)
-
-
+        printToFile(revRecords, self.args.output)
 
         return True

@@ -11,8 +11,11 @@ from porestat.helper.filter_length import FilterLengthFactory
 from porestat.helper.extract_entries_fasta import FAFQRecordExtractFactory
 from porestat.helper.sequence_merge import FARecordSequenceMergeFactory
 from porestat.helper.revcompl import FaRevComplFactory
-
+from porestat.helper.extractPartOfSequence import FaSeqExtractFactory
+from porestat.helper.replacePartOfSequence import FaSeqReplaceFactory
 from porestat.assemblies.GenomeSimilarity import GenomeSimilarityPlotFactory
+from porestat.helper.find_sequence import FaFindSequenceFactory
+from porestat.helper.list_records import FaListRecordsFactory
 
 
 
@@ -37,7 +40,11 @@ if __name__ == '__main__':
         FAFQRecordExtractFactory(parser, subparsers, 'seq_extract'),
         GenomeSimilarityPlotFactory(parser, subparsers, 'simplot'),
         FARecordSequenceMergeFactory(parser, subparsers, 'seq_merge'),
-        FaRevComplFactory(parser, subparsers, 'rev_compl')
+        FaRevComplFactory(parser, subparsers, 'rev_compl'),
+        FaSeqExtractFactory(parser, subparsers, 'extract_seq'),
+        FaSeqReplaceFactory(parser, subparsers, 'replace_seq'),
+        FaFindSequenceFactory(parser, subparsers, 'find_seq'),
+        FaListRecordsFactory(parser, subparsers, 'list_recs')
     ]
 
     for tool in allTools:

@@ -1,4 +1,6 @@
 import random, os, sys
+
+
 sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../")
 
 import argparse
@@ -6,11 +8,12 @@ import argparse
 from porestat.analysis.alignmentReport import ReportFactory
 from porestat.analysis.foldchange_distribution import FoldChangeDistributionFactory
 from porestat.analysis.foldchange_similarity import FoldChangeSimilarityFactory
-
+from porestat.analysis.analyse_secondary_alignments import SecondaryAlignmentAnalysisFactory
 from porestat.analysis.alignmentStatistics import AlignmentStatisticAnalysisFactory
 from porestat.analysis.foldchange_top_regulated import FoldChangeTopRegulatedFactory
 from porestat.analysis.read_counts import ReadCountAnalysisFactory
 from porestat.analysis.similarity_analysis import SimilarityAnalysisFactory
+from porestat.analysis.foldchange_featurecounts import FoldChangeFeatureCountsDistributionFactory
 
 from porestat.tools.PTToolInterface import PSToolException
 from porestat.utils import eprint
@@ -42,9 +45,11 @@ if __name__ == '__main__':
         SimilarityAnalysisFactory(parser, subparsers, 'similarity'),
         ReportFactory(parser, subparsers, 'summary'),
         FoldChangeDistributionFactory(parser, subparsers, 'foldchange'),
+        FoldChangeFeatureCountsDistributionFactory(parser, subparsers, 'foldchange_fc'),
         ReportFactory(parser, subparsers, 'timeline'),
         FoldChangeSimilarityFactory(parser, subparsers, 'fcdist'),
-        FoldChangeTopRegulatedFactory(parser, subparsers, 'topreg')
+        FoldChangeTopRegulatedFactory(parser, subparsers, 'topreg'),
+        SecondaryAlignmentAnalysisFactory(parser, subparsers, 'sec_alignments')
     ]
 
     for tool in allTools:
