@@ -264,6 +264,12 @@ class DataRow(DefaultDataColumnAccess, DataSeries):
         except:
             raise DataRowException("Column not found: " + str(item))
 
+    def getIndex(self, idx):
+
+        assert(type(idx) == int)
+
+        return self.data[idx]
+
     def addColumn(self, name, default=None):
         DefaultDataColumnAccess.addColumn(self, name, default)
         DataSeries.append_data(self, default)
@@ -420,6 +426,33 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         return dReturn
 
 
+
+    def namedRows(self, idxcol, datacols):
+
+
+        if idxcol == None:
+            idxcol = [x for x in range(0, len(self.data))]
+        else:
+            idxcol = [x[idxcol] for x in self.data]
+
+        res = {}
+
+        for datacolName in datacols:
+            dataDict = {}
+
+            datacol = datacols[datacolName]
+
+            for i in range(0, len(self.data)):
+                key = idxcol[i]
+                value = self.data[i][datacol]
+
+                dataDict[key] = value
+
+            res[datacolName] = DataRow.fromDict(dataDict)
+
+        return res
+
+
     def toDataRow(self, idxcol = None, datacol = None):
 
         if datacol == None:
@@ -476,6 +509,19 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
             vReturn.append(self[i, iColumnIndex])
 
         return vReturn
+
+    def filterRows(self, filter):
+
+        ndata = []
+
+        for row in self.data:
+
+            rowResult = filter(row)
+
+            if rowResult:
+                ndata.append(row)
+
+        self.data = ndata
 
     def selectColumns(self, colDict):
 
@@ -583,7 +629,11 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
                     addedRows += 1
 
                     if ignoreMissingCols:
+                        if type(drow) == dict:
+                            drow = DataRow.fromDict(drow)
+
                         rowheaders = set([x for x in drow.column2idx])
+
                         selfheaders = set([x for x in self.column2idx])
                         setDifference = rowheaders.difference(selfheaders)
 

@@ -51,6 +51,10 @@ class FoldChangeFeatureCountsDistributionFactory(PSToolInterfaceFactory):
                             default='/usr/bin/Rscript')
 
         parser.add_argument('-e', '--enhanced', type=argparse.FileType('r'), default=None)
+        parser.add_argument('-l', '--lengths', type=argparse.FileType('r'), default=None)
+        parser.add_argument('-rrna', '--no-rrna', dest='norrna', action='store_true', default=False)
+        parser.add_argument('-fpkm', '--fpkm', dest='fpkm', action='store_true', default=False)
+        parser.add_argument('-tpm', '--tpm', dest='tpm', action='store_true', default=False)
 
         parser = PlotConfig.addParserArgs(parser)
         parser.set_defaults(func=self._prepObj)
@@ -82,7 +86,16 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
 
         return None
 
-    def readCounts(self, args):
+    def readCounts(self, args, biotypes=None, gene2length=None):
+
+        if args.norrna and biotypes == None:
+            raise argparse.ArgumentParser().error("removal of rRNA requires --enhanced!")
+
+        if args.fpkm and gene2length == None:
+            raise argparse.ArgumentParser().error("calculation of FPKM requires --lengths!")
+
+        if args.tpm and gene2length == None:
+            raise argparse.ArgumentParser().error("calculation of TPM requires --lengths!")
 
         featureCountsColumns = ["Geneid",	"Chr",	"Start",	"End",	"Strand",	"Length"]
 
@@ -109,7 +122,60 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                     print(condName, condElement)
 
                     subDf = df.selectColumns({"Geneid": "gene", condElement: "count"})
+
+                    if biotypes != None and args.norrna:
+                        geneColIdx = subDf.getColumnIndex("gene")
+                        subDf.filterRows(lambda x: x[geneColIdx] in biotypes and not "rRNA" in biotypes[x[geneColIdx]][1] )
+
                     subDf.setFilepath(os.path.abspath(condElement))
+
+                    if args.fpkm:
+
+                        countCol = subDf.getColumnIndex("count")
+                        geneCol = subDf.getColumnIndex("gene")
+
+                        totalCounts = sum([x[countCol] for x in subDf.data])
+
+                        fpkmIdx = subDf.addColumn("FPKM", 0)
+
+                        def addFPKM(x):
+
+                            geneID = x[geneCol]
+                            geneLength = gene2length.get(geneID, 0)
+
+                            x[fpkmIdx] = x[countCol]/(totalCounts*geneLength) * pow(10,9)
+
+                            return tuple(x)
+
+                        subDf.applyToRow(addFPKM)
+
+                    if args.tpm:
+
+                        countCol = subDf.getColumnIndex("count")
+                        geneCol = subDf.getColumnIndex("gene")
+
+                        totalCounts = sum([x[countCol] for x in subDf.data])
+                        totalRatio = 0
+
+                        for row in subDf:
+                            geneID = row["gene"]
+                            geneCount = row["count"]
+                            geneLength = gene2length.get(geneID, 0)
+
+                            totalRatio += geneCount/geneLength
+
+                        tpmIdx = subDf.addColumn("TPM", 0)
+
+                        def addTPM(x):
+
+                            geneID = x[geneCol]
+                            geneLength = gene2length.get(geneID, 0)
+
+                            x[tpmIdx] = x[countCol]/(geneLength * totalRatio) * pow(10,6)
+
+                            return tuple(x)
+
+                        subDf.applyToRow(addTPM)
 
                     counts[condName].append(subDf)
 
@@ -141,6 +207,7 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
         print("Loading gene name enhancements", fileE.name)
 
         ens2sym = {}
+
         for line in fileE:
             line = line.strip().split("\t")
 
@@ -149,13 +216,47 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
 
             ensemblID = line[0]
             geneSymbol = line[1]
+            biotype = line[2]
 
             if len(geneSymbol) == 0:
                 continue
 
-            ens2sym[ensemblID] = geneSymbol
+            ens2sym[ensemblID] = (geneSymbol, biotype)
 
         return ens2sym
+
+    def loadGeneLengths(self, fileE):
+
+        if fileE == None:
+            print("Not loading gene lengths")
+            return None
+
+        print("Loading gene lengths", fileE.name)
+
+        """
+            Ensembl_gene_identifier GeneID  length
+            ENSMUSG00000000001      14679   3262
+            ENSMUSG00000000003      54192   902
+            ENSMUSG00000000028      12544   2252
+        """
+
+        ens2gl = {}
+        for line in fileE:
+            line = line.strip().split("\t")
+
+            if not line[0].startswith("ENS"):
+                continue
+
+            ensemblID = line[0]
+            geneLength = line[1]
+
+            if len(ensemblID) == 0 or len(geneLength) == 0:
+                continue
+
+            geneLength = int(geneLength)
+            ens2gl[ensemblID] = geneLength
+
+        return ens2gl
 
 
     def makeResults(self, parallelResult, oEnvironment, args):
@@ -167,8 +268,9 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
             """
 
             geneEnhancement = self.loadEnhancement(args.enhanced)
+            geneLengths = self.loadGeneLengths(args.lengths)
 
-            counts, cond2samples = self.readCounts(args)
+            counts, cond2samples = self.readCounts(args, biotypes=geneEnhancement, gene2length=geneLengths)
 
             vConds = sorted([x for x in counts])
 
@@ -188,14 +290,32 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                         geneNames = condDataSample.getColumnIndex('gene')
                         geneCounts = condDataSample.getColumnIndex(valueSource)
 
-                        condRow = condDataSample.toDataRow(geneNames, geneCounts)
-
+                        rowUpdates = []
                         sampleName = condDataSample.filepath
-                        conditions.append(sampleName)
 
+                        for row in condDataSample:
+
+                            rowData = {
+                                    "id": row["gene"],
+                                    sampleName: row[valueSource]
+                                }
+
+                            if args.fpkm:
+                                rowData[sampleName+".FPKM"] = row["FPKM"]
+
+                            if args.tpm:
+                                rowData[sampleName+".TPM"] = row["TPM"]
+
+                            rowUpdates.append(rowData)
+
+                        #condRows = condDataSample.namedRows(geneNames, interestCols)
+
+                        #condRow = condDataSample.toDataRow(geneNames, geneCounts)
+
+                        conditions.append(sampleName)
                         condReplicates.append(sampleName)
 
-                        self.condData.addCondition(condRow, sampleName)
+                        self.condData.addConditions(rowUpdates, sampleName)
 
                     replicates[condition] = condReplicates
 
@@ -206,7 +326,10 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                                                                                methods=args.methods,
                                                                                replicates=replicates,
                                                                                noDErun=args.noanalysis,
-                                                                               enhanceSymbol=geneEnhancement)
+                                                                               enhanceSymbol=geneEnhancement,
+                                                                               geneLengths=geneLengths,
+                                                                               norRNA=args.norrna
+                                                                               )
 
             self.prepareHTMLOut(createdComparisons, replicates, args)
 

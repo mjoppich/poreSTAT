@@ -24,6 +24,19 @@ class EnrichmentDF(DataFrame):
             self.data = otherDF.data
             self.column2idx = otherDF.column2idx
 
+
+    def addConditions(self, condDatas, condName):
+
+        allCols = set()
+        for x in condDatas:
+            for y in x:
+                allCols.add(y)
+
+        self.addColumns(sorted(allCols), default=None, ignoreDuplicates=True)
+
+        self.updateRowIndexed("id", condDatas, ignoreMissingCols=True, addIfNotFound=True)
+
+
     def addCondition(self, condData, condName):
 
         isDataRow = isinstance(condData, DataRow)
@@ -145,7 +158,7 @@ class EnrichmentDF(DataFrame):
         return ['NOISeq', 'DESeq', 'msEmpiRe', 'limma', 'edgeR']
 
 
-    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['NOISeq', 'msEmpiRe', 'DESeq'], rscriptPath="/usr/bin/Rscript", noDErun=False, enhanceSymbol=None):
+    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['NOISeq', 'msEmpiRe', 'DESeq'], rscriptPath="/usr/bin/Rscript", noDErun=False, enhanceSymbol=None, geneLengths=None, norRNA=False):
 
 
         filePrefix = prefix
@@ -231,13 +244,38 @@ class EnrichmentDF(DataFrame):
 
                 # TODO this must be done for all samples!
                 compDF = EnrichmentDF()
+                #id column already there!
                 evCol = compDF.addColumn('evidence', prefix) # TODO this is just a quick hack!
+
 
                 geneNames = self.getColumnIndex('id')
 
-                for sampleName in replicates[cond1] + replicates[cond2]:
-                    condSampleCounts = self.toDataRow(geneNames, self.getColumnIndex(sampleName))
-                    compDF.addCondition(condSampleCounts, sampleName)
+                updateRows = []
+
+                for row in self:
+                    baseDict = {"id": row["id"]}
+
+                    for sampleName in replicates[cond1] + replicates[cond2]:
+                        baseDict[sampleName] = row[sampleName]
+
+                        if sampleName + ".FPKM" in self.column2idx:
+                            baseDict[sampleName + ".FPKM"] = row[sampleName + ".FPKM"]
+
+                        if sampleName + ".TPM" in self.column2idx:
+                            baseDict[sampleName + ".TPM"] = row[sampleName + ".TPM"]
+
+                    updateRows.append(baseDict)
+
+                    #condSampleCounts = self.toDataRow(geneNames, self.getColumnIndex(sampleName))
+
+                allCols = set()
+                for x in updateRows:
+                    for y in x:
+                        allCols.add(y)
+
+                compDF.addColumns(sorted(allCols), default=0, ignoreDuplicates=True)
+                compDF.updateRowIndexed("id", updateRows, ignoreMissingCols=True, addIfNotFound=True)
+                    #compDF.addCondition(condSampleCounts, sampleName)
 
 
 
@@ -269,21 +307,44 @@ class EnrichmentDF(DataFrame):
                     rawPdata = methDF.toDataRow( geneIDidx, rawPValidx)
                     adjPdata = methDF.toDataRow( geneIDidx, adjPValidx)
 
-                    print("Combining Method adding cond", method)
-                    compDF.addCondition(l2FCdata, l2FCTitle)
-                    compDF.addCondition(rawPdata, rawpTitle)
-                    compDF.addCondition(adjPdata, adjpTitle)
-
+                    noiSeqProbIdx = None
+                    noiSeqProbTitle = None
                     if method in ['NOISeq']:
-
-                        probTitle = method + "_prob"
-
+                        noiSeqProbTitle = method + "_prob"
                         if methDF.columnExists("prob"):
-                            probidx = methDF.getColumnIndex('prob')
-                            probData = methDF.toDataRow(geneIDidx, probidx)
+                            noiSeqProbIdx = methDF.getColumnIndex('prob')
 
-                            compDF.addCondition(probData, probTitle)
 
+                    methRows = []
+                    for row in methDF:
+
+                        rowDict = {
+                            "id": row[geneIDidx],
+                            l2FCTitle: row.getIndex(log2FCidx),
+                            rawpTitle: row.getIndex(rawPValidx),
+                            adjpTitle: row.getIndex(adjPValidx),
+                        }
+
+                        if noiSeqProbIdx != None:
+                            rowDict[noiSeqProbTitle] = row[noiSeqProbIdx]
+
+
+                        methRows.append(rowDict)
+
+
+                    print("Combining Method adding cond", method)
+                    print("Adding total rows:", len(methRows))
+                    allCols = set()
+                    for x in methRows:
+                        for y in x:
+                            allCols.add(y)
+
+                    compDF.addColumns(sorted(allCols), default=None, ignoreDuplicates=True)
+                    compDF.updateRowIndexed("id", methRows, ignoreMissingCols=True, addIfNotFound=True)
+
+                    #compDF.addCondition(l2FCdata, l2FCTitle)
+                    #compDF.addCondition(rawPdata, rawpTitle)
+                    #compDF.addCondition(adjPdata, adjpTitle)
 
 
                     print("cond VP Data ready")
@@ -307,15 +368,41 @@ class EnrichmentDF(DataFrame):
 
                     def addGeneSymbol(x, gscol):
                         gene = x[0]
-                        genesym = enhanceSymbol.get(gene, "")
+                        genesym = enhanceSymbol.get(gene, ("", ""))
 
-                        x[gscol] = genesym
+                        x[gscol] = genesym[0]
 
                         return tuple(x)
 
 
                     gsCol = compDF.addColumn("gene_symbol")
                     compDF.applyToRow( lambda x: addGeneSymbol(x, gsCol) )
+
+                    def addGeneBiotype(x, gscol):
+                        gene = x[0]
+                        genesym = enhanceSymbol.get(gene, ("", ""))
+
+                        x[gscol] = genesym[1]
+
+                        return tuple(x)
+
+
+                    gsCol = compDF.addColumn("gene_biotype")
+                    compDF.applyToRow( lambda x: addGeneBiotype(x, gsCol) )
+
+                if geneLengths != None:
+
+                    def addGeneLengths(x, gscol):
+                        gene = x[0]
+                        genesym = geneLengths.get(gene, "")
+
+                        x[gscol] = genesym
+
+                        return tuple(x)
+
+
+                    gsCol = compDF.addColumn("ue_gene_length")
+                    compDF.applyToRow( lambda x: addGeneLengths(x, gsCol) )
 
 
                 #print("Applying add info")
