@@ -383,6 +383,23 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
                 for x in elemIdx:
                     DataSeries.__setitem__(x, value[x])
 
+    def get_abs_largest(self, idcol, targetCols):
+
+        id2val = defaultdict(0)
+        for row in self:
+            idVal = row[idcol]
+            for col in targetCols:
+
+                colVal = row[col]
+
+                if abs(colVal) > abs(id2val[idVal]):
+                    id2val[idVal] = colVal
+
+        return sorted([(x, id2val[x]) for x in id2val], key=lambda x: x[1], reverse=True)
+
+
+
+
     def merge(self, other):
 
         if not type(other)==DataFrame:
