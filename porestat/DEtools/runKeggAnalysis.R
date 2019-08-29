@@ -95,4 +95,4 @@ rsc = colnames(rs)
 rsc[1] = "KEGG ID"
 colnames(rs) = rsc
 
-write.table(rs, file=paste(filename,"kegg",mode,".tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+write.table(rs, file=paste(filename,"kegg",mode,"tsv", sep="."), sep="\t", quote=F, row.names=FALSE)

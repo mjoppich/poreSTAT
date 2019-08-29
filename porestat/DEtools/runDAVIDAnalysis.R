@@ -98,9 +98,23 @@ callDAVIDEnrichment <- function(gene,
     term.list <- sapply(term, function(y) strsplit(y, split=sep))
     term.df <- do.call("rbind", term.list)
 
+    #print("term.list")
+    #rint(head(term.list))
+
+    #print("term.df")
+    #print(head(term.df))
+
 
     ID <- term.df[,1]
-    Description <- term.df[,2]
+
+    if (ncol(term.df) == 1)
+    {
+        #print("Single Column")
+        Description <- term.df[,1]
+    } else {
+        Description <- term.df[,2]
+    }
+
     GeneRatio <- with(x, paste(Count, List.Total, sep="/"))
     BgRatio <- with(x, paste(Pop.Hits, Pop.Total, sep="/"))
     Over <- data.frame(ID          = ID,
@@ -206,7 +220,7 @@ if (mode == "all")
 
 if (length(allGeneIDs) == 0)
 {
-    print("NO GENE ID SELECTED. TERMINATING")
+    print("NO GENE ID SELECTED. TERMINATING.")
     quit(status=0, save='no')
 }
 
@@ -259,4 +273,4 @@ rsc = colnames(rs)
 rsc[1] = "TERM.ID"
 colnames(rs) = rsc
 
-write.table(rs, file=paste(filename,"david",mode,".tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+write.table(rs, file=paste(filename,"david",mode,"tsv", sep="."), sep="\t", quote=F, row.names=FALSE)

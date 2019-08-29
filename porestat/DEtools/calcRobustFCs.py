@@ -1,3 +1,5 @@
+import math
+
 import matplotlib as mpl
 mpl.use('Agg')
 
@@ -273,6 +275,30 @@ if __name__ == '__main__':
 
         print(signCount)
 
+        fcPvals = []
+        fcPvalsSig = []
+
+        for row in indf:
+
+            rowFC = row["ROB_log2FC"]
+            rowPV = row["ROB_ADJ.PVAL"]
+
+            if rowFC == None or rowPV == None:
+                continue
+
+            logRowPV = -math.log10(rowPV)
+
+            if rowPV < 0.05 and abs(rowFC) >= 1.0:
+                fcPvalsSig.append((rowFC, logRowPV))
+            else:
+                fcPvals.append((rowFC, logRowPV))
+
+        plt.scatter([x[0] for x in fcPvals], [x[1] for x in fcPvals], color="blue", label="Gene (n={})".format(len(fcPvals)))
+        plt.scatter([x[0] for x in fcPvalsSig], [x[1] for x in fcPvalsSig], color="red", label="Gene pVal < 0.05 &\n logFC >= 1 (n={})".format(len(fcPvalsSig)))
+        plt.legend(loc='lower left')
+        plt.savefig(args.output[fidx].name + ".rob.volcano.png", bbox_inches="tight")
+
+        print("Writing out DF", args.output[fidx].name)
         indf.export(args.output[fidx].name)
 
         for method in availMethods:
@@ -285,7 +311,7 @@ if __name__ == '__main__':
         upIn = from_contents(method2genes)
         plot(upIn, subset_size="auto") 
 
-        plt.savefig(args.output[fidx].name + ".upset.png", bbox_inches="tight")
+        plt.savefig(args.output[fidx].name + ".rob.upset.png", bbox_inches="tight")
 
 
     

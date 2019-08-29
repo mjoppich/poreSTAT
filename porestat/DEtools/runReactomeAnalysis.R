@@ -100,4 +100,4 @@ rsc = colnames(rs)
 rsc[1] = "Reactome ID"
 colnames(rs) = rsc
 
-write.table(rs, file=paste(filename,"reactome",mode,".tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+write.table(rs, file=paste(filename,"reactome",mode,"tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
