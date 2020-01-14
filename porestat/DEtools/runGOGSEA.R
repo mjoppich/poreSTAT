@@ -21,9 +21,10 @@ indata = read.table(filename, header=TRUE, sep="\t")
 minFC = 1.0
 
 allGenes = indata
-allGeneIDs = allGenes$id
+allGenes = allGenes[allGenes$ROB_ADJ.PVAL != 1.0 & allGenes$ROB_log2FC != 0.0 & !is.na(allGenes$id) ,]
+allGenes = allGenes[!is.na(allGenes$id),]
+allGeneIDs = as.vector(allGenes$id)
 
-allGenes = allGenes[allGenes$ROB_ADJ.PVAL != 1.0 & allGenes$ROB_log2FC != 0.0,]
 
 if (nrow(allGenes) == 0)
 {
@@ -31,24 +32,66 @@ if (nrow(allGenes) == 0)
     quit(status=0, save='no')
 }
 
-egid = grcm38 %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+
+annotTable = NULL;
+readableState=T
+keyType = "ENTREZID"
+
+if (organism == "org.Mm.eg.db")
+{
+    annotTable = grcm38
+    egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+
+
+} else if (organism == "org.Hs.eg.db")
+{
+    annotTable = grch38
+    egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+
+} else if (organism == "org.Sc.sgd.db")
+{
+
+    suppressMessages(suppressWarnings(require(org.Sc.sgd.db)))
+
+
+    allEntrez = sapply(allGeneIDs, function(x) {get(x, org.Sc.sgdENTREZID)} )
+    egid = data.frame("ensgene"=allGeneIDs, "entrez"=allEntrez)
+
+    keyType = "GENENAME"
+
+}
+
+#egid = grcm38 %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 head(egid)
 
 egid = merge(x=egid, y=allGenes, by.x="ensgene", by.y="id")
-head(egid)
 
-entrezGenes = egid[!is.na(egid$entrez) & !is.null(egid$ROB_log2FC)& !is.nan(egid$ROB_log2FC) &!is.na(egid$ROB_log2FC),]
+entrezGenes = egid[!is.na(egid$entrez) & !is.na(egid$ensgene) & !is.null(egid$ensgene) & !is.null(egid$ROB_log2FC)& !is.nan(egid$ROB_log2FC) &!is.na(egid$ROB_log2FC),]
 head(entrezGenes)
-print(sum(is.na(entrezGenes$ROB_log2FC)))
+
+
 
 #entrezGenesC = entrezGenes$ROB_ADJ.PVAL
 entrezGenesC = as.vector(entrezGenes$ROB_log2FC)
-names(entrezGenesC) = entrezGenes$entrez
+
+
+if (keyType == "GENENAME")
+{
+    names(entrezGenesC) = entrezGenes$ensgene
+} else {
+    names(entrezGenesC) = entrezGenes$entrez
+}
 
 entrezGenesC = sort(entrezGenesC, decreasing = TRUE)
 
+print("entrez genes c")
 head(entrezGenesC)
 
+entrezGenesC <- entrezGenesC[!duplicated(names(entrezGenesC))]
+
+print(length(entrezGenesC))
+print("Dup genes")
+print(length(entrezGenesC[duplicated(names(entrezGenesC))]))
 
 #like
 #https://www.r-bloggers.com/kegg-enrichment-analysis-with-latest-online-data-using-clusterprofiler/
@@ -56,7 +99,7 @@ head(entrezGenesC)
 for (GODB in c("BP", "MF", "CC")) { #
 
 
-    kk <- gseGO(entrezGenesC, organism, keyType="ENTREZID", ont=GODB, pvalueCutoff=0.5, pAdjustMethod="BH")
+    kk <- gseGO(entrezGenesC, organism, keyType=keyType, ont=GODB, pvalueCutoff=0.5, pAdjustMethod="BH")
 
     if (is.null(kk))
     {
@@ -87,3 +130,6 @@ for (GODB in c("BP", "MF", "CC")) { #
     rsd = rs[rs$NES > 0,]
     write.table(rsd, file=paste(filename,"GeneOntology", GODB, mode,"gsea.tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
 }
+
+print("finished")
+quit(status=0, save='no')

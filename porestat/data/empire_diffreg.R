@@ -78,9 +78,13 @@ write.table(p_data, file=tmpout, row.names=FALSE, quote=FALSE, sep="\t")
 
 print(tmpout)
 
+print(p_data$V1)
+samples=do.call(paste, c(as.list(p_data$V1), sep = "|"))
+print(samples)
+
 print("Reading files")
 #loading data from installed data sets
-data <- msEmpiRe::read.standard(fdat.file, tmpout, prot.id.generator=function(pep) pep, signal_pattern="mnt")
+data <- msEmpiRe::read.standard(fdat.file, tmpout, prot.id.generator=function(pep) pep, signal_pattern=samples)
 
 
 print("Extracting Conditions1")

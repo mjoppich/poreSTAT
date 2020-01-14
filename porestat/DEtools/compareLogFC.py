@@ -59,7 +59,12 @@ if __name__ == '__main__':
                 sconditions = [".".join(x.split(".")[-4:-2]) for x in conditions]
             else:
                 if args.pathname:
-                    sconditions = [x.split(os.path.sep)[-2] for x in conditions]
+                    # just in case it's not an actual path :D
+                    sconditions = []
+                    for x in conditions:
+                        nx = x.split(os.path.sep)
+                        sconditions.append(nx[max([0, len(nx)-2])])
+
                 else:
                     sconditions = [os.path.basename(x) for x in conditions]            
 
@@ -90,11 +95,11 @@ if __name__ == '__main__':
 
                         cond1counts.append(rowfc)
 
-                    plt.hist(cond1counts, bins=len(cond1counts), label=sconditions[i] + " vs " + sconditions[j], density=True, cumulative=True, histtype="step")
+                    plt.hist(cond1counts, bins=len(cond1counts), label=sconditions[i] + " vs " + sconditions[j]  + " (n="+str(len(cond1counts))+")", density=True, cumulative=True, histtype="step")
 
             plt.legend(loc='upper left')
 
-            plt.savefig(args.output[fidx] + ".logfc."+str(fidx) + "." + str(cidx) +".png")
+            plt.savefig(args.output[fidx] + ".logfc."+str(fidx) + "." + str(cidx) +".png", bbox_inches="tight")
             plt.close()
 
                         

@@ -237,8 +237,8 @@ def main(args):
     # Create a new DataFrame with gene lengths and EnsemblID.
     ensembl_no_version = lengths.index.map(lambda x: x.split(".")[0])
     ldf = pd.DataFrame({'length': lengths,
-                        'gene_identifier': ensembl_no_version},
-                        'biotype': bioType,
+                        'gene_identifier': ensembl_no_version,
+                        'biotype': bioType},
                         index=lengths.index)
 
     # Merge so we have EntrezGeneID with length.

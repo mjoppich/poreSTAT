@@ -38,10 +38,11 @@ callDAVIDEnrichment <- function(gene,
     getSpecieNames <- eval(parse(text="getSpecieNames"))
     getIdTypes <- eval(parse(text="getIdTypes"))
 
-    david <- DAVIDWebService$new(email=david.user,
-                                 url="https://david.ncifcrf.gov/webservice/services/DAVIDWebService.DAVIDWebServiceHttpSoap12Endpoint/")
+    david <- DAVIDWebService$new(email=david.user, url="https://david.ncifcrf.gov/webservice/services/DAVIDWebService")
 
-    setTimeOut(david, 120000)
+    #url="https://david.ncifcrf.gov/webservice/services/DAVIDWebService.DAVIDWebServiceHttpSoap12Endpoint/")
+
+    setTimeOut(david, 240000)
 
     ## addList will throw error if idType is not match.
     ## use match.arg to check before addList make it more readable
@@ -217,6 +218,8 @@ if (mode == "all")
     print(length(bgGeneIDs))
 }
 
+allGeneIDs = allGeneIDs[!is.na(allGeneIDs)]
+bgGeneIDs = bgGeneIDs[!is.na(bgGeneIDs)]
 
 if (length(allGeneIDs) == 0)
 {
@@ -225,7 +228,31 @@ if (length(allGeneIDs) == 0)
 }
 
 
-egid = grcm38 %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+annotTable = NULL;
+
+if (organism == "mouse")
+{
+    annotTable = grcm38
+    egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+
+
+} else if (organism == "human")
+{
+    annotTable = grch38
+    egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+
+} else if (organism == "yeast")
+{
+
+    suppressMessages(suppressWarnings(require(org.Sc.sgd.db)))
+
+    readableState =F
+    allEntrez = sapply(allGeneIDs, function(x) {get(x, org.Sc.sgdENTREZID)} )
+    egid = data.frame("ensgene"=allGeneIDs, "entrez"=allEntrez)
+
+}
+
+#egid = grcm38 %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 head(egid)
 
 entrezGenes = egid[!is.na(egid$entrez),]
@@ -233,7 +260,31 @@ entrezGenes = as.vector(entrezGenes$entrez)
 
 
 
-egid = grcm38 %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+annotTable = NULL;
+
+if (organism == "mouse")
+{
+    annotTable = grcm38
+    egid = annotTable %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+
+
+} else if (organism == "human")
+{
+    annotTable = grch38
+    egid = annotTable %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+
+} else if (organism == "yeast")
+{
+
+    suppressMessages(suppressWarnings(require(org.Sc.sgd.db)))
+
+    readableState =F
+    allEntrez = sapply(bgGeneIDs, function(x) {get(x, org.Sc.sgdENTREZID)} )
+    egid = data.frame("ensgene"=bgGeneIDs, "entrez"=allEntrez)
+
+}
+
+#egid = grcm38 %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 head(egid)
 
 entrezBG = egid[!is.na(egid$entrez),]
@@ -274,3 +325,6 @@ rsc[1] = "TERM.ID"
 colnames(rs) = rsc
 
 write.table(rs, file=paste(filename,"david",mode,"tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+
+print("finished")
+quit(status=0, save='no')

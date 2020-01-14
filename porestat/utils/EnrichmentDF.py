@@ -97,6 +97,9 @@ class EnrichmentDF(DataFrame):
         assert (type(cond1Samples) == list)
         assert (type(cond2Samples) == list)
 
+        print(cond1Samples)
+        print(cond2Samples)
+
         header = ['gene'] + cond1Samples + cond2Samples
         prepData = [tuple(header)]
 
@@ -155,10 +158,10 @@ class EnrichmentDF(DataFrame):
 
     @property
     def supported_de_methods(self):
-        return ['NOISeq', 'DESeq', 'msEmpiRe', 'limma', 'edgeR']
+        return ['NOISeq', 'DESeq2', 'DirectDESeq2', 'msEmpiRe', 'limma', 'edgeR']
 
 
-    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['NOISeq', 'msEmpiRe', 'DESeq'], rscriptPath="/usr/bin/Rscript", noDErun=False, enhanceSymbol=None, geneLengths=None, norRNA=False):
+    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['NOISeq', 'msEmpiRe', 'DESeq2', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", noDErun=False, enhanceSymbol=None, geneLengths=None, norRNA=False):
 
 
         filePrefix = prefix
@@ -189,6 +192,9 @@ class EnrichmentDF(DataFrame):
         createdComparisons = []
         conditions = [x for x in replicates]
 
+        for cond in replicates:
+            print(cond, replicates[cond])
+
         for i in range(0, len(conditions)):
             cond1 = conditions[i]
             for j in range(i+1, len(conditions)):
@@ -209,11 +215,14 @@ class EnrichmentDF(DataFrame):
                     outFile = outFileBase + "_" + method
 
                     execStr = None
-                    if method in ['DESeq', 'limma', 'edgeR']:
+                    if method in ['DESeq2', 'limma', 'edgeR']:
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/de_rseq.R"
-
                         execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile
                             #raise PSToolException("Unable to run enrichment analsyis. " + str(execStr))
+
+                    elif method in ['DirectDESeq2']:
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/deseq_direct.R"
+                        execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" " + outFile
 
                     elif method in ['msEmpiRe']:
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/empire_diffreg.R"
@@ -368,9 +377,14 @@ class EnrichmentDF(DataFrame):
 
                     def addGeneSymbol(x, gscol):
                         gene = x[0]
-                        genesym = enhanceSymbol.get(gene, ("", ""))
+                        genesym = enhanceSymbol.get(gene, (gene, ""))
 
-                        x[gscol] = genesym[0]
+                        geneSymbol = genesym[0]
+
+                        if geneSymbol == None or geneSymbol == "":
+                            geneSymbol = gene
+
+                        x[gscol] = geneSymbol
 
                         return tuple(x)
 
@@ -548,10 +562,10 @@ class EnrichmentDF(DataFrame):
 
                     PorePlot.plotscatter(idata, jdata, "log2FC comparison " + methods[methodI] + " vs " + methods[methodJ], "log2 FC ("+methods[methodI] + ")", "log2 FC ("+methods[methodJ] + ")", None, pltcfg)
 
-            if all([x in methods for x in ['NOISeq', 'msEmpiRe', 'DESeq']]):
+            if all([x in methods for x in ['NOISeq', 'msEmpiRe', 'DESeq2']]):
 
                 method2calls = {}#defaultdict(set)
-                for method in ['NOISeq', 'msEmpiRe', 'DESeq']:
+                for method in ['NOISeq', 'msEmpiRe', 'DESeq2']:
                     adjpTitle = method + "_ADJ.PVAL"
                     adjPdata = compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(adjpTitle)).to_pairs()
                     method2calls[method] = set()

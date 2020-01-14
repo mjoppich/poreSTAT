@@ -46,21 +46,66 @@ if (mode == "all")
     print(length(bgGeneIDs))
 }
 
+allGeneIDs = allGeneIDs[!is.na(allGeneIDs)]
+bgGeneIDs = bgGeneIDs[!is.na(bgGeneIDs)]
+
 if (length(allGeneIDs) == 0)
 {
     print("NO GENE ID SELECTED. TERMINATING")
     quit(status=0, save='no')
 }
 
-egid = grcm38 %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
-head(egid)
+annotTable = NULL;
+
+if (organism == "mouse")
+{
+    annotTable = grcm38
+    egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+
+
+} else if (organism == "human")
+{
+    annotTable = grch38
+    egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+
+} else if (organism == "yeast")
+{
+
+    suppressMessages(suppressWarnings(require(org.Sc.sgd.db)))
+
+    readableState =F
+    allEntrez = allGeneIDs#sapply(allGeneIDs, function(x) {get(x, org.Sc.sgdENTREZID)} )
+    egid = data.frame("ensgene"=allGeneIDs, "entrez"=allEntrez)
+
+}
 
 entrezGenes = egid[!is.na(egid$entrez),]
 entrezGenes = as.vector(entrezGenes$entrez)
 
+annotTable = NULL;
+
+if (organism == "mouse")
+{
+    annotTable = grcm38
+    egid = annotTable %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
 
-egid = grcm38 %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+} else if (organism == "human")
+{
+    annotTable = grch38
+    egid = annotTable %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
+
+} else if (organism == "yeast")
+{
+
+    suppressMessages(suppressWarnings(require(org.Sc.sgd.db)))
+
+    readableState =F
+    allEntrez = bgGeneIDs#sapply(bgGeneIDs, function(x) {get(x, org.Sc.sgdENTREZID)} )
+    egid = data.frame("ensgene"=bgGeneIDs, "entrez"=allEntrez)
+
+}
+
 head(egid)
 
 entrezBG = egid[!is.na(egid$entrez),]
@@ -96,3 +141,6 @@ rsc[1] = "KEGG ID"
 colnames(rs) = rsc
 
 write.table(rs, file=paste(filename,"kegg",mode,"tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+
+print("finished")
+quit(status=0, save='no')

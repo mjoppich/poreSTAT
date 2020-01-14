@@ -18,7 +18,13 @@ if __name__ == '__main__':
 
     parser.add_argument("-p1", "--prefix1", type=str, required=True)
     parser.add_argument("-p2", "--prefix2", type=str, required=True)
-    
+
+    parser.add_argument('-s2', '--samples', nargs='+', type=str, default=[])
+
+
+    parser.add_argument('-pc', '--prefix-counts', dest="prefix_counts", action='store_true', default=False, help="run FC part")
+
+
     args = parser.parse_args()
 
     indf1 = DataFrame.parseFromFile(args.de1.name, skipChar='#', replacements = {
@@ -38,9 +44,8 @@ if __name__ == '__main__':
     df1Cols = indf1.getHeader()
     df2Cols = indf2.getHeader()
 
-    df1UniqueCols = [x for x in df1Cols if not x in df2Cols]
-    df2UniqueCols = [x for x in df2Cols if not x in df1Cols]
-
+    df1UniqueCols = [x for x in df1Cols if (not x in df2Cols or x in args.samples)]
+    df2UniqueCols = [x for x in df2Cols if (not x in df1Cols or x in args.samples)]
 
     df1SpecialCols = [x for x in df1Cols if any(["PVAL" in x, "FC" in x])]
     df2SpecialCols = [x for x in df2Cols if any(["PVAL" in x, "FC" in x])]
@@ -50,6 +55,28 @@ if __name__ == '__main__':
 
     df12CommonCols = [x for x in df1Cols if x in df2Cols and not x in df1SpecialCols and not x in df2SpecialCols]
 
+    # any common column should contain the same information ...
+    for ridx, (df1row, df2row) in enumerate(zip(indf1, indf2)):
+
+        if ridx == 10:
+            break
+
+
+        allCommonCols = [x for x in df12CommonCols]
+        for comCol in allCommonCols:
+
+            if df1row[comCol] != df2row[comCol]:
+                print("CHG", comCol)
+                df12CommonCols.remove(comCol)
+                df1UniqueCols.append(comCol)
+                df2UniqueCols.append(comCol)
+
+
+    df1UniqueCols = sorted(df1UniqueCols)
+    df2UniqueCols = sorted(df2UniqueCols)
+    df1SpecialCols = sorted(df1SpecialCols)
+    df2SpecialCols = sorted(df2SpecialCols)
+    df12CommonCols = sorted(df12CommonCols)
 
     df1Col2New = {}
     df2Col2New = {}
@@ -78,7 +105,15 @@ if __name__ == '__main__':
     
     
     outdf = DataFrame()
-    outdf.addColumns(df12CommonCols + df1UniqueCols + df2UniqueCols + df1NewCols + df2NewCols)
+
+    if args.prefix_counts:
+        outdf.addColumns(df12CommonCols + [args.prefix1 + "_" + x for x in df1UniqueCols] + [args.prefix2 + "_" + x for x in df2UniqueCols] + df1NewCols + df2NewCols)
+    else:
+        outdf.addColumns(df12CommonCols + df1UniqueCols + df2UniqueCols + df1NewCols + df2NewCols)
+
+
+
+
     for x in outdf.getHeader():
         print("O", x)
 
@@ -90,7 +125,11 @@ if __name__ == '__main__':
             data[x] = row[x]
 
         for x in df1UniqueCols:
-            data[x] = row[x]
+
+            if args.prefix_counts:
+                data[args.prefix1 + "_" +x] = row[x]
+            else:
+                data[x] = row[x]
 
         for x in df1Col2New:
             data[df1Col2New[x]] = row[x]
@@ -104,7 +143,11 @@ if __name__ == '__main__':
             data[x] = row[x]
 
         for x in df2UniqueCols:
-            data[x] = row[x]
+            if args.prefix_counts:
+                data[args.prefix2 + "_" +x] = row[x]
+            else:
+                data[x] = row[x]
+
 
         for x in df2Col2New:
             data[df2Col2New[x]] = row[x]

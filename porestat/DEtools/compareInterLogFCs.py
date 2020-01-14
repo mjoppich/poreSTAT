@@ -68,7 +68,13 @@ if __name__ == '__main__':
             sconditions1 = [".".join(x.split(".")[-4:-2]) for x in conditions1]
         else:
             if args.pathname:
-                sconditions1 = [x.split(os.path.sep)[-2] for x in conditions1]
+
+                # just in case it's not an actual path :D
+                sconditions1 = []
+                for x in conditions1:
+                    nx = x.split(os.path.sep)
+                    sconditions1.append(nx[max([0, len(nx) - 2])])
+
             else:
                 sconditions1 = [os.path.basename(x) for x in conditions1]
 
@@ -78,7 +84,13 @@ if __name__ == '__main__':
         else:
 
             if args.pathname:
-                sconditions2 = [x.split(os.path.sep)[-2] for x in conditions2]
+
+                # just in case it's not an actual path :D
+                sconditions2 = []
+                for x in conditions2:
+                    nx = x.split(os.path.sep)
+                    sconditions2.append(nx[max([0, len(nx) - 2])])
+
             else:
                 sconditions2 = [os.path.basename(x) for x in conditions2]
             
@@ -116,7 +128,7 @@ if __name__ == '__main__':
 
         plt.legend(loc='upper left')
 
-        plt.savefig(args.output[fidx] + ".interlogfc."+str(fidx)+".png")
+        plt.savefig(args.output[fidx] + ".interlogfc."+str(fidx)+".png", bbox_inches="tight")
 
         plt.close()
 

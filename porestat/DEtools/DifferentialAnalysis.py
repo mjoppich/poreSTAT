@@ -9,7 +9,11 @@ from glob import glob
 from shutil import copyfile
 from multiprocessing import Pool
 
-sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../")
+
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../")
+
+from porestat.utils.OrderedDefaultDictClass import OrderedDefaultDict
+
 
 def reportStart(reportFile):
 
@@ -131,8 +135,12 @@ def prepareDescriptions():
                                              "<p>If particularly a few/one replicate has a wide shape compared to all others, it probably should get excluded.</p>"
 
     plotId2Descr[
-        "Compare Log Fold-Changes (raw counts)"] = "<p>These plots compare all pairwise logFCs from all replicates within each condition.</p>" \
-                                                   "<p>Since these are replicates, no large logFcs are expected, nor very large ones.</p>"
+        "Compare Log Fold-Changes (raw counts)"] = "<p>These plots compare all pairwise logFCs from all replicates within each condition (log(raw_count_1/raw_count_2)).</p>" \
+                                                   "<p>Since these are replicates, most logFCs should be zero or close to zero.</p>"
+
+    plotId2Descr["Compare Log Fold-Changes (MS-EmpiRe normalized counts)"] = "<p>These plots compare all pairwise logFCs from all replicates within each condition (log(norm_count_1/norm_count_2)).</p>" \
+                                                    "<p>Counts have been normalized by MS-EmpiRe.</p>" \
+                                                   "<p>Since these are replicates, most logFCs should be zero or close to zero. Only expressed genes are shown.</p>"
 
     plotId2Descr[
         "Compare Inter-Log Fold-Changes (raw counts)"] = "<p>These plots compare all pairwise logFCs between the two conditions.</p>" \
@@ -161,6 +169,7 @@ def prepareDescriptions():
 
     """
 
+    # has description inline
 
     """
     ENRICHMENT
@@ -219,6 +228,10 @@ if __name__ == '__main__':
     parser.add_argument('-c1', '--cond1', nargs='+', type=str, action='append', required=True, help="columns in count files for cond1")
     parser.add_argument('-c2', '--cond2', nargs='+', type=str, action='append', required=True, help="columns in count files for cond2")
 
+    parser.add_argument('-fpkm', '--no-fpkm', dest='nofpkm', action='store_true', default=False)
+    parser.add_argument('-tpm', '--no-tpm', dest='notpm', action='store_true', default=False)
+    parser.add_argument('-rrna', '-keep-rrna', dest='keeprrna', action='store_true', default=False)
+
     parser.add_argument('-n', '--name', type=str, required=True)
     parser.add_argument('-o', '--organism', type=str, required=True)
     parser.add_argument('-on', '--organism-name', type=str, required=False)
@@ -232,12 +245,20 @@ if __name__ == '__main__':
 
     parser.add_argument('-all', '--all', action='store_true', default=False, help="run FC part")
     parser.add_argument('-sim', '--simulate', action='store_true', default=False, help="run FC part")
+    parser.add_argument('-pc', '--prefix-counts', dest="prefix_counts", action='store_true', default=False, help="run FC part")
 
-    parser.add_argument('-e', '--enhance', nargs='+', type=argparse.FileType('r'), help='enhancement file', default=open("/mnt/d/dev/data/genomes/ensembl.symbol.mouse.list", "r"))
-    parser.add_argument('-l', '--lengths', nargs='+', type=argparse.FileType('r'), help='lengths file', default=open("/mnt/d/dev/data/genomes/ensembl.symbol.mouse.lengths.list", "r"))
+    parser.add_argument('-e', '--enhance', type=argparse.FileType('r'), help='enhancement file', default=open("/mnt/d/dev/data/genomes/ensembl.symbol.mouse.list", "r"))
+    parser.add_argument('-l', '--lengths', type=argparse.FileType('r'), help='lengths file', default=open("/mnt/d/dev/data/genomes/ensembl.symbol.mouse.lengths.list", "r"))
 
     parser.add_argument('-m', '--de_methods', nargs='+', type=str, help="differential methods for analysis. If combination, write DESeq;msEmpiRe")
+    parser.add_argument('-em', '--enrich-methods', nargs='+', type=str, default=None, required=False,
+                        help="differential methods for enrichment analysis. If combination, write DESeq;msEmpiRe")
+
     parser.add_argument('-p', '--prefixes', nargs='+', type=str, required=True, help="short names for all subruns")
+
+
+    parser.add_argument('-cnp', '--condition-no-path', dest='condition_no_path', action='store_true', default=False)
+    parser.add_argument('-sn', '--synthetic-names', dest='synthetic_names', action='store_true', default=False)
 
     parser.add_argument('-r', '--report', type=argparse.FileType('w'), required=True, help='report files')
 
@@ -251,10 +272,44 @@ if __name__ == '__main__':
         args.enrichment = True
         args.stats = True
 
+    if args.prefix_counts:
+        args.prefix_counts = "--prefix-counts"
+    else:
+        args.prefix_counts = ""
 
-    #args.simulate=False
+    print(args.prefix_counts)
+
+    origArgsSimulate = args.simulate
 
     args.save = os.path.realpath(args.save)
+
+
+    args.fpkm = True
+    args.tpm = True
+    args.rm_rrna = True
+    if args.nofpkm:
+        args.fpkm = False
+
+    if args.notpm:
+        args.tpm = False
+
+    if args.keeprrna:
+        args.rm_rrna = False
+
+
+
+    tpmFlag = "--tpm"
+    fpkmFlag = "--fpkm"
+    rrnaFlag = "--no-rrna"
+
+    if not args.fpkm:
+        fpkmFlag = ""
+
+    if not args.tpm:
+        tpmFlag = ""
+
+    if not rrnaFlag:
+        rrnaFlag = ""
 
 
     if args.organism_name == None:
@@ -264,10 +319,17 @@ if __name__ == '__main__':
         elif args.organism == "hsa":
             args.organism_name = "human"
 
+        elif args.organism == "yeast":
+            args.organism_name = "yeast"
+
     if args.organism_mapping == None:
 
         if args.organism == "mmu":
             args.organism_mapping = "org.Mm.eg.db"
+        elif args.organism == "hsa":
+            args.organism_mapping = "org.Hs.eg.db"
+        elif args.organism == "yeast":
+            args.organism_mapping = "org.Sc.sgd.db"
 
 
     if args.organism_mapping == None:
@@ -292,6 +354,8 @@ if __name__ == '__main__':
         raise argparse.ArgumentError("cond2 must have at least 3 replicates")
 
     numberOfDiffSamples = len(args.prefixes)
+
+    errMSG = set()
 
     #CONDITIONSNAME = "macrophages"
 
@@ -331,43 +395,50 @@ if __name__ == '__main__':
 
     def path2rsave( inWord ):
 
-        outw = inWord.replace("//", "/").replace("/", ".").replace("-", ".")
-        outw = "X" + outw
+        outw = inWord.replace("/", ".").replace("-", ".")
+
+        #if not outw[0].isalpha():
+        #    outw = "X" + outw
 
         return outw
 
 
-    cond1RPaths = []
-    for cols in args.cond1:
+    def conditions2rpath( inconds ):
+        condRPaths = []
+        for cols in inconds:
 
-        colRPaths = []
-        for col in cols:
-            ncol = col
-            if ncol.startswith("./"):
-                ncol = ncol[2:]
+            colRPaths = []
+            for col in cols:
+                ncol = col
 
-            npath = os.path.join(cwd, ncol)
-            rpath = path2rsave(npath)
-            #print(ncol, npath, rpath)
-            colRPaths.append(rpath)
-        cond1RPaths.append(colRPaths)
+                if not args.condition_no_path:
+                    if ncol.startswith("./"):
+                        ncol = ncol[2:]
 
-    cond2RPaths = []
-    for cols in args.cond2:
+                    npath = os.path.join(cwd, ncol)
+                    rpath = path2rsave(npath)
+                    ncol = rpath
 
-        colRPaths = []
+                elif args.synthetic_names:
+                    rpath = path2rsave(ncol)
+                    print(ncol, rpath)
+                    ncol = rpath
 
-        for col in cols:
-            ncol = col
-            if ncol.startswith("./"):
-                ncol = ncol[2:]
+                # print(ncol, npath, rpath)
+                colRPaths.append(ncol)
+            condRPaths.append(colRPaths)
 
-            npath = os.path.join(cwd, ncol)
-            rpath = path2rsave(npath)
-            #print(ncol, npath, rpath)
-            colRPaths.append(rpath)
+        return  condRPaths
 
-        cond2RPaths.append(colRPaths)
+
+
+    cond1RPaths = conditions2rpath(args.cond1)
+    cond2RPaths = conditions2rpath(args.cond2)
+
+    print(cond1RPaths)
+    print(cond2RPaths)
+
+
     logging.root.setLevel(logging.DEBUG)
 
     consoleHandler = logging.StreamHandler()
@@ -438,7 +509,8 @@ if __name__ == '__main__':
         args.report.write("<h1>poreSTAT: COUNTS ANALYSIS</h1>\n")
         args.report.flush()
 
-        caPlots = defaultdict(lambda: defaultdict(list))
+        #caPlots = defaultdict(lambda: defaultdict(list))
+        caPlots = OrderedDefaultDict(lambda: OrderedDefaultDict(list))
 
         for pidx, prefix in enumerate(args.prefixes):
             caLogger.info("Running SubSample {} ({})".format(pidx, prefix))
@@ -490,6 +562,21 @@ if __name__ == '__main__':
             runSysCall(sysCall, "Compare Replicates (countreplicates)", caLogger, "Compare Replicates (raw counts)",
                        os.path.join(args.diffreg[pidx], "orig_counts.countreplicates"), args, prefix, caPlots)
 
+
+            outPrefix = os.path.join(args.diffreg[pidx], "empire_norm_counts.compLogFC")
+            sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
+                script=os.path.realpath(os.path.join(scriptMain, "compareLogFC.py")),
+                counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
+                conds1=" ".join(cond1RPaths[pidx]),
+                conds2=" ".join(cond2RPaths[pidx]),
+                output=outPrefix
+            )
+
+
+            runSysCall(sysCall, "Compare LogFC (normalized)", caLogger, "Compare Log Fold-Changes (MS-EmpiRe normalized counts)",
+                       outPrefix, args, prefix, caPlots)
+
+
             sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "compareLogFC.py")),
                 counts=args.counts[pidx].name,
@@ -499,19 +586,13 @@ if __name__ == '__main__':
             )
 
 
-            runSysCall(sysCall, "Compare LogFC", caLogger, "Compare Log Fold-Changes (raw counts)",
+            runSysCall(sysCall, "Compare LogFC (raw)", caLogger, "Compare Log Fold-Changes (raw counts)",
                        os.path.join(args.diffreg[pidx], "orig_counts.compLogFC"), args, prefix, caPlots)
 
-            sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "compareInterLogFCs.py")),
-                counts=args.counts[pidx].name,
-                conds1=" ".join(args.cond1[pidx]),
-                conds2=" ".join(args.cond2[pidx]),
-                output=os.path.join(args.diffreg[pidx], "orig_counts.interLogFC")
-            )
 
-            runSysCall(sysCall, "Compare Inter LogFC", caLogger, "Compare Inter-Log Fold-Changes (raw counts)",
-                       os.path.join(args.diffreg[pidx], "orig_counts.interLogFC"), args, prefix, caPlots)
+
+
+
 
             sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "compareInterLogFCs.py")),
@@ -527,6 +608,23 @@ if __name__ == '__main__':
 
             runSysCall(sysCall, "Compare Inter LogFC (normalized)", caLogger, "Compare Inter-Log Fold-Changes (msEmpiRe-normalized counts)",
                        os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm.interlogfc."), args, prefix, caPlots)
+
+            sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
+                script=os.path.realpath(os.path.join(scriptMain, "compareInterLogFCs.py")),
+                counts=args.counts[pidx].name,
+                conds1=" ".join(args.cond1[pidx]),
+                conds2=" ".join(args.cond2[pidx]),
+                output=os.path.join(args.diffreg[pidx], "orig_counts.interLogFC")
+            )
+
+            runSysCall(sysCall, "Compare Inter LogFC", caLogger, "Compare Inter-Log Fold-Changes (raw counts)",
+                       os.path.join(args.diffreg[pidx], "orig_counts.interLogFC"), args, prefix, caPlots)
+
+
+
+
+
+
 
             sysCall = "python3 {script} --counts {counts} --groups {conds1} --groups {conds2} --output {output}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "countPlots.py")),
@@ -550,6 +648,22 @@ if __name__ == '__main__':
 
             runSysCall(sysCall, "Compare Counts Per Gene", caLogger, "Raw Counts Per Gene",
                        os.path.join(args.diffreg[pidx], "countspergene.cpergenes"), args, prefix, caPlots)
+
+
+            if args.enhance != None and args.enhance.name != None:
+
+                sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output} --biotypes {biotypes}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "compareCountsPerBiotype.py")),
+                    counts=args.counts[pidx].name,
+                    conds1=" ".join(args.cond1[pidx]),
+                    conds2=" ".join(args.cond2[pidx]),
+                    output=os.path.join(args.diffreg[pidx], "countsperbiotype"),
+                    biotypes=args.enhance.name
+                )
+
+                runSysCall(sysCall, "Compare Counts Per Biotype", caLogger, "Raw Counts Per Biotype",
+                           os.path.join(args.diffreg[pidx], "countsperbiotype.cperbiotype"), args, prefix, caPlots)
+
 
 
             caLogger.info("Finished SubSample {} ({})".format(pidx, prefix))
@@ -607,19 +721,79 @@ if __name__ == '__main__':
             plotDict[method][plotid][prefix] = glob(plotsPrefix + "*.png")
             log.debug("Found Images\n" + "\n".join(plotDict[method][plotid][prefix]))
 
+    def splitDEMethods(inMethods):
+
+        retMethods = []
+        for x in inMethods:
+
+            if ";" in x:
+                retMethods.append( tuple(x.split(";")))
+            elif ":" in x:
+                retMethods.append( tuple(x.split(":")))
+            else:
+                retMethods.append(tuple(x.split(";")))
+
+        return retMethods
+
     if args.stats or args.enrichment:
         statsLogger.info("Starting STATS OR ENRICHMENT")
 
-        performMethods = [tuple(x.split(";")) for x in args.de_methods]
+
+        performMethods = splitDEMethods(args.de_methods)
+        #performMethods = [tuple(x.split(";")) for x in args.de_methods]
 
         statsLogger.info("Performing analysis for methods: "+" ".join([str(x) for x in performMethods]))
 
-        deEnrichPlots = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        #deEnrichPlots = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        deEnrichPlots = OrderedDefaultDict(lambda: OrderedDefaultDict(lambda: OrderedDefaultDict(list)))
 
         if args.stats:
 
             args.report.write("<h1>poreSTAT: REPORTS for DE ANALYSIS</h1>\n")
             args.report.flush()
+
+            if len(args.prefixes) == 2:
+
+                for countType in ["", "TPM", "FPKM"]:
+                    """
+    
+                    PLOT ENV START
+    
+                    """
+
+                    countAdd = countType
+                    if len(countAdd) > 0:
+                        countAdd = "." + countAdd
+
+                    outPrefix = os.path.join(args.save, args.name +  ".compare_mappers" + countAdd)
+                    sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --prefixes {prefixes} --output {output}".format(
+                        script=os.path.realpath(os.path.join(scriptMain, "compareMappingReplicates.py")),
+                        counts=" ".join([os.path.join(args.diffreg[0], "counts.tpm.fpkm.tsv"), os.path.join(args.diffreg[1], "counts.tpm.fpkm.tsv")]),
+                        conds1=" ".join([x +countAdd for x in args.cond1[0]] + [x + countAdd for x in args.cond2[0]]),
+                        conds2=" ".join([x +countAdd for x in args.cond1[1]] + [x + countAdd for x in args.cond2[1]]),
+                        prefixes=" ".join([args.prefixes[0], args.prefixes[1]]),
+                        output=outPrefix
+                    )
+
+                    if countType == "":
+                        countType = "raw"
+
+                    plotName = "Compare Mapper Counts ({ctname})".format(ctname=countType)
+                    plotId2Descr[plotName] = "<p>This plot compares the two supplied count files.</p>" \
+                                    "<p>In the best of all worlds these plots show a perfect diagonal.</p>" \
+                                    "<p>The more the dots deviate from such a diagonal, the less consistent are the mappers/counts.</p>"
+
+                    runSysCall(sysCall, plotName, statsLogger, plotName,
+                               outPrefix, args, "_".join(args.prefixes), ("all",),
+                               deEnrichPlots)
+
+                    """
+    
+                    PLOT ENV END
+    
+                    """
+
+
 
             for methods in performMethods:
                 prefix2countFile = {}
@@ -629,7 +803,7 @@ if __name__ == '__main__':
                 for pidx, prefix in enumerate(args.prefixes):
                     statsLogger.info("Running SubSample {} ({})".format(pidx, prefix))
 
-                    countDeFile = glob("{diffreg}/count__*.tsv".format(diffreg=args.diffreg[pidx]))[0]
+                    countDeFile = glob("{diffreg}/count_*.tsv".format(diffreg=args.diffreg[pidx]))[0]
                     robustDeFile = os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv")
 
                     prefix2countFile[prefix] = countDeFile
@@ -645,21 +819,59 @@ if __name__ == '__main__':
                                                                                          "<p>The volcano plot shows logFC and -log10(pVal) for the robustly detected genes (that are genes that are DE with all above methods).</p>".format(" ".join(methods))
                     runSysCall(sysCall, "Calculate Robust FCs", statsLogger, "DE Methods Overview ({})".format(" ".join(methods)), robustDeFile + ".rob.", args, prefix, methods, deEnrichPlots)
 
+
+
+
                     #makePCA.py --fc report_save/aortas.star.msEmpiRe_DESeq.tsv --output report_save/aortas.star.msEmpiRe_DESeq.tsv.mpca
-                    sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000".format(
+                    sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 --samples {samples}".format(
                         script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
                         counts=robustDeFile,
+                        samples=" ".join(args.cond1[pidx] + args.cond2[pidx] ),
                         output=robustDeFile + ".mpca"
                     )
 
-                    plotId2Descr["Cluster Raw Counts ({})".format(" ".join(
-                        methods))] = "<p>The following plots cluster the raw counts for the top differential genes (methods {})</p>" \
-                                     "<p>The cluster map plot shows how close the expression values (raw counts) are related..</p>" \
+                    plotName = "Cluster Raw Counts ({}, top 1000)".format(" ".join(methods))
+                    plotId2Descr[plotName] = "<p>The following plots cluster the raw counts for the top differential genes (methods {})</p>" \
+                                     "<p>The cluster map plot shows how close the expression values (raw counts) are related.</p>" \
                                      "<p>The scatter plot has performed a UMAP transformation and displays these results.</p>".format(
                         " ".join(methods))
 
-                    runSysCall(sysCall, "Cluster Data", statsLogger, "Cluster Raw Counts ({})".format(" ".join(
-                        methods)), robustDeFile + ".mpca.", args, prefix, methods, deEnrichPlots)
+                    runSysCall(sysCall, plotName, statsLogger, plotName, robustDeFile + ".mpca.", args, prefix, methods, deEnrichPlots)
+
+                    sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --samples {samples}".format(
+                        script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
+                        counts=robustDeFile,
+                        samples=" ".join(args.cond1[pidx] + args.cond2[pidx]),
+                        output=robustDeFile + ".all.mpca"
+                    )
+
+                    plotName = "Cluster Raw Counts ({}, all)".format(" ".join(methods))
+                    plotId2Descr[plotName] = "<p>The following plots cluster the raw counts for all differential genes (methods {})</p>" \
+                                     "<p>The cluster map plot shows how close the expression values (raw counts) are related.</p>" \
+                                     "<p>The scatter plot has performed a UMAP transformation and displays these results.</p>".format(
+                        " ".join(methods))
+
+                    runSysCall(sysCall, plotName, statsLogger, plotName, robustDeFile + ".all.mpca.", args, prefix, methods, deEnrichPlots)
+
+
+                    sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 100 --samples {samples}".format(
+                        script=os.path.realpath(os.path.join(scriptMain, "makeTopDiffExpr.py")),
+                        counts=robustDeFile,
+                        methods=" ".join(methods),
+                        samples=" ".join(args.cond1[pidx] + args.cond2[pidx]),
+                        output=robustDeFile + ".expr_topde"
+                    )
+
+                    plotId2Descr["Cluster Top 100 DE Genes by Counts ({})".format(" ".join(methods))] = "" \
+                                                                                                                   "<p>The following plots cluster the raw counts for the top differential genes (methods {ms})</p>" \
+                                                                                                                   "<p>The cluster map plot shows the gene-expression (raw counts) for each selected gene.</p>".format(
+                    ms=" ".join(methods))
+
+                    runSysCall(sysCall, "Cluster Top 100 DE Genes by Counts ({})", statsLogger,
+                               "Cluster Top 100 DE Genes by Counts ({})".format(" ".join(
+                                   methods)), robustDeFile + ".expr_topde", args, prefix, methods,
+                               deEnrichPlots)
+
 
                     sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --last --ignoreMissing".format(
                         script=os.path.realpath(os.path.join(scriptMain, "compareCountsPerGene.py")),
@@ -686,8 +898,12 @@ if __name__ == '__main__':
                             conds1=" ".join(cond1RPaths[pidx]),
                             conds2=" ".join(cond2RPaths[pidx])
                         )
+                        #plotName = "Compare DE Counts ({})".format(" ".join(methods))
+                        #plotId2Descr[plotName] = "<p>Plots something cool</p>"
 
-                        runSysCall(sysCall, "Compare DE Counts", statsLogger, None, None, args, prefix, methods, deEnrichPlots)
+                        runSysCall(sysCall, plotName, statsLogger, None, None, args, prefix, methods, deEnrichPlots)
+
+
 
 
 
@@ -725,11 +941,10 @@ if __name__ == '__main__':
                         runSysCall(sysCall, "Compare Counts Per Gene", statsLogger, "Compare {} Counts Per Gene".format(countType),
                                    os.path.join(args.diffreg[pidx], "countspergene."+countType+".cpergenes"), args, prefix, methods, deEnrichPlots)
 
-
-
-                        sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 --{ct}".format(
+                        sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 --{ct} --samples {samples}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
                             counts=robustDeFile,
+                            samples=" ".join(args.cond1[pidx] + args.cond2[pidx] ),
                             output=robustDeFile + "." + countType + ".mpca",
                             ct=countType.lower()
                         )
@@ -746,119 +961,299 @@ if __name__ == '__main__':
                             methods)), robustDeFile + "." + countType + ".mpca", args, prefix, methods, deEnrichPlots)
 
 
-
-                if True:
-
-                    allPrefixes = [x for x in prefix2countFile]
-
-                    combinedRaw = os.path.join(args.save, args.name + "." + "combined_raw" + "." + methodStr + ".tsv")
-                    combinedDE = os.path.join(args.save, args.name + "." + "combined" + "." + methodStr + ".tsv")
-
-                    sysCall = "python3 {script} --de1 {counts1} --de2 {counts2} --prefix1 {prefix1} --prefix2 {prefix2} --output {output}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "mergeDiffreg.py")),
-                        counts1=prefix2countFile[allPrefixes[0]],
-                        counts2=prefix2countFile[allPrefixes[1]],
-                        prefix1=allPrefixes[0],
-                        prefix2=allPrefixes[1],
-                        methods=" ".join(methods),
-                        output=combinedRaw
-                    )
-
-                    runSysCall(sysCall, "Merging DE Methods", statsLogger, None, None, args, prefix, methods, deEnrichPlots)
-
-                    prefix2countFile[prefix] = countDeFile
-                    sysCall = "python3 {script} --de {counts} --methods {methods} --output {output}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "calcRobustFCs.py")),
-                        counts=combinedRaw,
-                        methods=" ".join(methods),
-                        output=combinedDE
-                    )
-
-                    runSysCall(sysCall, "Calculate Robust FCs", statsLogger, "DE Methods Overview", combinedDE + ".upset", args, prefix, methods, deEnrichPlots)
-
-
-                    for countType in ["", "TPM", "FPKM"]:
-
-                        sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 {ct}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
-                            counts=combinedDE,
+                        sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 100 {ct} --samples {samples}".format(
+                            script=os.path.realpath(os.path.join(scriptMain, "makeTopDiffExpr.py")),
+                            counts=robustDeFile,
                             methods=" ".join(methods),
-                            output=combinedDE + "." + countType + ".mpca",
+                            samples=" ".join(args.cond1[pidx] + args.cond2[pidx]),
+                            output=robustDeFile + "." + countType + ".expr_topde",
                             ct="--"+countType.lower() if len(countType) > 0 else ""
                         )
 
-                        plotId2Descr["Cluster Combined {} Counts ({})".format(countType, " ".join(
-                            methods))] = "<p>The following plots cluster the raw counts for the top differential genes (methods {})</p>" \
-                                         "<p>The cluster map plot shows how close the expression values (raw counts) are related..</p>" \
-                                         "<p>The scatter plot has performed a UMAP transformation and displays these results.</p>".format(
-                            " ".join(methods))
+                        plotName = "Cluster Top 100 DE Genes {} Counts ({})".format(countType, " ".join(methods))
+
+                        plotId2Descr[plotName] = ""\
+                                        "<p>The following plots cluster the raw counts for the top differential genes (methods {ms})</p>" \
+                                        "<p>The cluster map plot shows the gene-expression ({ev}) for each selected gene.</p>".format(ms=" ".join(methods), ev=countType)
 
 
-                        runSysCall(sysCall, "Cluster Data Combined", statsLogger,
-                                   "Cluster Combined {} Counts ({})".format(countType, " ".join(
-                                       methods)), combinedDE + "." + countType + ".mpca", args, prefix, methods,
+                        runSysCall(sysCall, plotName, statsLogger,
+                                   plotName, robustDeFile + "." + countType + ".expr_topde", args, prefix, methods,
                                    deEnrichPlots)
 
 
+                if True:
 
-                #[plotid][method][prefix]
-                print(deEnrichPlots)
+                    errMSGs = "YOU SHOULD FIX THE PREFIX"
+                    print(errMSGs)
+                    errMSG.add((796, errMSGs))
 
-                for method in deEnrichPlots:
+                    prefix = "combined"
 
-                    tableOut = "<h2>{}</h2>".format("&".join(method))
-                    args.report.write(tableOut + "\n")
+                    allPrefixes = [x for x in prefix2countFile]
 
-                    for plotId in deEnrichPlots[method]:
+                    if len(args.prefixes) == 2:
 
-                        prefixCount = len(deEnrichPlots[method][plotId])
+                        combinedRaw = os.path.join(args.save,
+                                                   args.name + "." + "combined_raw" + "." + methodStr + ".tsv")
+                        combinedDE = os.path.join(args.save, args.name + "." + "combined" + "." + methodStr + ".tsv")
 
-                        tableOut = "<h3>{}</h3>".format(plotId)
+                        combinedSamples = [allPrefixes[0] + "_" + x for x in args.cond1[0]] + [allPrefixes[1] + "_" + x for x in args.cond1[1]]
+                        combinedSamples += [allPrefixes[0] + "_" + x for x in args.cond2[0]] + [allPrefixes[1] + "_" + x for x in args.cond2[1]]
 
-                        if plotId in plotId2Descr:
-                            tableOut += "<div>{}</div>".format(plotId2Descr[plotId])
+                        sysCall = "python3 {script} {prefix_counts} --samples {samples} --de1 {counts1} --de2 {counts2} --prefix1 {prefix1} --prefix2 {prefix2} --output {output}".format(
+                            script=os.path.realpath(os.path.join(scriptMain, "mergeDiffreg.py")),
+                            counts1=prefix2countFile[allPrefixes[0]],
+                            counts2=prefix2countFile[allPrefixes[1]],
+                            prefix1=allPrefixes[0],
+                            prefix2=allPrefixes[1],
+                            samples=" ".join(args.cond1[0] + args.cond2[0] + args.cond1[1] + args.cond2[1]),
+                            methods=" ".join(methods),
+                            prefix_counts=args.prefix_counts,
+                            output=combinedRaw
+                        )
 
-                        tableOut += "<table>"
+                        runSysCall(sysCall, "Merging DE Methods", statsLogger, None, None, args, prefix, methods +  ("MapCombined",),
+                                   deEnrichPlots)
 
+                        prefix2countFile[prefix] = countDeFile
+                        sysCall = "python3 {script} --de {counts} --methods {methods} --output {output}".format(
+                            script=os.path.realpath(os.path.join(scriptMain, "calcRobustFCs.py")),
+                            counts=combinedRaw,
+                            methods=" ".join(methods),
+                            output=combinedDE
+                        )
+
+                        runSysCall(sysCall, "Calculate Robust FCs", statsLogger, "DE Methods Overview",
+                                   combinedDE + ".rob.", args, prefix, methods +  ("MapCombined",), deEnrichPlots)
+
+                        """
+
+                        PLOT ENV START
+
+                        """
+
+                        outputname = os.path.join(args.save, args.name + "." + methodStr + "." + "rankplot")
+
+                        inname0 = os.path.join(args.save, args.name + "." + args.prefixes[0] +"."+ methodStr + ".tsv")
+                        inname1 = os.path.join(args.save, args.name + "." + args.prefixes[1] +"."+ methodStr + ".tsv")
+
+                        sysCall = "python3 {script} --counts {counts} --prefixes {prefixes} --output {output}".format(
+                            script=os.path.realpath(os.path.join(scriptMain, "compareRankPlots.py")),
+                            counts=inname0 + " " + inname1,
+                            prefixes=" ".join(args.prefixes),
+                            output=outputname
+                        )
+
+                        plotName = "Compare DE Ranks by mappers"
+                        plotId2Descr[plotName] = "<p>This plot compares significant robust genes (DE).</p>" \
+                                                 "<p>Genes must have robust adj. p-value l.t. 0.05.</p>" \
+                                                 "<p>Between the the mappers, only horizontal lines are expected, unless results differ between mappers.</p>"
+
+                        runSysCall(sysCall, plotName, statsLogger, plotName,
+                                   outputname, args, "_".join(args.prefixes), methods +  ("MapCombined",),
+                                   deEnrichPlots)
+
+                        """
+
+                        PLOT ENV END
+
+                        """
+
+
+                        for countType in ["", "TPM", "FPKM"]:
+
+                            """
+    
+                            PLOT ENV START
+    
+                            """
+                            outPrefix = combinedDE + "." + countType + ".high_expressed"
+                            sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output".format(
+                                script=os.path.realpath(os.path.join(scriptMain, "compareCombinedData.py")),
+                                counts=combinedDE,
+                                conds1="",
+                                conds2="",
+                                output=outPrefix
+                            )
+
+                            plotName = "Compare Top Expressed Genes ({})".format(countType)
+                            plotId2Descr[plotName] = "<p>Compares Top Expressed Genes in Two Sets</p>"
+
+                            #runSysCall(sysCall, plotName, statsLogger, plotName,
+                            #           outPrefix, args, "_".join(args.prefixes), "all",
+                            #           deEnrichPlots)
+
+                            """
+    
+                            PLOT ENV END
+    
+                            """
+
+                            """
+                            
+                            PLOT ENV START
+                            
+                            """
+                            outPrefix = combinedDE + "." + countType + ".mpca"
+                            sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 {ct} --samples {samples}".format(
+                                script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
+                                counts=combinedDE,
+                                methods=" ".join(methods),
+                                output=outPrefix,
+                                samples=" ".join(combinedSamples),
+                                ct="--"+countType.lower() if len(countType) > 0 else ""
+                            )
+
+                            plotName = "Cluster Combined {} Correlation/Distance ({}) (Top 1000)".format(countType, " ".join(methods))
+                            plotId2Descr[plotName] = "<p>The following plots use the raw counts for the top 1000 differential genes (methods {})</p>" \
+                                             "<p>The cluster map plot shows how close the expression values (raw counts) are related.</p>" \
+                                             "<p>The scatter plot has performed a UMAP transformation and displays these results.</p>".format(
+                                " ".join(methods))
+
+                            runSysCall(sysCall, plotName, statsLogger, plotName,
+                                       outPrefix, args, prefix, methods +  ("MapCombined",),
+                                       deEnrichPlots)
+
+                            """
+    
+                            PLOT ENV END
+    
+                            """
+
+
+                            """
+    
+                            PLOT ENV START
+                            """
+                            outPrefix = combinedDE + "." + countType + ".all.mpca"
+                            sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB {ct} --samples {samples}".format(
+                                script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
+                                counts=combinedDE,
+                                methods=" ".join(methods),
+                                output=outPrefix,
+                                samples=" ".join(combinedSamples),
+                                ct="--"+countType.lower() if len(countType) > 0 else ""
+                            )
+
+                            plotName = "Cluster All Combined {} Correlation/Distance ({})".format(countType, " ".join(methods))
+                            plotId2Descr[plotName] = "<p>The following plots use the raw counts for all differential genes (methods {})</p>" \
+                                             "<p>The cluster map plot shows how close the expression values (raw counts) are related.</p>" \
+                                             "<p>The scatter plot has performed a UMAP transformation and displays these results.</p>".format(
+                                " ".join(methods))
+
+
+                            runSysCall(sysCall, plotName, statsLogger,
+                                       plotName,
+                                       outPrefix, args, prefix, methods +  ("MapCombined",),
+                                       deEnrichPlots)
+                            """
+    
+                            PLOT ENV END
+    
+                            """
+
+                            sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 100 {ct}  --samples {samples}".format(
+                                script=os.path.realpath(os.path.join(scriptMain, "makeTopDiffExpr.py")),
+                                counts=combinedDE,
+                                methods=" ".join(methods),
+                                samples=" ".join(combinedSamples),
+                                output=combinedDE + "." + countType + ".expr_topde",
+                                ct="--"+countType.lower() if len(countType) > 0 else ""
+                            )
+
+                            plotId2Descr["Cluster TopDE Combined {} Counts ({})".format(countType, " ".join(methods))] = ""\
+                                            "<p>The following plots cluster the raw counts for the top differential genes (methods {ms})</p>" \
+                                            "<p>The cluster map plot shows the gene-expression ({ev}) for each selected gene.</p>".format(ms=" ".join(methods), ev=countType)
+
+
+                            runSysCall(sysCall, "Cluster Data Combined (TopDiffReg)", statsLogger,
+                                       "Cluster TopDE Combined {} Counts ({})".format(countType, " ".join(
+                                           methods)), combinedDE + "." + countType + ".expr_topde", args, prefix, methods +  ("MapCombined",),
+                                       deEnrichPlots)
+
+
+                    #args.simulate=True
+                    # TODO maybe delete combinedDE file here?
+
+
+
+
+            #[plotid][method][prefix]
+            for method in deEnrichPlots:
+                print(method)
+                for plotid in deEnrichPlots[method]:
+                    print(method, plotid, deEnrichPlots[method][plotid])
+
+            for method in deEnrichPlots:
+
+                tableOut = "<h2>{}</h2>".format("&".join(method))
+                args.report.write(tableOut + "\n")
+
+                for plotId in deEnrichPlots[method]:
+
+                    prefixCount = len(deEnrichPlots[method][plotId])
+
+                    tableOut = "<h3>{}</h3>".format(plotId)
+
+                    if plotId in plotId2Descr:
+                        tableOut += "<div>{}</div>".format(plotId2Descr[plotId])
+
+                    tableOut += "<table>"
+
+                    tableOut += "<tr>"
+                    for prefix in deEnrichPlots[method][plotId]:
+                        tableOut += "<td>" + str(prefix) + "</td>"
+                    tableOut += "</tr>"
+
+                    print(plotId)
+                    for filetuple in itertools.zip_longest(*[deEnrichPlots[method][plotId][x] for x in deEnrichPlots[method][plotId]]):
                         tableOut += "<tr>"
-                        for prefix in deEnrichPlots[method][plotId]:
-                            tableOut += "<td>" + str(prefix) + "</td>"
+
+                        print(filetuple)
+                        for imgFile in filetuple:
+
+                            if imgFile != None:
+                                tableOut += "<td><img src=\"" + str(os.path.relpath(os.path.realpath(imgFile), os.path.dirname(args.report.name))) + "\"/></td>"
+                            else:
+                                tableOut += "<td>N/A</td>"
+
                         tableOut += "</tr>"
 
-                        print(plotId)
-                        for filetuple in itertools.zip_longest(*[deEnrichPlots[method][plotId][x] for x in deEnrichPlots[method][plotId]]):
-                            tableOut += "<tr>"
+                    tableOut += "</table>"
 
-                            print(filetuple)
-                            for imgFile in filetuple:
-
-                                if imgFile != None:
-                                    tableOut += "<td><img src=\"" + str(os.path.relpath(os.path.realpath(imgFile), os.path.dirname(args.report.name))) + "\"/></td>"
-                                else:
-                                    tableOut += "<td>N/A</td>"
-
-                            tableOut += "</tr>"
-
-                        tableOut += "</table>"
-
-                        args.report.write(tableOut + "\n")
-                        args.report.flush()
+                    args.report.write(tableOut + "\n")
+                    args.report.flush()
 
 
         if args.enrichment:
 
+            includeMethods = None
+
+            if args.enrich_methods != None:
+                includeMethods = splitDEMethods(args.enrich_methods)
+
+
             args.report.write("<h1>poreSTAT: ENRICHMENT ANALYSIS</h1>\n")
             args.report.flush()
 
-            deEnrichTables = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-            deEnrichFiles = defaultdict(lambda: dict())
+            #deEnrichTables = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+            #deEnrichFiles = defaultdict(lambda: dict())
+
+            deEnrichTables = OrderedDefaultDict(lambda: OrderedDefaultDict(lambda: OrderedDefaultDict(list)))
+            deEnrichFiles = OrderedDefaultDict(lambda: dict())
+
+            enrichmentPrefixes = args.prefixes + ["combined"]
 
             for methods in performMethods:
+
+                if includeMethods != None and not methods in includeMethods:
+                    continue
 
                 statsLogger.info("Running Methods {}".format(methods))
                 methodStr = "_".join(methods)
 
-                for pidx, prefix in enumerate(args.prefixes + ["combined"]):
+                for pidx, prefix in enumerate(enrichmentPrefixes):
                     statsLogger.info("Running SubSample {} ({})".format(pidx, prefix))
 
                     deFile = os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv")
@@ -884,7 +1279,7 @@ if __name__ == '__main__':
                         sysCall = "Rscript {script} {de} {org} {dir}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "runDAVIDAnalysis.R")),
                             de=deFile,
-                            org=args.organism,
+                            org=args.organism_name,
                             dir=direction
                         )
                         enrichCalls.append(sysCall)
@@ -907,7 +1302,7 @@ if __name__ == '__main__':
                         sysCall = "Rscript {script} {de} {org} {dir}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "runKeggAnalysis.R")),
                             de=deFile,
-                            org=args.organism,
+                            org=args.organism_name,
                             dir=direction)
                         enrichCalls.append(sysCall)
 
@@ -923,6 +1318,7 @@ if __name__ == '__main__':
                         statsLogger.info(x)
 
                     parallel = args.parallel
+                    #parallel = 1
 
                     #args.simulate = True
 
@@ -937,11 +1333,11 @@ if __name__ == '__main__':
                     #[method][plotid][prefix]
 
             statsLogger.info("Fetching Enrichment Data")
-            for methods in performMethods:
+            for methods in includeMethods:
                 statsLogger.info("Running Methods {}".format(methods))
                 methodStr = "_".join(methods)
 
-                for pidx, prefix in enumerate(args.prefixes):
+                for pidx, prefix in enumerate(enrichmentPrefixes):
 
                     deFile = deEnrichFiles[methods][prefix]
 
@@ -997,6 +1393,9 @@ if __name__ == '__main__':
     else:
         statsLogger.info("Skipping STATS and ENRICHMENT")
 
+
+    for err in sorted(errMSG, key=lambda x: x[1]):
+        print(err)
 
     reportEnd(args.report)
 

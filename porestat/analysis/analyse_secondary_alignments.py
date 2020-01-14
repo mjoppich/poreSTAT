@@ -102,10 +102,10 @@ class SecondaryAlignmentAnalysis(ParallelPSTInterface):
 
         algntNames = defaultdict(list)
 
-        gapOpenC = -2
-        gapExtendC = -0.5
-        matchC = 2
-        mismatchC = -1
+        gapOpenC = -5
+        gapExtendC = -2
+        matchC = 1
+        mismatchC = -4
 
         def scoreGap( gaplength ):
 
@@ -132,16 +132,35 @@ class SecondaryAlignmentAnalysis(ParallelPSTInterface):
 
             for alngt in alignment_file:
 
+                alngtName = None
+
+                if alngt.read != None:
+                    alngtName = alngt.read.name
+
+                if alngtName != None:
+                    alngtName = alngtName.split(" ")[0]
+
+
+
+
                 if alngt.aligned:
 
-                    if alngt.read != None and alngt.read.seq != None and alngt.read.seq != b'*':
-                        read2seq[alngt.read.name] = alngt.read
+                    alngtChrom = None
+
+                    if alngt.iv != None:
+                        alngtChrom = alngt.iv.chrom
+
+                    if alngtChrom != None:
+                        alngtChrom = alngtChrom.split(" ")[0]
+
+                    if alngt.read.seq != b'*':
+                        read2seq[alngtName] = alngt.read
 
                     #if alngt.supplementary:
                     #    continue
 
                     if alngt.read.seq == b'*' or alngt.read.seq == b'':
-                        readstring = read2seq.get(alngt.read.name, "")
+                        readstring = read2seq.get(alngtName, "")
                     else:
                         readstring = alngt.read
 
@@ -179,7 +198,7 @@ class SecondaryAlignmentAnalysis(ParallelPSTInterface):
                         elif cigarOp.type in ["M"]:
 
                             readCigar = readstring[cigarOp.query_from:cigarOp.query_to]
-                            refCigar = allSeqs[cigarOp.ref_iv.chrom][cigarOp.ref_iv.start:cigarOp.ref_iv.end]
+                            refCigar = allSeqs[alngtChrom][cigarOp.ref_iv.start:cigarOp.ref_iv.end]
 
                             matchScore = scoreMatch( readCigar, refCigar)
                             readScoreGlobal += matchScore
@@ -195,7 +214,7 @@ class SecondaryAlignmentAnalysis(ParallelPSTInterface):
                     readScoreFreeshiftByLength = readScoreFreeshift / (alngt.iv.end - alngt.iv.start + 1)
 
                     adata = (
-                        alngt.iv.chrom,
+                        alngtChrom,
                         alngt.iv.start,
                         alngt.iv.end,
                         alngt.iv.strand,
@@ -205,7 +224,7 @@ class SecondaryAlignmentAnalysis(ParallelPSTInterface):
                         readScoreGlobalByLength,
                         readScoreFreeshiftByLength,
                         readstring)
-                    algntNames[alngt.read.name].append(
+                    algntNames[alngtName].append(
                         adata
                     )
 

@@ -1,3 +1,5 @@
+import os
+import shutil
 from collections import defaultdict
 from enum import Enum
 
@@ -58,6 +60,7 @@ class ExportTYPE(Enum):
     HTML=3
     HTML_STRING=4
     LATEX=5
+    TABLE_FILTER=6
 
 
 class DataSeries:
@@ -279,6 +282,13 @@ class DataRow(DefaultDataColumnAccess, DataSeries):
 
     def to_pairs(self):
         return [ (x, self.__getitem__(x)) for x in self.column2idx ]
+
+    def get(self, colname, default=None):
+
+        if self.columnExists(colname):
+            return self[colname]
+
+        return default
 
 
     def to_dict(self):
@@ -837,7 +847,7 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         bodypart = """
         {% if title %}
         {{title}}
-        {% endif %}
+        {% endif %}       
         <table id="{{html_element_id}}" class="display" cellspacing="0" width="100%">
                 <thead>
                 <tr>
@@ -966,6 +976,259 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         return (headpart, output)
 
 
+    def _makeTableFilter(self, outFile):
+
+        (headpart, bodypart) = self._makeHTMLStringFilterTable("dftable")
+
+        if self.title != None:
+            bodypart = "<h1>"+self.title+"</h1>" + bodypart
+
+        htmlfile="""
+
+        <html>
+            <head>
+        """ + headpart + """
+            </head>
+            <body>
+        """ + bodypart + """
+            </body>
+        </html>
+        """
+
+        with open(outFile, 'w') as outHtml:
+            outHtml.write(htmlfile)
+
+        def copyFolders(root_src_dir, root_target_dir):
+
+            for src_dir, dirs, files in os.walk(root_src_dir):
+                dst_dir = src_dir.replace(root_src_dir, root_target_dir)
+                if not os.path.exists(dst_dir):
+                    os.mkdir(dst_dir)
+                for file_ in files:
+                    src_file = os.path.join(src_dir, file_)
+                    dst_file = os.path.join(dst_dir, file_)
+                    if os.path.exists(dst_file):
+                        os.remove(dst_file)
+
+                    shutil.copy(src_file, dst_dir)
+
+
+        sourceDir = os.path.dirname(__file__) + "/../data/tablefilter"
+        targetDir = os.path.dirname(outFile) + "/tablefilter"
+
+        print("copy tablefilter files from", sourceDir, "to", targetDir)
+        copyFolders(sourceDir, targetDir)
+
+    def _makeHTMLStringFilterTable(self, html_element_id=None):
+
+        headpart = """
+        """
+
+        bodypart = """
+        {% if title %}
+        {{title}}
+        {% endif %}
+        
+        <button id="csvButton" type="button">Save current table!</button>
+        
+        <table id="{{html_element_id}}" class="display" cellspacing="0" width="100%">
+                <thead>
+                <tr>
+                {% for column in columns %}
+                    <th>{{column}}</th>
+                    {% endfor %}
+                </tr>
+                </thead>
+
+                <tbody>
+                {%- for row in rows %}
+                <tr>
+                    {% for idx in indices %}
+                    <td>{{ row[idx] }}</td>
+                    {%- endfor -%}
+                </tr>
+                {% endfor -%}
+                </tbody>
+
+                <tfoot>
+                <tr>
+                {% for column in columns %}
+                    <th>{{column}}</th>
+                    {% endfor %}
+                </tr>
+                </tfoot>
+
+                </table>
+
+<script src="tablefilter/tablefilter.js"></script>
+
+<script data-config>
+    var filtersConfig = {
+        base_path: 'tablefilter/',
+        alternate_rows: true,
+        rows_counter: true,
+        btn_reset: true,
+        loader: true,
+        status_bar: true,
+        mark_active_columns: true,
+        highlight_keywords: true,
+        sticky_headers: true,
+        col_types: [{{coltypes}}],
+        custom_options: {
+            cols:[],
+            texts: [],
+            values: [],
+            sorts: []
+        },
+        col_widths: [],
+        extensions:[{ name: 'sort' }]
+    };
+
+    var tf = new TableFilter("{{html_element_id}}", filtersConfig);
+    tf.init();
+
+function download_csv(csv, filename) {
+    var csvFile;
+    var downloadLink;
+
+    // CSV FILE
+    csvFile = new Blob([csv], {type: "text/csv"});
+
+    // Download link
+    downloadLink = document.createElement("a");
+
+    // File name
+    downloadLink.download = filename;
+
+    // We have to create a link to the file
+    downloadLink.href = window.URL.createObjectURL(csvFile);
+
+    // Make sure that the link is not displayed
+    downloadLink.style.display = "none";
+
+    // Add the link to your DOM
+    document.body.appendChild(downloadLink);
+
+    // Lanzamos
+    downloadLink.click();
+}
+
+function isHidden(el) {
+    var style = window.getComputedStyle(el);
+    return ((style.display === 'none') || (style.visibility === 'hidden'))
+}
+
+function export_table_to_csv(html, filename) {
+	var csv = [];
+	var rows = document.querySelectorAll("table tr");
+	
+    for (var i = 0; i < rows.length; i++) {
+		var row = [], cols = rows[i].querySelectorAll("td, th");
+
+        if (!isHidden(rows[i]))
+        {
+            for (var j = 0; j < cols.length; j++) 
+            {
+                colText = ""+cols[j].innerText;
+                colText = colText.replace(/(\\r\\n|\\n|\\r)/gm, ';')
+                row.push(colText);
+
+            }
+
+            if (row.length > 0)
+            {
+                csv.push(row.join("\\t"));
+            }		
+
+        }
+		    
+	}
+
+    // Download CSV
+    download_csv(csv.join("\\n"), filename);
+}
+
+document.addEventListener('readystatechange', event => {
+
+    if (event.target.readyState === "interactive") {      //same as:  document.addEventListener("DOMContentLoaded"...   // same as  jQuery.ready
+            console.log("Ready state");
+
+        document.getElementById("csvButton").addEventListener("click", function () {
+            var html = document.getElementById("{{html_element_id}}").outerHTML;
+            export_table_to_csv(html, "table.tsv");
+        });
+
+    }
+
+    if (event.target.readyState === "complete") {
+        console.log("Now external resources are loaded too, like css,src etc... ");
+        
+        document.getElementById("csvButton").addEventListener("click", function () {
+            var html = document.getElementById("{{html_element_id}}").outerHTML;
+            export_table_to_csv(html, "table.tsv");
+        });
+    }
+
+});
+
+                </script>
+
+        """
+
+        column2types = defaultdict(set)
+
+        for ridx, row in enumerate(self):
+
+            if ridx > 100:
+                break
+
+            for column in self.column2idx:
+
+                ctype = type(row[column])
+                column2types[column].add(ctype)
+
+        ntype = type(None)
+        for x in column2types:
+
+            print(x, column2types[x])
+            if ntype in column2types[x]:
+                column2types[x].remove(ntype)
+
+            print(x, column2types[x])
+
+
+        jsCols = []
+        for column in self.getHeader():
+
+            nonNumberType = len(column2types[column]) == 0
+
+            if not nonNumberType:
+                for ctype in column2types[column]:
+                    if not ctype in [int, float, complex]:
+                        nonNumberType = True
+
+            if nonNumberType:
+                jsCols.append("\"string\"")
+            else:
+                jsCols.append("\"number\"")
+
+
+
+        sortedHeader = sorted(self.column2idx.items(), key=operator.itemgetter(1))
+        vHeader = [str(x[0]) for x in sortedHeader]
+        vIndices = [x[1] for x in sortedHeader]
+
+        if html_element_id == None:
+            html_element_id = "dftable"
+
+        jinjaTemplate = Template(bodypart)
+        output = jinjaTemplate.render(rows=self.data, indices=vIndices, columns=vHeader, title=self.title,
+                                      html_element_id=html_element_id, coltypes=", ".join(jsCols))
+
+        return (headpart, output)
+
+
+
     def _makeHTML(self, outFile):
 
         (headpart, bodypart) = self._makeHTMLString()
@@ -1019,6 +1282,10 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
 
         elif exType == None:
             outputText = self._makeStr('\t')
+
+        elif exType == ExportTYPE.TABLE_FILTER:
+            self._makeTableFilter(outFile)
+            return
 
         if outFile == None:
             print(outputText)

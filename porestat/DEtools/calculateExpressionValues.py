@@ -50,11 +50,14 @@ def loadGeneLengths(fileE):
     """
 
     ens2gl = {}
-    for line in fileE:
+    for lidx, line in enumerate(fileE):
         line = line.strip().split("\t")
 
-        if not line[0].startswith("ENS"):
-            continue
+        if lidx == 0:
+            try:
+                int(line[1])
+            except:
+                continue
 
         ensemblID = line[0]
         geneLength = line[1]
@@ -117,7 +120,8 @@ if __name__ == '__main__':
             geneCount = row[sample]
             geneLength = geneLengths.get(geneID, 0)
 
-            sample2ratio[sample] += geneCount/geneLength
+            if geneLength != 0:
+                sample2ratio[sample] += geneCount/geneLength
 
     allRowUpdates = []
     for row  in indf:
@@ -143,6 +147,8 @@ if __name__ == '__main__':
             rowDict[sample] = row[sample]
 
             if args.fpkm:
+
+                #print(curGeneID, geneLength)
 
                 fpkmValue = row[sample]/(sample2total[sample]*geneLength) * pow(10,9)
                 rowDict[sample + ".FPKM"] = fpkmValue

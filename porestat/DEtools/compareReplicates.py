@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
         for cidx, conditions in enumerate(args.conditions):
 
-            fig, axes = plt.subplots(len(conditions), len(conditions), figsize=(8, 6), sharex=True, sharey=True)
+            fig, axes = plt.subplots(len(conditions), len(conditions), figsize=(24, 18), sharex=True, sharey=True)
             fig.suptitle("Comparison of read counts", fontsize=15)
 
             if conditions[0].startswith("X."):
@@ -65,7 +65,12 @@ if __name__ == '__main__':
             else:
 
                 if args.pathname:
-                    sconditions = [x.split(os.path.sep)[-2] for x in conditions]
+                    # just in case it's not an actual path :D
+                    sconditions = []
+                    for x in conditions:
+                        nx = x.split(os.path.sep)
+                        sconditions.append(nx[max([0, len(nx)-2])])
+
                 else:
                     sconditions = [os.path.basename(x) for x in conditions]
 
@@ -114,7 +119,7 @@ if __name__ == '__main__':
                         cond1counts.append(cond1count)
                         cond2counts.append(cond2count)
 
-                    axes[i,j].scatter(cond1counts, cond2counts, label=sconditions[i] + " vs. " + sconditions[j])
+                    axes[i,j].scatter(cond1counts, cond2counts, label=sconditions[i] + " vs. " + sconditions[j],s=5)
                     axes[i,j].set_yscale('log')
                     axes[i,j].set_xscale('log')
 

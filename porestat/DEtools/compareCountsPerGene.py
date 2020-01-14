@@ -164,7 +164,8 @@ if __name__ == '__main__':
             fig, axes = plt.subplots(len(conditions), 1, figsize=(14, 30))
 
             #print(conditions)
-
+            for condition in conditions:
+                print(condition, total2condition[condition])
 
             for ccidx, condition in enumerate(conditions):
                 sgenes = sorted(condition2gc[condition], key=lambda x: x[1],reverse=True) 

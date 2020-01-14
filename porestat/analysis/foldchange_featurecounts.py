@@ -43,7 +43,7 @@ class FoldChangeFeatureCountsDistributionFactory(PSToolInterfaceFactory):
                             help='counts summary file', required=False)
 
         parser.add_argument('-v', '--no-analysis', dest='noanalysis', action='store_true', default=False)
-        parser.add_argument('-m', '--methods', type=str, nargs='+', default=['DESeq', 'edgeR', 'limma', 'msEmpiRe'])
+        parser.add_argument('-m', '--methods', type=str, nargs='+', default=['DESeq2', 'DirectDESeq2', 'edgeR', 'limma', 'msEmpiRe'])
 
         parser.add_argument('-o', '--output', type=FolderType('w'), help='output location, default: std out',
                             required=True)
@@ -127,7 +127,10 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                         geneColIdx = subDf.getColumnIndex("gene")
                         subDf.filterRows(lambda x: x[geneColIdx] in biotypes and not "rRNA" in biotypes[x[geneColIdx]][1] )
 
-                    subDf.setFilepath(os.path.abspath(condElement))
+                    if os.path.isdir(condElement) or os.path.isfile(condElement):
+                        subDf.setFilepath(os.path.abspath(condElement))
+                    else:
+                        subDf.setFilepath(condElement)
 
                     if args.fpkm:
 
@@ -143,7 +146,10 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                             geneID = x[geneCol]
                             geneLength = gene2length.get(geneID, 0)
 
-                            x[fpkmIdx] = x[countCol]/(totalCounts*geneLength) * pow(10,9)
+                            if geneLength == 0:
+                                x[fpkmIdx] = 0
+                            else:
+                                x[fpkmIdx] = x[countCol]/(totalCounts*geneLength) * pow(10,9)
 
                             return tuple(x)
 
@@ -162,7 +168,10 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                             geneCount = row["count"]
                             geneLength = gene2length.get(geneID, 0)
 
-                            totalRatio += geneCount/geneLength
+                            if geneLength == 0:
+                                pass
+                            else:
+                                totalRatio += geneCount/geneLength
 
                         tpmIdx = subDf.addColumn("TPM", 0)
 
@@ -171,7 +180,10 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                             geneID = x[geneCol]
                             geneLength = gene2length.get(geneID, 0)
 
-                            x[tpmIdx] = x[countCol]/(geneLength * totalRatio) * pow(10,6)
+                            if geneLength == 0:
+                                x[fpkmIdx] = 0
+                            else:
+                                x[tpmIdx] = x[countCol]/(geneLength * totalRatio) * pow(10,6)
 
                             return tuple(x)
 
@@ -208,18 +220,18 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
 
         ens2sym = {}
 
-        for line in fileE:
+        for lidx, line in enumerate(fileE):
             line = line.strip().split("\t")
 
-            if not line[0].startswith("ENS"):
+            if lidx == 0 or line[0].startswith("#"):
                 continue
 
             ensemblID = line[0]
             geneSymbol = line[1]
             biotype = line[2]
 
-            if len(geneSymbol) == 0:
-                continue
+            #if len(geneSymbol) == 0:
+            #    continue
 
             ens2sym[ensemblID] = (geneSymbol, biotype)
 
@@ -241,11 +253,14 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
         """
 
         ens2gl = {}
-        for line in fileE:
+        for lidx, line in enumerate(fileE):
             line = line.strip().split("\t")
 
-            if not line[0].startswith("ENS"):
-                continue
+            if lidx == 0:
+                try:
+                    int(line[1])
+                except:
+                    continue
 
             ensemblID = line[0]
             geneLength = line[1]
