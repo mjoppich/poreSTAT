@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('-p', '--pathways', nargs='+', type=argparse.FileType('r'), required=True, help='alignment files')
-    parser.add_argument('-n', '--top_n', type=int, required=False, default=100)
+    parser.add_argument('-n', '--top_n', nargs='+', type=int, required=False, default=100)
     parser.add_argument('-o', '--output', type=str, required=False, help="output base")
 
 
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     }
 
 
-    foundRes = []
+    foundRes = defaultdict(lambda: list())
 
     for pathwaysFile in args.pathways:
         indf = DataFrame.parseFromFile(pathwaysFile.name, skipChar='#', replacements={
@@ -65,25 +65,38 @@ if __name__ == '__main__':
         topNIDs = []
         for ridx, row in enumerate(indf):
 
-            if ridx >= args.top_n:
-                break
+            qvalue = float(row["qvalue"])
+
+            topNIDs.append((row[idColumn], qvalue))
+
+        topNIDs = sorted(topNIDs, key=lambda x: x[1])
+
+        for topN in args.top_n:
+
+            lqCount = topN
+            if len(topNIDs) >= topN:
+
+                topNElement = topNIDs[topN - 1]
+
+                lqCount = sum([1 for x in topNIDs if x[1] <= topNElement[1]])
+
+                topNIDs = topNIDs[:topN]
+
+            foundRes[topN].append((os.path.basename(pathwaysFile.name), topNIDs, lqCount))
 
 
 
-            topNIDs.append(row[idColumn])
 
+    for topN in args.top_n:
+        vennLabels = venn.generate_petal_labels([set(x[1]) for x in foundRes[topN]])
+        fig, ax = pwcount2function[len(foundRes[topN])](vennLabels, names=["{fn} (lq={lqc})".format(fn=x[0], lqc=x[2]) for x in foundRes[topN]])
 
-        foundRes.append((pathwaysFile.name, topNIDs))
+        plt.suptitle("Overlaps for topN={} pathways (by qvalue)".format(topN))
 
+        outname = args.output + "." + str(topN)
 
-    vennLabels = venn.generate_petal_labels([set(x[1]) for x in foundRes])
-    fig, ax = pwcount2function[len(foundRes)](vennLabels, names=[x[0] for x in foundRes])
+        if not outname.endswith(".png"):
+            outname += ".png"
 
-
-    outname = args.output
-
-    if not outname.endswith(".png"):
-        outname += ".png"
-
-    plt.savefig(outname, bbox_inches ="tight")
+        plt.savefig(outname, bbox_inches ="tight")
 

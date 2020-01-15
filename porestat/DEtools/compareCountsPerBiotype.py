@@ -62,17 +62,11 @@ def makeConditionNames(conditions, inHeaders):
 
     dfGroups = args.conditions
     newgroups = []
-    for group in dfGroups:
-        ngroup = []
-        for gelem in group:
-            if gelem in replaceSamples:  # may only not be included, if not added -> error before
-                ngroup.append(replaceSamples[gelem])
+    for gelem in dfGroups:
+        if gelem in replaceSamples:  # may only not be included, if not added -> error before
+            newgroups.append(replaceSamples[gelem])
 
-        newgroups.append(ngroup)
-
-    newconds = newgroups
-
-    return newconds
+    return newgroups
 
 
 def autolabel(ax, rects):
@@ -81,15 +75,21 @@ def autolabel(ax, rects):
     """
     for rect in rects:
         height = rect.get_height()
+
+        ltext = str(round(height, 2))
+
+        if height < 0.01:
+            ltext = ""
+
         ax.text(rect.get_x() + rect.get_width()/2., 1.05*height,
-                str(round(height, 2)),
-                ha='center', va='bottom')
+                ltext,
+                ha='left', va='bottom', rotation=45)
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('-c', '--counts', nargs='+', type=argparse.FileType('r'), required=True, help='alignment files')
-    parser.add_argument('-d', '--conditions', nargs='+', type=str, action='append',  required=True, help='alignment files')
+    parser.add_argument('-d', '--conditions' ,nargs='+', type=str,  required=True, help='alignment files')
     parser.add_argument('-l', '--last', action="store_true", default=False)
     parser.add_argument('-i', '--ignoreMissing', action="store_true", default=False)
     parser.add_argument('-o', '--output', nargs='+', type=str, required=False, help="output base")
@@ -103,13 +103,16 @@ if __name__ == '__main__':
     geneID2Type = {}
     allTypes = set()
 
-    for line in args.biotype:
+    for lidx, line in enumerate(args.biotype):
+
+        if lidx == 0:
+            continue
 
         aline = line.strip().split("\t")
 
         ensID = aline[0]
         geneSym = aline[1]
-        geneType = aline[2]
+        geneType = aline[2].strip()
 
         allTypes.add(geneType)
 
@@ -129,9 +132,9 @@ if __name__ == '__main__':
 
 
         inHeaders = indf.getHeader()
-        newconds = makeConditionNames(args.conditions, inHeaders)
+        newconds = makeConditionNames([args.conditions], inHeaders)
 
-        for condition in newconds:
+        for cidx, condition in enumerate(sorted(newconds)):
             geneTypeCounts = Counter()
 
             for row in indf:
@@ -155,24 +158,45 @@ if __name__ == '__main__':
 
                 geneTypeCounts[geneSymType] += geneCount
 
+            plotFigSize=(14, 6)
+
+            fig, ax = plt.subplots(figsize=plotFigSize, dpi=80)
+
+            allValues = [geneTypeCounts.get(gtype, 0) for gtype in allTypes]
+            allValueCount = sum(allValues)
+            ind = range(0, len(allTypes))
 
 
-            fig, ax = plt.subplots()
+            rects = ax.bar(ind, allValues)
+            autolabel(ax, rects)
 
-            allValues = [geneTypeCounts.get(gtype, 0) for gtype in geneTypeCounts]
+            plt.title(condition)
+            plt.xticks(ind, allTypes, rotation=90)
+
+            plt.xlabel("Gene Type")
+            plt.ylabel("Counters of all Genes")
+
+
+            plt.savefig(args.output[fidx] + ".cpergenes." +str(fidx ) + "." + str(cidx) + ".png", bbox_inches ="tight")
+            plt.close()
+
+
+
+            fig, ax = plt.subplots(figsize=plotFigSize, dpi=80)
+
+            allValues = [geneTypeCounts.get(gtype, 0)/allValueCount for gtype in allTypes]
             ind = range(0, len(allTypes))
 
             rects = ax.bar(ind, allValues)
             autolabel(ax, rects)
 
             plt.title(condition)
+            plt.xticks(ind, allTypes, rotation=90)
 
-            plt.xticks(ind, allTypes, rotation=70)
-
-            plt.xlabel("Category Rel Count")
-            plt.ylabel("Assigned Rel Count")
+            plt.xlabel("Gene Type")
+            plt.ylabel("Counters of all Genes")
 
 
-            plt.savefig(args.output[fidx] + ".cpergenes. " +str(fidx ) + ".png", bbox_inches ="tight")
+            plt.savefig(args.output[fidx] + ".cpergenes.rel" +str(fidx ) + "." + str(cidx) + ".png", bbox_inches ="tight")
             plt.close()
 

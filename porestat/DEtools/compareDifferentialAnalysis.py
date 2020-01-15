@@ -136,7 +136,7 @@ if __name__ == '__main__':
 
             vennLabels = venn.generate_petal_labels(inputSets)
             fig, ax = pwcount2function[len(foundRes[topN][compMethod])](vennLabels, names=["{fn} (lq={lqc})".format(fn=x[0], lqc=x[2]) for x in foundRes[topN][compMethod]])
-
+            plt.suptitle("Overlaps for topN={} DE genes (by {})".format(topN, compMethod))
 
             outname = args.output + "." + str(topN) + "." + compMethod
 

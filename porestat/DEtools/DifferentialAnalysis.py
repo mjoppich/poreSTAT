@@ -515,7 +515,6 @@ if __name__ == '__main__':
         for pidx, prefix in enumerate(args.prefixes):
             caLogger.info("Running SubSample {} ({})".format(pidx, prefix))
 
-
             sysCall = "python3 {script} --fc {countfile} --output {outdir} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna --fpkm --tpm".format(
                 script=os.path.realpath(os.path.join(scriptMain, "calculateExpressionValues.py")),
                 outdir=os.path.join(args.diffreg[pidx], "counts.tpm.fpkm.tsv"),
@@ -541,6 +540,7 @@ if __name__ == '__main__':
             runSysCall(sysCall, "Visualise featureCount Summary", caLogger, "FeatureCount Summary",
                        os.path.join(args.diffreg[pidx], "fcsummary"), args, prefix, caPlots)
 
+
             sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "compareReplicates.py")),
                 counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
@@ -550,6 +550,7 @@ if __name__ == '__main__':
 
             runSysCall(sysCall, "compareReplicates (normalized)", caLogger, "Compare Replicates (msEmpiRe-normalized counts)",
                        os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm.replicates."), args, prefix, caPlots)
+
 
             sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "compareReplicates.py")),
@@ -652,18 +653,18 @@ if __name__ == '__main__':
 
             if args.enhance != None and args.enhance.name != None:
 
-                sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output} --biotypes {biotypes}".format(
+                countDeFile = glob("{diffreg}/count_*.tsv".format(diffreg=args.diffreg[pidx]))[0]
+
+                sysCall = "python3 {script} --counts {counts} --conditions {conds1} --output {output} --biotype {biotypes}".format(
                     script=os.path.realpath(os.path.join(scriptMain, "compareCountsPerBiotype.py")),
-                    counts=args.counts[pidx].name,
-                    conds1=" ".join(args.cond1[pidx]),
-                    conds2=" ".join(args.cond2[pidx]),
+                    counts=countDeFile,
+                    conds1=" ".join(args.cond1[pidx]+args.cond2[pidx]),
                     output=os.path.join(args.diffreg[pidx], "countsperbiotype"),
                     biotypes=args.enhance.name
                 )
 
                 runSysCall(sysCall, "Compare Counts Per Biotype", caLogger, "Raw Counts Per Biotype",
-                           os.path.join(args.diffreg[pidx], "countsperbiotype.cperbiotype"), args, prefix, caPlots)
-
+                           os.path.join(args.diffreg[pidx], "countsperbiotype"), args, prefix, caPlots)
 
 
             caLogger.info("Finished SubSample {} ({})".format(pidx, prefix))
@@ -992,10 +993,30 @@ if __name__ == '__main__':
 
                     allPrefixes = [x for x in prefix2countFile]
 
+                    outputname = os.path.join(args.save, args.name + "." + methodStr + "." + "devenn")
+
+                    allMethodPrefixes = []
+                    for prefix in args.prefixes + ["combined"]:
+                        allMethodPrefixes += glob(os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv"))
+
+                    sysCall = "python3 {script} --detable {detable} --top_n 10 100 250 500 1000 --output {output}".format(
+                        script=os.path.realpath(os.path.join(scriptMain, "compareDifferentialAnalysis.py")),
+                        detable=inname0 + " " + inname1 + " " + combinedDE,
+                        output=outputname
+                    )
+
+                    plotName = "Compare DE Gene Overlap by mappers"
+                    plotId2Descr[plotName] = "<p>This plot compares robust DE genes from the used prefix approaches and the combined approach.</p>" \
+                                             "<p>For the significant logFCs, only genes with an adjusted p-value less than 0.05 are considered.</p>"
+
+                    runSysCall(sysCall, plotName, statsLogger, plotName,
+                               outputname, args, "_".join(args.prefixes), methods + ("MapCombined",),
+                               deEnrichPlots)
+
+
                     if len(args.prefixes) == 2:
 
-                        combinedRaw = os.path.join(args.save,
-                                                   args.name + "." + "combined_raw" + "." + methodStr + ".tsv")
+                        combinedRaw = os.path.join(args.save, args.name + "." + "combined_raw" + "." + methodStr + ".tsv")
                         combinedDE = os.path.join(args.save, args.name + "." + "combined" + "." + methodStr + ".tsv")
 
                         combinedSamples = [allPrefixes[0] + "_" + x for x in args.cond1[0]] + [allPrefixes[1] + "_" + x for x in args.cond1[1]]
@@ -1053,6 +1074,8 @@ if __name__ == '__main__':
                         runSysCall(sysCall, plotName, statsLogger, plotName,
                                    outputname, args, "_".join(args.prefixes), methods +  ("MapCombined",),
                                    deEnrichPlots)
+
+
 
                         """
 
@@ -1228,6 +1251,8 @@ if __name__ == '__main__':
 
         if args.enrichment:
 
+            deEnrichPlots = OrderedDefaultDict(lambda: OrderedDefaultDict(lambda: OrderedDefaultDict(list)))
+
             includeMethods = None
 
             if args.enrich_methods != None:
@@ -1334,7 +1359,7 @@ if __name__ == '__main__':
 
             statsLogger.info("Fetching Enrichment Data")
             for methods in includeMethods:
-                statsLogger.info("Running Methods {}".format(methods))
+                statsLogger.info("Fetching Results for Methods {}".format(methods))
                 methodStr = "_".join(methods)
 
                 for pidx, prefix in enumerate(enrichmentPrefixes):
@@ -1348,7 +1373,106 @@ if __name__ == '__main__':
                     deEnrichTables[methods]["GeneOntology (GSEA)"][prefix] = glob(deFile + ".GeneOntology*gsea.tsv")
 
 
+            for methods in includeMethods:
+                statsLogger.info("Comparing Methods {}".format(methods))
+                deMethodStr = "_".join(methods)
 
+                allEnrichFiles = []
+
+                for pidx, prefix in enumerate(enrichmentPrefixes):
+                    deFile = deEnrichFiles[methods][prefix]
+                    allEnrichFiles.append(deFile)
+
+                for direction in ["all", "up", "down"]:
+
+                    for methodStr, suffixStr in [("david", None), ("kegg", None), ("reactome", None), ("GeneOntology.BP", "goenrich"), ("GeneOntology.CC", "goenrich"), ("GeneOntology.MF", "goenrich"), ("GeneOntology.BP", "gsea"), ("GeneOntology.CC", "gsea"), ("GeneOntology.MF", "gsea"),]:
+
+                        resFiles = []
+                        for deFile in allEnrichFiles:
+                            outputFile = os.path.join(args.save, args.name + "." + deMethodStr + ".pa_enrich_compare." + methodStr)
+
+                            if suffixStr == None:
+                                resFile = deFile + "."+methodStr+"." + direction + ".tsv"
+
+                            else:
+                                resFile = deFile + "." + methodStr + "." + direction + "." + suffixStr + ".tsv"
+                                outputFile += "." + suffixStr
+
+                            resFiles.append(resFile)
+
+
+                        print(methods, direction, outputFile, resFiles)
+
+                        sysCall = "python3 {script} --pathways {pathways} --output {output} --top_n 10 50 100 150 --output {output}".format(
+                            script=os.path.realpath(os.path.join(scriptMain, "compareEnrichmentAnalysis.py")),
+                            pathways=" ".join(resFiles),
+                            output=outputFile,
+                        )
+                        print(sysCall)
+
+                        if not args.simulate:
+                            subprocess.run(sysCall, shell=True, check=True)
+
+
+
+                        headerStr = methodStr.upper()
+                        if suffixStr != None:
+                            headerStr += " (" + suffixStr + ")"
+                        headerStr += " Comparison"
+
+                        deEnrichPlots[methods][headerStr]["all"] = glob(outputFile + "*.png")
+                        plotId2Descr[headerStr] = "<p>Overlap Comparison for the enrichment analysis for terms/pathways/sets from {}.</p>" \
+                                             "<p>The top <it>n</it> pathways from {} enrichment analysis with direction {} are taken and intersected among all base analyses.</p>".format(
+                            headerStr, headerStr, direction
+                        )
+
+
+
+            #[plotid][method][prefix]
+            for method in deEnrichPlots:
+                print(method)
+                for plotid in deEnrichPlots[method]:
+                    print(method, plotid, deEnrichPlots[method][plotid])
+
+            for method in deEnrichPlots:
+
+                tableOut = "<h2>{}</h2>".format("&".join(method))
+                args.report.write(tableOut + "\n")
+
+                for plotId in deEnrichPlots[method]:
+
+                    prefixCount = len(deEnrichPlots[method][plotId])
+
+                    tableOut = "<h3>{}</h3>".format(plotId)
+
+                    if plotId in plotId2Descr:
+                        tableOut += "<div>{}</div>".format(plotId2Descr[plotId])
+
+                    tableOut += "<table>"
+
+                    tableOut += "<tr>"
+                    for prefix in deEnrichPlots[method][plotId]:
+                        tableOut += "<td>" + str(prefix) + "</td>"
+                    tableOut += "</tr>"
+
+                    print(plotId)
+                    for filetuple in itertools.zip_longest(*[deEnrichPlots[method][plotId][x] for x in deEnrichPlots[method][plotId]]):
+                        tableOut += "<tr>"
+
+                        print(filetuple)
+                        for imgFile in filetuple:
+
+                            if imgFile != None:
+                                tableOut += "<td><img src=\"" + str(os.path.relpath(os.path.realpath(imgFile), os.path.dirname(args.report.name))) + "\"/></td>"
+                            else:
+                                tableOut += "<td>N/A</td>"
+
+                        tableOut += "</tr>"
+
+                    tableOut += "</table>"
+
+                    args.report.write(tableOut + "\n")
+                    args.report.flush()
 
             for method in deEnrichTables:
 
