@@ -57,6 +57,7 @@ if __name__ == '__main__':
 
             if "ID" in header:
                 idColumn = header
+                break
 
 
         if idColumn == None:
@@ -65,7 +66,7 @@ if __name__ == '__main__':
         topNIDs = []
         for ridx, row in enumerate(indf):
 
-            qvalue = float(row["qvalue"])
+            qvalue = float(row.get("qvalue", row.get("qvalues")))
 
             topNIDs.append((row[idColumn], qvalue))
 
@@ -73,22 +74,25 @@ if __name__ == '__main__':
 
         for topN in args.top_n:
 
-            lqCount = topN
-            if len(topNIDs) >= topN:
+            localTopNIDs = [x for x in topNIDs]
 
-                topNElement = topNIDs[topN - 1]
+            lqCount = len(localTopNIDs)
+            if len(localTopNIDs) >= topN:
 
-                lqCount = sum([1 for x in topNIDs if x[1] <= topNElement[1]])
+                topNElement = localTopNIDs[topN - 1]
 
-                topNIDs = topNIDs[:topN]
+                lqCount = sum([1 for x in localTopNIDs if x[1] <= topNElement[1]])
 
-            foundRes[topN].append((os.path.basename(pathwaysFile.name), topNIDs, lqCount))
+                localTopNIDs = localTopNIDs[:topN]
+
+            print(pathwaysFile.name, topN, len(localTopNIDs))
+            foundRes[topN].append((os.path.basename(pathwaysFile.name), localTopNIDs, lqCount))
 
 
 
 
     for topN in args.top_n:
-        vennLabels = venn.generate_petal_labels([set(x[1]) for x in foundRes[topN]])
+        vennLabels = venn.generate_petal_labels([set([y[0] for y in x[1]]) for x in foundRes[topN]])
         fig, ax = pwcount2function[len(foundRes[topN])](vennLabels, names=["{fn} (lq={lqc})".format(fn=x[0], lqc=x[2]) for x in foundRes[topN]])
 
         plt.suptitle("Overlaps for topN={} pathways (by qvalue)".format(topN))
@@ -98,5 +102,6 @@ if __name__ == '__main__':
         if not outname.endswith(".png"):
             outname += ".png"
 
+        print(outname)
         plt.savefig(outname, bbox_inches ="tight")
 

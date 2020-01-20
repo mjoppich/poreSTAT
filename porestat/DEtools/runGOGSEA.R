@@ -119,6 +119,11 @@ for (GODB in c("BP", "MF", "CC")) { #
     rsc[1] = "GO.ID"
     colnames(rs) = rsc
 
+    if (match('qvalues',colnames(rs)))
+    {
+        names(rs)[names(rs)=="qvalues"] <- "qvalue"
+    }
+
     mode="all"
     write.table(rs, file=paste(filename,"GeneOntology", GODB, mode,"gsea.tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
 

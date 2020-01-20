@@ -14,11 +14,13 @@ import venn
 
 if __name__ == '__main__':
 
+    allowedStats = ["ROB_ADJ.PVAL","ROB_log2FC","ROB_log2FC_SIG"]
+
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('-d', '--detable', nargs='+', type=argparse.FileType('r'), required=True, help='alignment files')
     parser.add_argument('-n', '--top_n', type=int, nargs='+', required=False, default=100)
     parser.add_argument('-o', '--output', type=str, required=False, help="output base")
-
+    parser.add_argument('-s', '--stats', type=str, nargs="+", required=False, default=allowedStats)
 
     args = parser.parse_args()
 
@@ -26,6 +28,10 @@ if __name__ == '__main__':
     if len(args.detable) <= 2 or len(args.detable) > 5:
         exit()
 
+    for x in args.stats:
+        if not x in allowedStats:
+            print("Allowed stat values", allowedStats)
+            exit(-1)
 
 
     pwcount2function = {
@@ -77,7 +83,7 @@ if __name__ == '__main__':
 
 
         for topN in args.top_n:
-            for compMethod in ["ROB_log2FC", "ROB_ADJ.PVAL", "ROB_log2FC_SIG"]:
+            for compMethod in args.stats:
 
                 print(detableFile.name, compMethod, topN)
 
@@ -109,7 +115,7 @@ if __name__ == '__main__':
                 sortReversed = valColumn in ["ROB_log2FC"]
 
                 topNIDs = sorted(topNIDs, key=lambda x: x[1], reverse=sortReversed)
-
+                lqCount = len(topNIDs)
                 if len(topNIDs) >= topN:
 
                     topNElement = topNIDs[topN-1]
@@ -124,7 +130,7 @@ if __name__ == '__main__':
                 print(detableFile.name, compMethod, valColumn, topN, lqCount)
 
 
-                foundRes[topN][compMethod].append((detableFile.name, topNIDs, lqCount))
+                foundRes[topN][compMethod].append((os.path.basename(detableFile.name), topNIDs, lqCount))
 
     for topN in args.top_n:
         for compMethod in foundRes[topN]:

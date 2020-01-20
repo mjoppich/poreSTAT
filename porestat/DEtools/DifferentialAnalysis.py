@@ -719,7 +719,11 @@ if __name__ == '__main__':
             subprocess.run(sysCall, shell=True, check=True)
 
         if plotid != None and plotsPrefix != None:
-            plotDict[method][plotid][prefix] = glob(plotsPrefix + "*.png")
+
+            if not plotsPrefix.upper().endswith(".PNG"):
+                plotsPrefix += "*.png"
+
+            plotDict[method][plotid][prefix] = glob(plotsPrefix)
             log.debug("Found Images\n" + "\n".join(plotDict[method][plotid][prefix]))
 
     def splitDEMethods(inMethods):
@@ -993,25 +997,7 @@ if __name__ == '__main__':
 
                     allPrefixes = [x for x in prefix2countFile]
 
-                    outputname = os.path.join(args.save, args.name + "." + methodStr + "." + "devenn")
 
-                    allMethodPrefixes = []
-                    for prefix in args.prefixes + ["combined"]:
-                        allMethodPrefixes += glob(os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv"))
-
-                    sysCall = "python3 {script} --detable {detable} --top_n 10 100 250 500 1000 --output {output}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "compareDifferentialAnalysis.py")),
-                        detable=inname0 + " " + inname1 + " " + combinedDE,
-                        output=outputname
-                    )
-
-                    plotName = "Compare DE Gene Overlap by mappers"
-                    plotId2Descr[plotName] = "<p>This plot compares robust DE genes from the used prefix approaches and the combined approach.</p>" \
-                                             "<p>For the significant logFCs, only genes with an adjusted p-value less than 0.05 are considered.</p>"
-
-                    runSysCall(sysCall, plotName, statsLogger, plotName,
-                               outputname, args, "_".join(args.prefixes), methods + ("MapCombined",),
-                               deEnrichPlots)
 
 
                     if len(args.prefixes) == 2:
@@ -1199,8 +1185,31 @@ if __name__ == '__main__':
                     #args.simulate=True
                     # TODO maybe delete combinedDE file here?
 
+                #args.simulate = False
 
+                for statTerm in ["ROB_ADJ.PVAL","ROB_log2FC","ROB_log2FC_SIG"]:
+                    outputname = os.path.join(args.save, args.name + "." + methodStr + "." + "devenn")
 
+                    allMethodPrefixes = []
+                    for prefix in args.prefixes + ["combined"]:
+                        allMethodPrefixes += glob(os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv"))
+
+                    sysCall = "python3 {script} --detable {detable} --top_n 10 100 250 500 1000 --stats {stats} --output {output}".format(
+                        script=os.path.realpath(os.path.join(scriptMain, "compareDifferentialAnalysis.py")),
+                        detable=" ".join(allMethodPrefixes),
+                        output=outputname,
+                        stats=statTerm
+                    )
+
+                    plotName = "Compare DE Gene Overlap by mappers (sorted by {})".format(statTerm)
+                    imgGlob = outputname + "*" + statTerm +".png"
+                    plotId2Descr[plotName] = "<p>This plot compares robust DE genes from the used prefix approaches and the combined approach. Genes are sorted by {}</p>" \
+                                             "<p>For the significant logFCs, only genes with an adjusted p-value less than 0.05 are considered.</p>".format(statTerm)
+
+                    runSysCall(sysCall, plotName, statsLogger, plotName,
+                               imgGlob, args, "_".join(args.prefixes), methods + ("MapCombined",),
+                               deEnrichPlots)
+                #args.simulate = True
 
             #[plotid][method][prefix]
             for method in deEnrichPlots:
@@ -1409,10 +1418,10 @@ if __name__ == '__main__':
                             output=outputFile,
                         )
                         print(sysCall)
-
+                        #args.simulate = False
                         if not args.simulate:
                             subprocess.run(sysCall, shell=True, check=True)
-
+                        #args.simulate = True
 
 
                         headerStr = methodStr.upper()
