@@ -17,6 +17,10 @@
     <script src="https://unpkg.com/layout-base/layout-base.js"></script>
     <script src="https://unpkg.com/cose-base/cose-base.js"></script>
     <script src="https://ivis-at-bilkent.github.io/cytoscape.js-fcose/cytoscape-fcose.js"></script>
+
+    <link href="https://unpkg.com/tabulator-tables@4.5.3/dist/css/tabulator.min.css" rel="stylesheet">
+    <script type="text/javascript" src="https://unpkg.com/tabulator-tables@4.5.3/dist/js/tabulator.min.js"></script>
+
     <!-- for testing with local version of cytoscape.js -->
     <!--<script src="../cytoscape.js/build/cytoscape.js"></script>-->
     <link rel="stylesheet" href="https://unpkg.com/tippy.js@5/dist/backdrop.css" />
@@ -58,16 +62,47 @@ h1 {
       <h1>{{title}}</h1>
     <div id="cy"></div>
 
-    <h2>Detected Inconsisties</h2>
-    <table>
-      <th>miRNA</th><th>References</th>
-    </table>
+      {% if stats %}
 
-    <h2>Imputed </h2>
-    <table>
-      <th>miRNA</th><th>References</th>
-    </table>
+        {% for k,v in stats.items() %}
 
+          <h2>{{k}}</h2>
+          <table id="{{k.lower().replace(' ', '_').replace('(', '_').replace(')', '_')}}">
+              {% set cnt = [0] %}
+              {% for elems in v %}
+                {% if (cnt[0] == 0) %}
+                  <thead><tr>
+                    {% for elem in elems %}
+                      <th>{{elem}}</th>
+                    {% endfor %}
+                  </tr></thead><tbody>
+                  {% else %}
+                  <tr>
+                    {% for elem in elems %}
+                      <td>{{elem}}</td>
+                    {% endfor %}
+                    </tr>
+                  {% endif %}
+                  {% if (cnt.append(cnt.pop() + 1)) %} {% endif %}
+              {% endfor %}
+              </tbody>
+          </table>
+
+          <script>
+                        // without jQuery (doesn't work in older IEs)
+            document.addEventListener('DOMContentLoaded', function(){
+                var table = new Tabulator("#{{k.lower().replace(' ', '_').replace('(', '_').replace(')', '_')}}", {
+                    layout:"fitDataStretch",
+                    pagination:"local", //enable local pagination.
+                    paginationSize:6,
+                    paginationSizeSelector:[3, 6, 8, 10],
+                });
+            }, false);
+          </script>
+
+        {% endfor %}
+
+      {% endif %}
 
     <!-- Load appplication code at the end to ensure DOM is loaded -->
     <script>
@@ -82,7 +117,6 @@ h1 {
 
           return div;
       };
-
 
 
     var cy = window.cy = cytoscape({

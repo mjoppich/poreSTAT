@@ -201,7 +201,7 @@ def main(args):
     # Select just exons of protein coding genes, and columns that we want to use.
     idx = (gc.feature == 'exon')# & (gc.transcript_biotype == 'protein_coding')
 
-    exonData = ['seqname','start','end','gene_id']
+    exonData = ['seqname','start','end','gene_id', 'gene_name']
 
     if "gene_biotype" in gc:
         exonData.append("gene_biotype")
@@ -221,6 +221,7 @@ def main(args):
     with log("Calculating coding region (exonic) length for each gene..."):
         lengths = groups.apply(count_bp)
         bioType = groups.apply(get_biotype)
+        gene_name = groups.apply(get_genename)
 
     if NCBI_ENSEMBL != None:
         with log("Reading NCBI mapping of Entrez GeneID to Ensembl gene identifier: {}".format(NCBI_ENSEMBL)):
@@ -234,22 +235,34 @@ def main(args):
                                     'protein_accession.version',
                                     'Ensembl_protein_identifier'])
 
-    # Create a new DataFrame with gene lengths and EnsemblID.
-    ensembl_no_version = lengths.index.map(lambda x: x.split(".")[0])
-    ldf = pd.DataFrame({'length': lengths,
-                        'gene_identifier': ensembl_no_version,
-                        'biotype': bioType},
-                        index=lengths.index)
 
-    # Merge so we have EntrezGeneID with length.
-    #m1 = pd.merge(ldf, g2e, on='Ensembl_gene_identifier')
-    #m1 = m1[['Ensembl_gene_identifier', 'GeneID', 'length']].drop_duplicates()
-    m1 = ldf.drop_duplicates()
+    with log("Creating result df ..."):
+
+        # Create a new DataFrame with gene lengths and EnsemblID.
+        ensembl_no_version = lengths.index.map(lambda x: x.split(".")[0])
+        ldf = pd.DataFrame({'length': lengths,
+                            'gene_identifier': ensembl_no_version,
+                            'biotype': bioType,
+                            'gene_name': gene_name},
+                            index=lengths.index)
+
+
+    with log("Creating result df (dropping dups) ..."):
+        # Merge so we have EntrezGeneID with length.
+        #m1 = pd.merge(ldf, g2e, on='Ensembl_gene_identifier')
+        #m1 = m1[['Ensembl_gene_identifier', 'GeneID', 'length']].drop_duplicates()
+        m1 = ldf.drop_duplicates()
 
     with log("Writing output file: {}".format(GENE_LENGTHS)):
         with open(GENE_LENGTHS, "w") as out:
             m1.to_csv(out, sep="\t", index=False)
 
+def get_genename(df):
+
+    if not "gene_name" in df:
+        return ""
+
+    return "|".join(set(df["gene_name"]))
 
 def get_biotype(df):
 

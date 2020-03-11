@@ -176,7 +176,7 @@ class miRGeneGraph:
 
 
 
-    def __init__(self, mirnaHits, geneHits, props):
+    def __init__(self, props):
         self.priorityEdgeTypes = ["expected", "unexpected"]
         self.dirToOpposite = {"up": "down", "down": "up"}
 
@@ -185,6 +185,9 @@ class miRGeneGraph:
         self.minLogFC = props["minLogFC"] if "minLogFC" in props else -5
         self.maxLogFC = props["maxLogFC"] if "maxLogFC" in props else 5
 
+
+
+    def createGraph(self, mirnaHits, geneHits):
 
         graph = networkx.Graph()
         deNodes = set()
@@ -235,6 +238,10 @@ class miRGeneGraph:
         for x in delNode:
             graph.remove_node(x)
 
+        return graph
+
+
+    def imputeGraph(self, graph):
 
         self.colorInitial(graph)
         self.__impute1(graph)
@@ -243,8 +250,134 @@ class miRGeneGraph:
         self.__impute3(graph)
         self.__impute4(graph)
 
-        self.gp.showGraph(graph, location="/mnt/d/dev/data/human_plaque/tmp/")
+        self.colorEdges(graph)
 
+        return graph
+
+
+    def to_print_format(self, dictElem):
+
+        outlistH = [("Category", "Count")]
+        outlist = []
+
+        if dictElem == None:
+            return outlist
+
+        for x in dictElem:
+
+            keyElem = x
+
+            if type(keyElem) in [list, tuple]:
+                keyElem = ", ".join(x)
+
+            outlist.append((keyElem, str(dictElem[x])))
+
+        return outlistH + sorted(outlist)
+
+
+    def getUnexplainedGenes(self, graph):
+
+        returnResult = [("Gene", "Number of inconsistent Edges", "Number of Edges for Gene")]
+
+        totalNodeCount = 0
+        nodeConditionCount = 0
+        for node in sorted([x for x in graph.nodes()]):
+
+            nodeData = graph.node[node]["attr_dict"]
+
+            if nodeData["type"] == "mirna":
+                continue
+
+            totalNodeCount += 1
+            nodeNN = [x for x in graph.neighbors(node)]
+
+            mirDirection = nodeData["node_expr_direction"]
+
+            inconsistCount = 0
+            for nn in nodeNN:
+                nnData = graph.node[nn]["attr_dict"]
+
+                nnDirection = nnData["node_expr_direction"]
+                edgeType = graph.edges[(node, nn)]["edge_type"]
+                edgeCreation = graph.edges[(node, nn)]["edge_creation"]
+
+                if mirDirection == nnDirection:
+                    inconsistCount += 1
+
+            if inconsistCount == len(nodeNN):
+                nodeConditionCount += 1
+                print(node, inconsistCount, len(nodeNN))
+
+                returnResult.append((node, inconsistCount, len(nodeNN)))
+
+        print(nodeConditionCount, totalNodeCount)
+
+        return returnResult
+
+
+    def getMeasuredInconsistencies(self, graph):
+
+        returnResult = [("Source", "Target")]
+
+        for edge in graph.edges():
+
+            if graph.edges[edge]["edge_type"] == "unexpected":
+
+                returnResult.append((edge[0], edge[1]))
+
+        return returnResult
+
+    def getImputedInconsistencies(self, graph):
+
+        returnResult = [("Source", "Target", "Has Other Explanation")]
+
+        for edge in graph.edges():
+
+            if graph.edges[edge]["dir_type"] == "unexpected_imputed":
+
+                hasOtherExplain = False
+
+                src = edge[0]
+                tgt = edge[1]
+
+                srcData = graph.node[src]["attr_dict"]
+                tgtData = graph.node[tgt]["attr_dict"]
+
+                if srcData["type"] == "gene":
+
+                    srcNN = [x for x in graph.neighbors(src)]
+
+                    for nn in srcNN:
+                        if graph.edges[(src, nn)]["dir_type"] in ["expected", "expected_imputed"]:
+                            hasOtherExplain = True
+                            break
+                elif tgtData["type"] == "gene":
+                    tgtNN = [x for x in graph.neighbors(tgt)]
+
+                    for nn in tgtNN:
+                        if graph.edges[(tgt, nn)]["dir_type"] in ["expected", "expected_imputed"]:
+                            hasOtherExplain = True
+                            break
+
+
+                if not hasOtherExplain:
+                    returnResult.append((edge[0], edge[1], hasOtherExplain))
+
+        return returnResult
+
+    def saveGraph(self, outpath, outhtml, graph):
+
+        graphStats = {}
+
+        graphStats["Node Stats"] = self.to_print_format(self.countAttributeNodes(graph, ["type", "node_expr_direction", "node_expr_detection"]))
+        graphStats["Edge Stats"] = self.to_print_format(self.countAttributeEdges(graph, ["edge_type", "edge_creation"]))
+        graphStats["Edge Stats (2)"] = self.to_print_format(self.countAttributeEdges(graph, ["dir_type", "edge_creation"]))
+
+        graphStats["Unexplained Genes"] = self.getUnexplainedGenes(graph)
+        graphStats["Measured Inconsistencies"] = self.getMeasuredInconsistencies(graph)
+        graphStats["Remaining Imputed Inconsistencies"] = self.getImputedInconsistencies(graph)
+
+        self.gp.showGraph(graph, location=outpath, name=outhtml, stats=graphStats)
 
 
 
@@ -509,7 +642,7 @@ class miRGeneGraph:
                             continue
 
                         if imputeDir == nnRegs[nn]:
-                            graph.edges[(node, nn)]["color"] = "#ffb733"
+                            graph.edges[(node, nn)]["color"] = "#D50000"
                             graph.edges[(node, nn)]["linestyle"] = "dotted"
                             graph.edges[(node, nn)]["edge_type"] = "imputed"
                             graph.edges[(node, nn)]["edge_creation"] = "imputed2"
@@ -647,7 +780,7 @@ class miRGeneGraph:
                     if childDir == targetDir:
                         if graph.edges[(node, nn)]["edge_type"] in self.priorityEdgeTypes:
                             continue
-                        graph.edges[(node, nn)]["color"] = "#ffb733"
+                        graph.edges[(node, nn)]["color"] = "#D50000"
                         graph.edges[(node, nn)]["linestyle"] = "dotted"
                         graph.edges[(node, nn)]["edge_type"] = "imputed"
                         graph.edges[(node, nn)]["edge_creation"] = "imputed3"
@@ -703,6 +836,62 @@ class miRGeneGraph:
                 graph.edges[mirEdge]["linestyle"] = "dashed"
                 graph.edges[mirEdge]["edge_type"] = "errored"
                 graph.edges[mirEdge]["edge_creation"] = "imputed4"
+
+
+    def colorEdges(self, graph):
+
+        for edge in graph.edges():
+
+
+            src = edge[0]
+            tgt = edge[1]
+
+            srcData = graph.node[src]["attr_dict"]
+            tgtData = graph.node[tgt]["attr_dict"]
+
+
+            edgeType = graph.edges[edge]["edge_type"]
+
+            if edgeType == "expected":
+                graph.edges[edge]["color"] = "#4CAF50"
+                graph.edges[edge]["linestyle"] = "solid"
+                graph.edges[edge]["dir_type"] = "expected"
+
+            elif edgeType == "unexpected":
+
+                graph.edges[edge]["color"] = "#F44336"
+                graph.edges[edge]["linestyle"] = "solid"
+                graph.edges[edge]["dir_type"] = "unexpected"
+
+            elif edgeType == "imputed":
+
+                srcDir = srcData.get("node_expr_direction", "N/A")
+                tgtDir = tgtData.get("node_expr_direction", "N/A")
+
+                if srcDir == self.dirToOpposite[tgtDir]:
+                    graph.edges[edge]["color"] = "#4CAF50" #green
+                    graph.edges[edge]["linestyle"] = "dashed"
+                    graph.edges[edge]["dir_type"] = "expected_imputed"
+
+                elif srcDir == tgtDir and srcDir != "N/A":
+
+                    graph.edges[edge]["color"] = "#F44336"  # red
+                    graph.edges[edge]["linestyle"] = "dashed"
+                    graph.edges[edge]["dir_type"] = "unexpected_imputed"
+
+                else:
+                    graph.edges[edge]["color"] = "#607D8B"  # gray
+                    graph.edges[edge]["linestyle"] = "dashed"
+                    graph.edges[edge]["dir_type"] = "unknown_imputed"
+
+
+            else:
+                graph.edges[edge]["color"] = "#607D8B"
+                graph.edges[edge]["linestyle"] = "dotted"
+                graph.edges[edge]["dir_type"] = "unknown"
+
+
+
 
 
     def __impute4(self, graph):
@@ -791,24 +980,7 @@ class miRGeneGraph:
             self.changeMirDirection(graph, node, newMirDir)
 
 
-    def countAttributeEdge(self, graph, attrNames):
-        tCounter = Counter()
-        for edge in graph.edges():
-            edgeData = graph.edges[edge]
-
-            tCounter[tuple([edgeData.get(x, None) for x in attrNames])] += 1
-
-        print("Counts for attributes: ", ", ".join(attrNames))
-
-        totalTCounter = 0
-        for etype in tCounter:
-            etypeCount = tCounter[etype]
-            totalTCounter += etypeCount
-            print(etype, etypeCount)
-
-        print("Total", totalTCounter)
-        print()
-
+    def checkConsistency(self, graph):
         for node in sorted([x for x in graph.nodes()]):
 
             nodeData = graph.node[node]["attr_dict"]
@@ -866,13 +1038,12 @@ class miRGeneGraph:
 
         print(nodeConditionCount, totalNodeCount)
 
-    def countAttributeNodes(self, graph, attrNames):
-
+    def countAttributeEdges(self, graph, attrNames):
         tCounter = Counter()
-        for node in graph.nodes():
-            nodeData = graph.node[node]["attr_dict"]
+        for edge in graph.edges():
+            edgeData = graph.edges[edge]
 
-            tCounter[tuple([nodeData[x] for x in attrNames])] += 1
+            tCounter[tuple([edgeData.get(x, "") for x in attrNames])] += 1
 
         print("Counts for attributes: ", ", ".join(attrNames))
 
@@ -885,12 +1056,35 @@ class miRGeneGraph:
         print("Total", totalTCounter)
         print()
 
+        return tCounter
+
+    def countAttributeNodes(self, graph, attrNames):
+
+        tCounter = Counter()
+        for node in graph.nodes():
+            nodeData = graph.node[node]["attr_dict"]
+
+            tCounter[tuple([nodeData.get(x, "") for x in attrNames])] += 1
+
+        print("Counts for attributes: ", ", ".join(attrNames))
+
+        totalTCounter = 0
+        for etype in tCounter:
+            etypeCount = tCounter[etype]
+            totalTCounter += etypeCount
+            print(etype, etypeCount)
+
+        print("Total", totalTCounter)
+        print()
+
+        return tCounter
+
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('-d', '--detable', nargs='+', type=argparse.FileType('r'), required=True, help='alignment files')
-    parser.add_argument('-o', '--output', nargs='+', type=str, required=False, help="output base")
+    parser.add_argument('-o', '--output', type=str, required=True, help="output base")
 
 
     parser.add_argument('--organisms', nargs='+', type=str, default=[], required=False)
@@ -915,98 +1109,132 @@ if __name__ == '__main__':
         contextDict['ncits'].append(x)
 
 
+    """
+    LOAD GENE -> MIRNA HOST GENE
+    """
+    genes2mirFilename = os.path.dirname(__file__) + "/../data/gene_mir_overlap.tsv"
+    genename2mirs = defaultdict(set)
+
+    for line in open(genes2mirFilename):
+        aline = line.strip().split()
+
+        aline[2] = aline[2].replace("hsa-", "")
+
+        genename2mirs[aline[1].upper()].add(aline[2])
+
+
+
+    """
+    FETCH/BUILD INTERACTIONS
+    """
     contextDict = DataBaseAccessor.checkContext(contextDict)
 
-    defilename = "/mnt/d/dev/data/human_plaque/reports/stable_vs_unstable.star.msEmpiRe_DESeq2.tsv"
+    for didx, detable in enumerate(args.detable):
 
-    indf = DataFrame.parseFromFile(defilename, skipChar='#', replacements={
-        "None": None,
-        "": None,
-        "NA": None
-    })
+        defilename = detable.name
 
-    geneSymCol = None
-    inHeaders = indf.getHeader()
+        indf = DataFrame.parseFromFile(defilename, skipChar='#', replacements={
+            "None": None,
+            "": None,
+            "NA": None
+        })
 
-    deMIRs = {}
-    deGenes = {}
+        geneSymCol = None
+        inHeaders = indf.getHeader()
 
-    allMIRs = {}
-    allGenes = {}
+        deMIRs = {}
+        deGenes = {}
 
-    if "gene_symbol" in inHeaders:
-        geneSymCol = "gene_symbol"
-    elif "Geneid" in inHeaders:
-        geneSymCol = "Geneid"
-    elif "id" in inHeaders:
-        geneSymCol = "id"
+        allMIRs = {}
+        allGenes = {}
 
-    for ridx, row in enumerate(indf):
+        if "gene_symbol" in inHeaders:
+            geneSymCol = "gene_symbol"
+        elif "Geneid" in inHeaders:
+            geneSymCol = "Geneid"
+        elif "id" in inHeaders:
+            geneSymCol = "id"
 
-        try:
-            robL2FC = float(row["ROB_log2FC"])
-            robAdjPVal = float(row["ROB_ADJ.PVAL"])
-        except:
-            continue
+        for ridx, row in enumerate(indf):
 
-        # if robAdjPVal > 0.05:
-        #    continue
+            try:
+                robL2FC = float(row["ROB_log2FC"])
+                robAdjPVal = float(row["ROB_ADJ.PVAL"])
+            except:
+                continue
 
-        geneSymbol = row[geneSymCol]
+            # if robAdjPVal > 0.05:
+            #    continue
 
-        if geneSymbol.upper().startswith("MIR") and isNumber(geneSymbol[3:]):
+            geneSymbol = row[geneSymCol]
 
-            geneSymbol = geneSymbol.split("-")[0]
+            #if geneSymbol.upper().startswith("MIR") and isNumber(geneSymbol[3:]):
+            if geneSymbol.upper() in genename2mirs:
 
-            if geneSymbol.upper() in allMIRs:
+                assocMirs = genename2mirs[geneSymbol.upper()]
 
-                oldL2FC, oldPVAL = allMIRs[geneSymbol.upper()]
+                for amir in assocMirs:
 
-                newFC = oldL2FC if abs(oldL2FC) < abs(robL2FC) else robL2FC
-                newPV = min(oldPVAL, robAdjPVal)
+                    geneSymbol = amir#geneSymbol.split("-")[0].upper()
 
-                allMIRs[geneSymbol.upper()] = (newFC, newPV)
+                    if geneSymbol in allMIRs:
+
+                        oldL2FC, oldPVAL = allMIRs[geneSymbol]
+
+                        newFC = oldL2FC if abs(oldL2FC) < abs(robL2FC) else robL2FC
+                        newPV = min(oldPVAL, robAdjPVal)
+
+                        allMIRs[geneSymbol] = (newFC, newPV)
+                    else:
+                        allMIRs[geneSymbol] = (robL2FC, robAdjPVal)
+
+                    if robAdjPVal < 0.05:
+                        deMIRs[geneSymbol] = (robL2FC, robAdjPVal)
+
             else:
-                allMIRs[geneSymbol.upper()] = (robL2FC, robAdjPVal)
+                allGenes[geneSymbol.upper()] = (robL2FC, robAdjPVal)
 
-            if robAdjPVal < 0.05:
-                deMIRs[geneSymbol.upper()] = (robL2FC, robAdjPVal)
+                if robAdjPVal < 0.05:
+                    deGenes[geneSymbol.upper()] = (robL2FC, robAdjPVal)
 
-        else:
-            allGenes[geneSymbol.upper()] = (robL2FC, robAdjPVal)
+        print("DE MIRNAS", deMIRs)
+        print("DE GENES", len(deGenes))
 
-            if robAdjPVal < 0.05:
-                deGenes[geneSymbol.upper()] = (robL2FC, robAdjPVal)
+        mirnaContextDict = {"mirna": [x for x in deMIRs]}
+        for x in contextDict:
+            mirnaContextDict[x] = contextDict[x]
 
-    print("DE MIRNAS", deMIRs)
-    print("DE GENES", len(deGenes))
+        geneContextDict = {"gene": [x for x in deGenes]}
+        for x in contextDict:
+            geneContextDict[x] = contextDict[x]
 
-    mirnaContextDict = {"mirna": [x for x in deMIRs]}
-    for x in contextDict:
-        mirnaContextDict[x] = contextDict[x]
+        mirnaHits = DataBaseAccessor.fetch_mirna_interactions(
+            mirnaContextDict
+        )
 
-    geneContextDict = {"gene": [x for x in deGenes]}
-    for x in contextDict:
-        geneContextDict[x] = contextDict[x]
+        geneHits = DataBaseAccessor.fetch_mirna_interactions(
+            geneContextDict
+        )
 
-    mirnaHits = DataBaseAccessor.fetch_mirna_interactions(
-        mirnaContextDict
-    )
+        print("DE MIRNAS", deMIRs, len(mirnaHits))
+        print("DE GENES", len(deGenes), len(geneHits))
 
-    geneHits = DataBaseAccessor.fetch_mirna_interactions(
-        geneContextDict
-    )
+        allLogFC = [deMIRs[x][0] for x in deMIRs] + [deGenes[x][0] for x in deGenes]
+        minLogFC = min(allLogFC)
+        maxLogFC = max(allLogFC)
 
-    print("DE MIRNAS", deMIRs, len(mirnaHits))
-    print("DE GENES", len(deGenes), len(geneHits))
+        mgG = miRGeneGraph({
+            "minLogFC": minLogFC,
+            "maxLogFC": maxLogFC,
+        })
 
-    allLogFC = [deMIRs[x][0] for x in deMIRs] + [deGenes[x][0] for x in deGenes]
-    minLogFC = min(allLogFC)
-    maxLogFC = max(allLogFC)
+        mgGraph = mgG.createGraph(mirnaHits, geneHits)
+        mgG.imputeGraph(mgGraph)
 
-    mgG = miRGeneGraph(mirnaHits, geneHits, {
-        "minLogFC": minLogFC,
-        "maxLogFC": maxLogFC,
-    })
+        mgG.saveGraph(args.output, "graph_" + os.path.basename(defilename) + ".html", mgGraph)
+
+
+
+
 
 

@@ -62,13 +62,17 @@ class GraphPlot:
         return Environment( loader=FileSystemLoader(path or './') ).get_template(filename).render(context)
 
     @classmethod
-    def showGraph(cls, graph, location='/tmp/', name='graph', title=None, nodeLabel=lambda x: x, edgeLabel=lambda x: ''):
+    def showGraph(cls, graph, stats=None, location='/tmp/', name='graph', title=None, nodeLabel=lambda x: x, edgeLabel=lambda x: ''):
 
         if title == None:
             title=name
 
         this_dir, this_filename = os.path.split(__file__)
-        copyfile(this_dir + '/cytoscape.js', location + "/cytoscape.js")
+
+        try:
+            copyfile(this_dir + '/cytoscape.js', location + "/cytoscape.js")
+        except:
+            print("Failed copying", this_dir, '/cytoscape.js', location, "/cytoscape.js")
 
 
         graphNodes = []
@@ -138,8 +142,14 @@ class GraphPlot:
             'edges': graphEdges
         }
 
+        if stats != None:
+            content["stats"] = stats
 
-        outfile = location + "/" + name + ".html"
+        outfile = location + "/" + name
+
+        if not outfile.endswith(".html"):
+            outfile += ".html"
+
         with open(outfile, 'w') as outfile:
 
             output = cls.jinjaRender(this_dir + '/interactiveCYjsGraph.html', content)

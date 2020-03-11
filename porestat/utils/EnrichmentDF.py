@@ -305,10 +305,18 @@ class EnrichmentDF(DataFrame):
                     rawpTitle = method + "_RAW.PVAL"
                     adjpTitle = method + "_ADJ.PVAL"
 
+                    def recognizeColumnIndex( df, colNames):
 
-                    geneIDidx = methDF.getColumnIndex('GENE.ID') if methDF.columnExists('GENE.ID') else methDF.getColumnIndex('PROBEID')
-                    log2FCidx = methDF.getColumnIndex('log2FC') if methDF.columnExists('log2FC') else methDF.getColumnIndex('FC')
-                    rawPValidx = methDF.getColumnIndex('RAW.PVAL') if methDF.columnExists('RAW.PVAL') else methDF.getColumnIndex('ADJ.PVAL')
+                        for colName in colNames:
+                            if df.columnExists(colName):
+                                return df.getColumnIndex(colName)
+
+                        return -1
+
+
+                    geneIDidx = recognizeColumnIndex(methDF, ["GENE.ID", "PROBEID"])#methDF.getColumnIndex('GENE.ID') if methDF.columnExists('GENE.ID') else methDF.getColumnIndex('PROBEID')
+                    log2FCidx = recognizeColumnIndex(methDF, ["log2FC", "FC"]) #methDF.getColumnIndex('log2FC') if methDF.columnExists('log2FC') else methDF.getColumnIndex('FC')
+                    rawPValidx = recognizeColumnIndex(methDF, ["RAW.PVAL", "PVAL", "ADJ.PVAL"]) # methDF.getColumnIndex('RAW.PVAL') if methDF.columnExists('RAW.PVAL') else methDF.getColumnIndex('ADJ.PVAL')
                     adjPValidx = methDF.getColumnIndex('ADJ.PVAL')
 
                     print("Combining Method to data row", method)
