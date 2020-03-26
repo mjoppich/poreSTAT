@@ -61,6 +61,101 @@ class GraphPlot:
         path, filename = os.path.split(tpl_path)
         return Environment( loader=FileSystemLoader(path or './') ).get_template(filename).render(context)
 
+
+    @classmethod
+    def saveGraph(cls, graph, outFileName, stats=None, name='graph', title=None, nodeLabel=lambda x: x, edgeLabel=lambda x: ''):
+
+        if title == None:
+            title=name
+
+        this_dir, this_filename = os.path.split(__file__)
+
+        location = os.path.dirname(outFileName.name)
+
+        try:
+            copyfile(this_dir + '/cytoscape.js', location + "/cytoscape.js")
+        except:
+            print("Failed copying", this_dir, '/cytoscape.js', location, "/cytoscape.js")
+
+
+        graphNodes = []
+
+        for (node, nodeAttr) in graph.nodes(data=True):
+
+            nodeName = nodeLabel(node)
+            nodeColor = '#555555'
+            nodeId = str(node)
+
+            if 'attr_dict' in nodeAttr:
+                nodeAttr = nodeAttr['attr_dict']
+
+            plotAttr = {'id': nodeId,'name': nodeName, 'color': nodeColor, "size": 20, "shape":"ellipse"}
+
+            #print(node)
+            #print(nodeAttr)
+
+            if 'color' in nodeAttr:
+                plotAttr['color'] = nodeAttr['color']
+
+                if nodeAttr['color'] in ['g', 'b', 'r']:
+                    repMap = {'g': 'green', 'b': 'blue', 'r': 'red'}
+                    plotAttr['color'] = repMap[nodeAttr['color']]
+
+            if 'size' in nodeAttr:
+                plotAttr['size'] = nodeAttr['size']
+
+            if 'shape' in nodeAttr:
+                plotAttr['shape'] = nodeAttr['shape']
+
+
+            for x in nodeAttr:
+                if not x in plotAttr:
+                    plotAttr[x] = nodeAttr[x]
+
+            graphNodes.append(plotAttr)
+
+        graphEdges = []
+        for edge in graph.edges():
+
+            edata = graph.get_edge_data(edge[0], edge[1])
+
+            eSource = str(edge[0])
+            eTarget = str(edge[1])
+            eColor = edata['color'] if 'color' in edata else '#9dbaea'
+            eLabel = edata['label'] if 'label' in edata else edgeLabel(edge)
+
+            if eColor in ['g', 'b', 'r']:
+                repMap = {'g': 'green', 'b': 'blue', 'r': 'red'}
+                eColor = repMap[eColor]
+
+
+            edgeData = {'source': eSource, 'target': eTarget, 'color': eColor, 'label': eLabel}
+
+            for x in edata:
+                if not x in edgeData:
+                    edgeData[x] = edata[x]
+
+            graphEdges.append( edgeData )
+
+
+
+        content = {
+            'title': title,
+            'nodes': graphNodes,
+            'edges': graphEdges
+        }
+
+        if stats != None:
+            content["stats"] = stats
+
+        output = cls.jinjaRender(this_dir + '/interactiveCYjsGraph.html', content)
+        outFileName.write(output)
+        outFileName.flush()
+
+
+        return outFileName
+
+
     @classmethod
     def showGraph(cls, graph, stats=None, location='/tmp/', name='graph', title=None, nodeLabel=lambda x: x, edgeLabel=lambda x: ''):
 

@@ -239,12 +239,16 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--save', type=readable_dir, required=True)
 
     parser.add_argument('-fc', '--fold_changes', action='store_true', default=False, help="run FC part")
-    parser.add_argument('-ca', '--counts_analysis', action='store_true', default=False, help="run FC part")
-    parser.add_argument('-enrich', '--enrichment', action='store_true', default=False, help="run FC part")
-    parser.add_argument('-stats', '--stats', action='store_true', default=False, help="run FC part")
+    parser.add_argument('-ca', '--counts_analysis', action='store_true', default=False, help="run counts analyses part")
+    parser.add_argument('-enrich', '--enrichment', action='store_true', default=False, help="run enrichment analyses part")
+    parser.add_argument('-stats', '--stats', action='store_true', default=False, help="run stats part")
+
+    parser.add_argument('-mir', '--mirnas', action='store_true', default=False, help="run miRNA enrichments (requires miRExplore)")
 
     parser.add_argument('-all', '--all', action='store_true', default=False, help="run FC part")
     parser.add_argument('-sim', '--simulate', action='store_true', default=False, help="run FC part")
+    parser.add_argument('-upd', '--update', action='store_true', default=False, help="update run")
+
     parser.add_argument('-pc', '--prefix-counts', dest="prefix_counts", action='store_true', default=False, help="run FC part")
 
     parser.add_argument('-e', '--enhance', type=argparse.FileType('r'), help='enhancement file', default=open("/mnt/d/dev/data/genomes/ensembl.symbol.mouse.list", "r"))
@@ -480,7 +484,7 @@ if __name__ == '__main__':
 
             fcLogger.debug(sysCall)
 
-            if not args.simulate:
+            if not args.simulate and not (args.update and len(glob(args.diffreg[pidx] + "/*")) > 0):
                 subprocess.run( sysCall, shell=True, check=True )
 
             fcLogger.info("Finished SubSample {} ({})".format(pidx, prefix))
@@ -493,7 +497,17 @@ if __name__ == '__main__':
         log.info(descr)
         log.debug(sysCall)
 
-        if not args.simulate:
+        simulate = args.simulate
+
+        if plotsPrefix != None:
+            searchPref = plotsPrefix
+            if not searchPref.upper().endswith(".PNG"):
+                searchPref += "*.png"
+
+            if args.update and len(glob(searchPref + "*")) > 0:
+                simulate = True
+
+        if not simulate:
             subprocess.run(sysCall, shell=True, check=True)
 
         if plotid != None:
@@ -526,7 +540,7 @@ if __name__ == '__main__':
             caLogger.info("Calculate Expression Values")
             caLogger.debug(sysCall)
 
-            if not args.simulate:
+            if not args.simulate and not (args.update and len(glob(os.path.join(args.diffreg[pidx], "counts.tpm.fpkm.tsv"))) > 0):
                 subprocess.run(sysCall, shell=True, check=True)
 
             sysCall = "python3 {script} --summary {countfile} --output {outdir}".format(
@@ -534,8 +548,6 @@ if __name__ == '__main__':
                 outdir=os.path.join(args.diffreg[pidx], "fcsummary"),
                 countfile=args.counts[pidx].name + ".summary"
             )
-
-
 
             runSysCall(sysCall, "Visualise featureCount Summary", caLogger, "FeatureCount Summary",
                        os.path.join(args.diffreg[pidx], "fcsummary"), args, prefix, caPlots)
@@ -715,7 +727,17 @@ if __name__ == '__main__':
         log.info(descr)
         log.debug(sysCall)
 
-        if not args.simulate:
+        simulate = args.simulate
+
+        if plotsPrefix != None:
+            searchPref = plotsPrefix
+            if not searchPref.upper().endswith(".PNG"):
+                searchPref += "*.png"
+
+            if args.update and len(glob(searchPref + "*")) > 0:
+                simulate = True
+
+        if not simulate:
             subprocess.run(sysCall, shell=True, check=True)
 
         if plotid != None and plotsPrefix != None:
@@ -1020,7 +1042,7 @@ if __name__ == '__main__':
                             output=combinedRaw
                         )
 
-                        runSysCall(sysCall, "Merging DE Methods", statsLogger, None, None, args, prefix, methods +  ("MapCombined",),
+                        runSysCall(sysCall, "Merging DE Methods", statsLogger, None, combinedRaw, args, prefix, methods +  ("MapCombined",),
                                    deEnrichPlots)
 
                         prefix2countFile[prefix] = countDeFile
@@ -1316,14 +1338,20 @@ if __name__ == '__main__':
                             org=args.organism_name,
                             dir=direction
                         )
-                        enrichCalls.append(sysCall)
+
+                        hasOutfile = len(glob(deFile + ".david." + direction + "*")) > 0
+                        if not args.simulate and (args.update and not hasOutfile):
+                            enrichCalls.append(sysCall)
 
                         sysCall = "Rscript {script} {de} {org} {dir}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "runGOAnalysis.R")),
                             de=deFile,
                             org=args.organism_mapping,
                             dir=direction)
-                        enrichCalls.append(sysCall)
+
+                        hasOutfile = len(glob(deFile + ".GeneOntology.*." + direction + ".goenrich.tsv")) > 0
+                        if not args.simulate and (args.update and not hasOutfile):
+                            enrichCalls.append(sysCall)
 
                         if args.organism_name != None:
                             sysCall = "Rscript {script} {de} {org} {dir}".format(
@@ -1331,14 +1359,19 @@ if __name__ == '__main__':
                                 de=deFile,
                                 org=args.organism_name,
                                 dir=direction)
-                            enrichCalls.append(sysCall)
+                            hasOutfile = len(glob(deFile + ".reactome." + direction + "*")) > 0
+                            if not args.simulate and (args.update and not hasOutfile):
+                                enrichCalls.append(sysCall)
 
                         sysCall = "Rscript {script} {de} {org} {dir}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "runKeggAnalysis.R")),
                             de=deFile,
                             org=args.organism_name,
                             dir=direction)
-                        enrichCalls.append(sysCall)
+
+                        hasOutfile = len(glob(deFile + ".kegg." + direction + "*")) > 0
+                        if not args.simulate and (args.update and not hasOutfile):
+                            enrichCalls.append(sysCall)
 
                         if direction == "all":
                             sysCall = "Rscript {script} {de} {org} {dir}".format(
@@ -1346,7 +1379,10 @@ if __name__ == '__main__':
                                 de=deFile,
                                 org=args.organism_mapping,
                                 dir=direction)
-                            enrichCalls.append(sysCall)
+
+                            hasOutfile = len(glob(deFile + ".GeneOntology.*." + direction + ".gsea.tsv")) > 0
+                            if not args.simulate and (args.update and not hasOutfile):
+                                enrichCalls.append(sysCall)
 
                     for x in enrichCalls:
                         statsLogger.info(x)
@@ -1525,6 +1561,219 @@ if __name__ == '__main__':
 
     else:
         statsLogger.info("Skipping STATS and ENRICHMENT")
+
+    if args.mirnas:
+        mirLogger = logging.getLogger("SET ENRICHMENT/MIR ENRICHMENT")
+        mirLogger.addHandler(consoleHandler)
+
+        mirEnrichResults = OrderedDefaultDict(lambda: OrderedDefaultDict(lambda: OrderedDefaultDict(list)))
+
+
+        def runSysCall(sysCall, log, plotid, plotsPrefix, args, prefix, method, plotDict, append=False, fexts = [".png"]):
+            log.info(plotid)
+            log.debug(sysCall)
+
+            simulate = args.simulate
+            if args.update and len(glob(plotsPrefix + "*")) > 0:
+                simulate=True
+
+            if not simulate:
+                subprocess.run(sysCall, shell=True, check=True)
+
+            if plotid != None and plotsPrefix != None:
+
+                hasAllowedExt = False
+
+                for ext in fexts:
+                    if plotsPrefix.upper().endswith(ext.upper()):
+                        hasAllowedExt = True
+                        break
+
+
+
+                allFiles = []
+                if not hasAllowedExt or len(fexts) > 1:
+
+                    for ext in fexts:
+                        searchStr = plotsPrefix
+
+                        if len(ext) > 0:
+                            searchStr += "*" + ext
+
+                        allFiles += glob(searchStr)
+                        print(hasAllowedExt, searchStr, method, plotid, prefix, allFiles)
+
+
+                else:
+                    allFiles = glob(plotsPrefix)
+
+                    print(hasAllowedExt, method, plotid, prefix, allFiles)
+
+
+
+                if not append:
+                    plotDict[method][plotid][prefix] = allFiles
+                else:
+                    plotDict[method][plotid][prefix] += allFiles
+
+                log.debug("Found Images\n" + "\n".join(plotDict[method][plotid][prefix]))
+
+
+        args.report.write("<h1>poreSTAT: MIRNA ANALYSIS for DE RESULTS</h1>\n")
+        args.report.flush()
+
+
+        curpath = os.path.dirname(__file__)
+        enrichPath = os.path.join(curpath, "sets/")
+
+        performMethods = splitDEMethods(args.de_methods)
+
+        for enrichSetFName in glob(enrichPath + "*.enrich"):
+
+            enrichName = os.path.splitext(os.path.basename(enrichSetFName))[0]
+
+            for methods in performMethods:
+                methodStr = "_".join(methods)
+
+                for prefix in args.prefixes + ["combined"]:
+                    methodResults = glob(os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv"))
+                    methodResult = methodResults[0]
+
+                    """
+        
+                    TAB ENV START
+        
+                    """
+                    outputname = os.path.splitext(methodResult)[0] + "." + enrichName + ".setenrich.tsv"
+
+                    inname0 = os.path.join(args.save, args.name + "." + args.prefixes[0] + "." + methodStr + ".tsv")
+                    inname1 = os.path.join(args.save, args.name + "." + args.prefixes[1] + "." + methodStr + ".tsv")
+
+                    sysCall = "python3 {script} --de {de} --sets {sets} --output {output}".format(
+                        script=os.path.realpath(os.path.join(scriptMain,"mirtools", "setEnrichment.py")),
+                        de=methodResult,
+                        sets=enrichSetFName,
+                        output=outputname
+                    )
+
+                    plotName = "Set enrichment for {}".format(enrichName)
+                    plotId2Descr[plotName] = "<p>This performs a set enrichment on given set.</p>" \
+                                             "<p>Genes must have robust adj. p-value l.t. 0.05 and a abs logFC g.t. 1.</p>" \
+                                             "<p></p>"
+
+                    runSysCall(sysCall, mirLogger, plotName,
+                               outputname, args, prefix, methods,
+                               mirEnrichResults, fexts=["tsv"])
+
+                    """
+                    PLOT
+                    
+                    """
+
+
+                    sysCall = "python3 {script} {resfile} {maxelems}".format(
+                        script=os.path.realpath(os.path.join(scriptMain, "mirtools", "plotSetEnrichment.py")),
+                        resfile=outputname,
+                        maxelems=20
+                    )
+
+                    runSysCall(sysCall, mirLogger, plotName,
+                               outputname + ".", args, prefix, methods,
+                               mirEnrichResults, append=True, fexts=["png"])
+
+
+        for methods in performMethods:
+            methodStr = "_".join(methods)
+
+            for prefix in args.prefixes + ["combined"]:
+                methodResults = glob(os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv"))
+                methodResult = methodResults[0]
+
+                """
+
+                NETWORK START
+
+                """
+                outputname = os.path.splitext(methodResult)[0] + ".mirexplore_enrich."
+
+
+                sysCall = "python3 {script} --detable {detable} --organisms {organisms} --disease {diseases} --output {outputpath}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "mirtools", "fetchMiRExploreGenes.py")),
+                    detable=methodResult,
+                    organisms="human mouse",
+                    diseases="DOID:1287",
+                    outputpath=outputname + "html"
+                )
+
+                plotName = "miRExplore enrichment"
+                plotId2Descr[plotName] = "<p>This performs a set enrichment on given set.</p>" \
+                                         "<p>Genes must have robust adj. p-value l.t. 0.05 and a abs logFC g.t. 1.</p>" \
+                                         "<p></p>"
+
+                runSysCall(sysCall, mirLogger, plotName,
+                           outputname, args, prefix, methods,
+                           mirEnrichResults, fexts=["html", "tsv"])
+
+                """
+                PLOT
+
+                """
+                outputname = os.path.splitext(methodResult)[0] + ".mirexplore_enrich.mirs.tsv"
+
+                sysCall = "python3 {script} {resfile} {maxelems}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "mirtools", "plotSetEnrichment.py")),
+                    resfile=outputname,
+                    maxelems=20
+                )
+
+                runSysCall(sysCall, mirLogger, plotName,
+                           outputname + ".", args, prefix, methods,
+                           mirEnrichResults, append=True, fexts=["png"])
+
+
+        for method in mirEnrichResults:
+
+            tableOut = "<h2>{}</h2>".format("&".join(method))
+            args.report.write(tableOut + "\n")
+
+            for plotId in mirEnrichResults[method]:
+
+                prefixCount = len(mirEnrichResults[method][plotId])
+
+                tableOut = "<h3>{}</h3>".format(plotId)
+
+                if plotId in plotId2Descr:
+                    tableOut += "<div>{}</div>".format(plotId2Descr[plotId])
+
+                tableOut += "<table>"
+                tableOut += "<tr>"
+                for prefix in mirEnrichResults[method][plotId]:
+                    tableOut += "<td>" + str(prefix) + "</td>"
+                tableOut += "</tr>"
+
+                print(plotId)
+                for filetuple in itertools.zip_longest(
+                        *[mirEnrichResults[method][plotId][x] for x in mirEnrichResults[method][plotId]]):
+                    print(filetuple)
+                    tableOut += "<tr>"
+
+                    for imgFile in filetuple:
+                        if imgFile != None:
+
+                            if imgFile.upper().endswith("TSV") or imgFile.upper().endswith("HTML"):
+                                tableOut += "<td><a href=\"" + str(os.path.relpath(os.path.realpath(imgFile),
+                                                                                os.path.dirname(
+                                                                                    args.report.name))) + "\">{}<a/></td>".format(os.path.basename(imgFile))
+                            else:
+                                tableOut += "<td><img src=\"" + str(os.path.relpath(os.path.realpath(imgFile), os.path.dirname(args.report.name))) + "\"/></td>"
+
+                        else:
+                            tableOut += "<td>N/A</td>"
+                    tableOut += "</tr>"
+                tableOut += "</table>"
+
+                args.report.write(tableOut + "\n")
+                args.report.flush()
 
 
     for err in sorted(errMSG, key=lambda x: x[1]):

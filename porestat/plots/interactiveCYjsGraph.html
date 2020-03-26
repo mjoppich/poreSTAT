@@ -52,7 +52,11 @@ h1 {
       z-index: 9999;
       padding: 0.25em;
       pointer-events: none;
-  }
+}
+
+.tippy-tooltip table {
+  color: #FFFFFF;
+}
 
 </style>
 
@@ -154,17 +158,17 @@ quality: "proof",
   samplingType: true,
   // Sample size to construct distance matrix
   sampleSize: 500,
-  // Separation amount between nodes
-  nodeSeparation: 300,
-  // Power iteration tolerance
-  piTol: 0.0000001,
+  // Separation amount between nodes, was 300
+  nodeSeparation: 700,
+  // Power iteration tolerance was 0.0000001
+  piTol: 0.01,
 
   /* incremental layout options */
 
   // Node repulsion (non overlapping) multiplier
   nodeRepulsion: 50,
   // Ideal edge (non nested) length
-  idealEdgeLength: 250,
+  idealEdgeLength: 500,
   // Divisor to compute edge forces
   edgeElasticity: 0.025,
   // Nesting factor (multiplier) to compute ideal edge length for nested edges
@@ -291,7 +295,21 @@ elements: {
             content: () => {
               let content = document.createElement('div');
 
-              content.innerHTML = "" + nodeData["id"] + "</br>" + "log2FC: " + nodeData["log2FC"].toFixed(2) + "</br>" + "adj. p-Value: " + nodeData["adjPval"].toFixed(2)
+              var elemsStr = "";
+              Object.keys(nodeData["edge_elements"]).forEach(function(x){
+                elemsStr += "<tr><td>"+x+"</td><td>"+nodeData["edge_elements"][x]+"</td></tr>"
+              });
+
+              var neighbourStr = "";
+              Object.keys(nodeData["node_elements"]).forEach(function(x){
+                neighbourStr += "<tr><td>"+x+"</td><td>"+nodeData["node_elements"][x]+"</td></tr>"
+              });
+
+              content.innerHTML = "" + nodeData["id"] + "</br>" +
+                      "log2FC: " + nodeData["log2FC"].toFixed(2) + "</br>" +
+                      "adj. p-Value: " + nodeData["adjPval"].toFixed(2) + "</br>" +
+                      "Edge Types: <table>" + elemsStr + "</table>" +
+                      "Neighbour Types: <table>" + neighbourStr + "</table>";
 
               return content;
             }
