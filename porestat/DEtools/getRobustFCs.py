@@ -44,7 +44,7 @@ if __name__ == '__main__':
         #    print(inHeaders)
         #    exit(-1)
 
-        if not all(["ROB_log2FC" in inHeaders,"ROB_RAW.PVAL" in inHeaders, "ROB_ADJ.PVAL" in inHeaders]):
+        if not all(["ROB_log2FC" in inHeaders, "ROB_ADJ.PVAL" in inHeaders]): #"ROB_RAW.PVAL" in inHeaders,
             print("Not all necessary columns found.")
             exit(-1)
 
@@ -53,5 +53,10 @@ if __name__ == '__main__':
         for row in indf:
 
             if row["ROB_ADJ.PVAL"] < args.cutoff:
+
+                rowVec = []
+                for x in [genesymname, "ROB_log2FC", "ROB_RAW.PVAL", "ROB_ADJ.PVAL"]:
+                    if x in row:
+                        rowVec.append(row[x])
                
-                print(row[genesymname], row["ROB_log2FC"], row["ROB_RAW.PVAL"], row["ROB_ADJ.PVAL"], sep="\t", file=args.output)
+                print(*rowVec, sep="\t", file=args.output)

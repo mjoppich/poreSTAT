@@ -18,102 +18,7 @@ from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 
 mpl.style.use("seaborn")
 
-def makeplot(plotdata, filename, stats):
 
-    maxlen = 0
-
-    commonGenes = defaultdict(set)
-
-    for sample in plotdata:
-        genecount = plotdata[sample]
-
-        for x in genecount:
-            commonGenes[sample].add(x[0])
-
-
-    allGenes = set()
-    for s in commonGenes:
-        allGenes = allGenes.union(commonGenes.get(s, set()))
-
-    for s in commonGenes:
-        allGenes = allGenes.intersection(commonGenes.get(s, set()))
-
-    print("Common Genes in all Samples", len(allGenes))
-
-    if len(allGenes) < 100:
-        for x in allGenes:
-            print(x)
-
-    colors = getColorVector(len(plotdata))
-
-    maxlen = 0
-    for sample in plotdata:
-        maxlen = max([maxlen, len(plotdata[sample])])
-
-    print()
-    print("All Counts")
-    print()
-
-    plt.figure()
-
-    for idx, sample in enumerate(plotdata):
-        counts = [x[1] for x in plotdata[sample]]
-        acounts = len([x for x in counts if x >= 1+pseudoCount])
-        print(sample, len(counts), acounts)
-        stats[sample]["genes_with_count"] = len(counts)
-        plt.hist(counts, int(maxlen), color=colors[idx], normed=False,cumulative =True, label=sample + " ("+str(len(counts))+", "+str(acounts)+")", histtype="step" )
-
-
-    plt.legend()
-    plt.xscale("log")
-    plt.title("Histogram of read counts with any count")
-    plt.savefig(filename + ".countplot.png")
-    #plt.show()
-
-    plt.close()
-
-    minCount = 1
-
-    print()
-    print("All Counts pseudocount+"+str(minCount))
-    print()
-
-    plt.figure()
-
-    for idx, sample in enumerate(plotdata):
-        counts = [x[1] for x in plotdata[sample] if x[1] >= minCount+pseudoCount]
-        print(sample, len(counts), len([x for x in counts if x >= minCount+pseudoCount]))
-
-        stats[sample]["genes_with_mincount_" + str(minCount)] = len(counts)
-
-        plt.hist(counts, int(maxlen), color=colors[idx], normed=False,cumulative =True, label=sample + " ("+str(len(counts))+")", histtype="step" )
-
-    plt.legend()
-    plt.xscale("log")
-    plt.title("Histogram of read counts with count >=" + str(minCount))
-    plt.savefig(filename + ".countplot"+str(minCount)+".png")
-    plt.close()
-    minCount = 20
-
-    print()
-    print("All Counts pseudocount+"+str(minCount))
-    print()
-
-    plt.figure()
-
-    for idx, sample in enumerate(plotdata):
-        counts = [x[1] for x in plotdata[sample] if x[1] >= minCount+pseudoCount]
-        print(sample, len(counts), len([x for x in counts if x >= minCount+pseudoCount]))
-        stats[sample]["genes_with_mincount_" + str(minCount)] = len(counts)
-        plt.hist(counts, int(maxlen), color=colors[idx], normed=False,cumulative =True, label=sample + " ("+str(len(counts))+")", histtype="step" )
-
-    plt.legend()
-    plt.xscale("log")
-    plt.title("Histogram of read counts with count >=" + str(minCount))
-    plt.savefig(filename + ".countplot"+str(minCount)+".png")
-    plt.close()
-
-    return stats
 
 def getColorMap(colormap="Viridis"):
     cmap = plt.cm.get_cmap(colormap)
@@ -219,7 +124,12 @@ if __name__ == '__main__':
                 for i in range(0, len(adjPVals)):
 
                     adjPval = line[adjPVals[i]]
-                    rawPval = line[rawPVals[i]]
+
+                    if i < len(rawPVals):
+                        rawPval = line[rawPVals[i]]
+                    else:
+                        rawPval = None
+
                     logFC = line[logFCs[i]]
 
                     if adjPval == None or adjPval == "None" or adjPval == "NA":
@@ -241,18 +151,59 @@ if __name__ == '__main__':
                     methodsAdjPvals.append(float(adjPval))
                     methodsRawPvals.append(float(rawPval))
                     methodsLog2FCs.append(float(logFC))
-        
-            allSameDirection = all([x >= 0 for x in methodsLog2FCs]) or all([x <= 0 for x in methodsLog2FCs]) 
+
+            allUp = all([x >= 0 for x in methodsLog2FCs])
+            allDown = all([x <= 0 for x in methodsLog2FCs])
+
+            allSameDirection = allUp or allDown
+
+            robustAdjPval = max(methodsAdjPvals)
+            robustRawPval = max(methodsRawPvals)
 
             if allSameDirection:
 
-                robustAdjPval = max(methodsAdjPvals)
-                robustRawPval = max(methodsRawPvals)
-
-                if methodsLog2FCs[0] >= 0:
+                if allUp:
                     robustLog2FC = min(methodsLog2FCs)
                 else:
                     robustLog2FC = max(methodsLog2FCs)
+
+
+            else:
+                lowestPositive = 1000
+                lowestNegative = -1000
+
+                posCount = 0
+                negCount = 0
+
+                for lfc in methodsLog2FCs:
+                    if lfc < 0:
+                        negCount += 1
+
+                        if abs(lfc) < abs(lowestNegative):
+                            lowestNegative = lfc
+
+                    elif lfc > 0:
+                        posCount += 1
+
+                        if abs(lfc) < abs(lowestPositive):
+                            lowestPositive = lfc
+
+                if posCount == negCount:
+
+                    robustLog2FC = 0
+
+                elif posCount > negCount and negCount <= 2 and len(methodsLog2FCs) > 4:
+                    robustLog2FC = lowestPositive
+
+                elif negCount > posCount and posCount <= 2 and len(methodsLog2FCs) > 4:
+                    robustLog2FC = lowestNegative
+
+
+                robustLog2FC = 0
+                robustRawPval = 1
+                robustAdjPval = 1
+
+                    #print("Inconsistent lfc", line[col2idx["gene_symbol"]], methodsLog2FCs)
 
             #if line[0] == 'ENSMUSG00000041773':
             #    print(methodsAdjPvals, methodsRawPvals, methodsLog2FCs)
@@ -263,6 +214,10 @@ if __name__ == '__main__':
 
                 if args.print:
                     print(line[col2idx["id"]], line[col2idx["gene_symbol"]], methodsAdjPvals, methodsRawPvals, methodsLog2FCs)
+
+            assert (robustLog2FC != None)
+            assert (robustRawPval != None)
+            assert (robustAdjPval != None)
 
             line[rowFCidx] = robustLog2FC
             line[robRawPidx] = robustRawPval
@@ -286,7 +241,15 @@ if __name__ == '__main__':
             if rowFC == None or rowPV == None:
                 continue
 
-            logRowPV = -math.log10(rowPV)
+            if rowPV == 0:
+                logRowPV = -1000
+            else:
+                try:
+                    logRowPV = -math.log10(rowPV)
+                except:
+                    print(row.to_tuple())
+                    print("logfc", row["ROB_log2FC"], "adj.pval", row["ROB_ADJ.PVAL"])
+                    exit(-1)
 
             if rowPV < 0.05 and abs(rowFC) >= 1.0:
                 fcPvalsSig.append((rowFC, logRowPV))
@@ -308,6 +271,7 @@ if __name__ == '__main__':
         for x in method2genes:
             print(x, len(method2genes[x]))
 
+        plt.title("Overlap of called genes per mehtod")
         upIn = from_contents(method2genes)
         plot(upIn, subset_size="auto") 
 

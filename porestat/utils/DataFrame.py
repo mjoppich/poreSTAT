@@ -1373,6 +1373,9 @@ document.addEventListener('readystatechange', event => {
 
         vLines = readLines(sFileName=sFileName, encoding=encoding, iSkipLines=skipLines, skipChar=skipChar)
 
+        if len(vLines) == 0:
+            return None
+
         iStartLine = 0
 
         if oHeader is None:

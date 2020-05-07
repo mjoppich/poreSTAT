@@ -106,7 +106,7 @@ if (organism == "mouse")
 
 }
 
-head(egid)
+#head(egid)
 
 entrezBG = egid[!is.na(egid$entrez),]
 entrezBG = as.vector(entrezBG$entrez)

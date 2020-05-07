@@ -55,6 +55,16 @@ tf	38058	2911	1	0	0.0	1.0	1.0
 
         elemRes = foundSets[elemName]
 
+        if len(elemRes) < 2:
+            seenDirs = set([x[1] for x in elemRes])
+
+            if not "UP" in seenDirs:
+                elemRes.append((1.0, "UP", 1))
+
+            if not "DOWN" in seenDirs:
+                elemRes.append((1.0, "DOWN", 1))
+
+
         if len(elemRes) > 1:
 
             countSig = sum([1 for x in elemRes if x[0] < 0.05])

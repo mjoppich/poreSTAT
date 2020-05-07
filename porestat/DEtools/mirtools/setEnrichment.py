@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
         for row in indf:
 
-            geneID = row[args.gene_symbol]
+            geneID = row[args.gene_symbol].upper()
 
             if geneID in sym2approvSym:
                 geneID = sym2approvSym[geneID]

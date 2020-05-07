@@ -4,6 +4,7 @@ suppressMessages(suppressWarnings(require(dplyr)))
 suppressMessages(suppressWarnings(require(RDAVIDWebService)))
 suppressMessages(suppressWarnings(require(qvalue)))
 
+suppressMessages(suppressWarnings(require(dplyr)))
 args = commandArgs(trailingOnly=TRUE)
 
 
@@ -253,7 +254,7 @@ if (organism == "mouse")
 }
 
 #egid = grcm38 %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
-head(egid)
+#head(egid)
 
 entrezGenes = egid[!is.na(egid$entrez),]
 entrezGenes = as.vector(entrezGenes$entrez)
@@ -285,7 +286,7 @@ if (organism == "mouse")
 }
 
 #egid = grcm38 %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
-head(egid)
+#head(egid)
 
 entrezBG = egid[!is.na(egid$entrez),]
 entrezBG = as.vector(entrezBG$entrez)
@@ -313,10 +314,13 @@ if (is.null(kk))
 }
 
 rs = as.data.frame(kk)
+outname=paste(filename,"david",mode,"tsv", sep=".")
 
 if (nrow(rs) == 0)
 {
     print("NO DATA in DF. TERMINATING")
+    x <- data.frame()
+    write.table(x, file=outname, col.names=FALSE)
     quit(status=0, save='no')
 }
 
@@ -324,7 +328,7 @@ rsc = colnames(rs)
 rsc[1] = "TERM.ID"
 colnames(rs) = rsc
 
-write.table(rs, file=paste(filename,"david",mode,"tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+write.table(rs, file=outname, sep="\t", quote=F, row.names=FALSE)
 
 print("finished")
 quit(status=0, save='no')

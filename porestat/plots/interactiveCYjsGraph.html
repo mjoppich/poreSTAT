@@ -308,6 +308,7 @@ elements: {
               content.innerHTML = "" + nodeData["id"] + "</br>" +
                       "log2FC: " + nodeData["log2FC"].toFixed(2) + "</br>" +
                       "adj. p-Value: " + nodeData["adjPval"].toFixed(2) + "</br>" +
+                      "NS score: <table>" + nodeData["ns"].toFixed(2) + "</table>" +
                       "Edge Types: <table>" + elemsStr + "</table>" +
                       "Neighbour Types: <table>" + neighbourStr + "</table>";
 

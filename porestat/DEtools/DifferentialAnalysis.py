@@ -245,6 +245,12 @@ if __name__ == '__main__':
 
     parser.add_argument('-mir', '--mirnas', action='store_true', default=False, help="run miRNA enrichments (requires miRExplore)")
 
+    parser.add_argument('-mird', '--mir_disease', type=str, nargs='+', required=False, default=[])
+    parser.add_argument('-mirc', '--mir_cells', type=str, nargs='+', required=False, default=[])
+    parser.add_argument('-mirg', '--mir_go', type=str, nargs='+', required=False, default=[])
+    parser.add_argument('-mirn', '--mir_ncit', type=str, nargs='+', required=False, default=[])
+
+
     parser.add_argument('-all', '--all', action='store_true', default=False, help="run FC part")
     parser.add_argument('-sim', '--simulate', action='store_true', default=False, help="run FC part")
     parser.add_argument('-upd', '--update', action='store_true', default=False, help="update run")
@@ -260,13 +266,19 @@ if __name__ == '__main__':
 
     parser.add_argument('-p', '--prefixes', nargs='+', type=str, required=True, help="short names for all subruns")
 
+    parser.add_argument('-ad', '--additional_de', nargs='+', type=argparse.FileType('r'), default=[])
+    parser.add_argument('-ap', '--additional_de_prefix', nargs='+', type=str, default=[])
+    parser.add_argument('-am', '--additional_de_method', nargs='+', type=str, default=[])
+
+
+
 
     parser.add_argument('-cnp', '--condition-no-path', dest='condition_no_path', action='store_true', default=False)
     parser.add_argument('-sn', '--synthetic-names', dest='synthetic_names', action='store_true', default=False)
 
     parser.add_argument('-r', '--report', type=argparse.FileType('w'), required=True, help='report files')
 
-    parser.add_argument('--parallel', type=int, required=False, default=6)
+    parser.add_argument('--parallel', type=int, required=False, default=4)
 
     args = parser.parse_args()
 
@@ -356,6 +368,14 @@ if __name__ == '__main__':
 
     if any([len(x) < 2 for x in args.cond2]):
         raise argparse.ArgumentError("cond2 must have at least 3 replicates")
+
+    if args.additional_de != None:
+        if not (len(args.additional_de) == len(args.additional_de_prefix) and len(args.additional_de) == len(args.additional_de_method)):
+            print(args.additional_de)
+            print(args.additional_de_prefix)
+            print(args.additional_de_method)
+            raise argparse.ArgumentError("additional de files, prefix and method lengths must match", "additional de files, prefix and method lengths must match")
+
 
     numberOfDiffSamples = len(args.prefixes)
 
@@ -731,7 +751,7 @@ if __name__ == '__main__':
 
         if plotsPrefix != None:
             searchPref = plotsPrefix
-            if not searchPref.upper().endswith(".PNG"):
+            if not searchPref.upper().endswith(".PNG") and len(glob(searchPref)) == 0:
                 searchPref += "*.png"
 
             if args.update and len(glob(searchPref + "*")) > 0:
@@ -779,47 +799,57 @@ if __name__ == '__main__':
             args.report.write("<h1>poreSTAT: REPORTS for DE ANALYSIS</h1>\n")
             args.report.flush()
 
-            if len(args.prefixes) == 2:
+            if len(args.prefixes) > 1:
 
-                for countType in ["", "TPM", "FPKM"]:
-                    """
-    
-                    PLOT ENV START
-    
-                    """
+                prefixPairs = []
+                for i in range(0, len(args.prefixes)):
+                    for j in range(i+1, len(args.prefixes)):
+                        prefixPairs.append((args.prefixes[i], args.prefixes[j]))
 
-                    countAdd = countType
-                    if len(countAdd) > 0:
-                        countAdd = "." + countAdd
+                for prefixPair in prefixPairs:
 
-                    outPrefix = os.path.join(args.save, args.name +  ".compare_mappers" + countAdd)
-                    sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --prefixes {prefixes} --output {output}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "compareMappingReplicates.py")),
-                        counts=" ".join([os.path.join(args.diffreg[0], "counts.tpm.fpkm.tsv"), os.path.join(args.diffreg[1], "counts.tpm.fpkm.tsv")]),
-                        conds1=" ".join([x +countAdd for x in args.cond1[0]] + [x + countAdd for x in args.cond2[0]]),
-                        conds2=" ".join([x +countAdd for x in args.cond1[1]] + [x + countAdd for x in args.cond2[1]]),
-                        prefixes=" ".join([args.prefixes[0], args.prefixes[1]]),
-                        output=outPrefix
-                    )
+                    prefixIdx1 = args.prefixes.index(prefixPair[0])
+                    prefixIdx2 = args.prefixes.index(prefixPair[1])
 
-                    if countType == "":
-                        countType = "raw"
+                    for countType in ["", "TPM", "FPKM"]:
+                        """
+        
+                        PLOT ENV START
+        
+                        """
 
-                    plotName = "Compare Mapper Counts ({ctname})".format(ctname=countType)
-                    plotId2Descr[plotName] = "<p>This plot compares the two supplied count files.</p>" \
-                                    "<p>In the best of all worlds these plots show a perfect diagonal.</p>" \
-                                    "<p>The more the dots deviate from such a diagonal, the less consistent are the mappers/counts.</p>"
+                        if len(countType) > 0:
+                            countAdd = "." + countType
+                            countSuffix = countAdd
+                        else:
+                            countSuffix = ".raw"
+                            countType = "raw"
+                            countAdd = ""
 
-                    runSysCall(sysCall, plotName, statsLogger, plotName,
-                               outPrefix, args, "_".join(args.prefixes), ("all",),
-                               deEnrichPlots)
+                        outPrefix = os.path.join(args.save, args.name +  ".compare_mappers" + countSuffix)
+                        sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --prefixes {prefixes} --output {output}".format(
+                            script=os.path.realpath(os.path.join(scriptMain, "compareMappingReplicates.py")),
+                            counts=" ".join([os.path.join(args.diffreg[prefixIdx1], "counts.tpm.fpkm.tsv"), os.path.join(args.diffreg[prefixIdx2], "counts.tpm.fpkm.tsv")]),
+                            conds1=" ".join([x +countAdd for x in args.cond1[prefixIdx1]] + [x + countAdd for x in args.cond2[prefixIdx1]]),
+                            conds2=" ".join([x +countAdd for x in args.cond1[prefixIdx2]] + [x + countAdd for x in args.cond2[prefixIdx2]]),
+                            prefixes=" ".join([args.prefixes[prefixIdx1], args.prefixes[prefixIdx2]]),
+                            output=outPrefix
+                        )
 
-                    """
-    
-                    PLOT ENV END
-    
-                    """
+                        plotName = "Compare Mapper Counts ({ctname})".format(ctname=countType)
+                        plotId2Descr[plotName] = "<p>This plot compares the two supplied count files.</p>" \
+                                        "<p>In the best of all worlds these plots show a perfect diagonal.</p>" \
+                                        "<p>The more the dots deviate from such a diagonal, the less consistent are the mappers/counts.</p>"
 
+                        runSysCall(sysCall, plotName, statsLogger, plotName,
+                                   outPrefix, args, "_".join(args.prefixes), ("all",),
+                                   deEnrichPlots)
+
+                        """
+        
+                        PLOT ENV END
+        
+                        """
 
 
             for methods in performMethods:
@@ -916,19 +946,22 @@ if __name__ == '__main__':
                     #python3 compareDECounts.py --de $COUNTFILESTAR --counts $STARDIFFREG/count_out_data_msEmpiRe.norm --conditions $COND1RPATHSTAR --conditions $COND2RPATHSTAR --tools ${dems[@]} > $SAVEOUT/$CONDITIONSNAME.star.$JDEMS.directcompare.tsv
 
                     if len(methods) >= 2:
+
+                        outputFilename = os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".directcompare.tsv")
+
                         sysCall = "python3 {script} --de {de} --counts {counts} --conditions {conds1} --conditions {conds2} --tools {methods} --output {output}".format(
                             de=countDeFile,
                             counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
                             script=os.path.realpath(os.path.join(scriptMain, "compareDECounts.py")),
                             methods=" ".join(methods),
-                            output=os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".directcompare.tsv"),
+                            output=outputFilename,
                             conds1=" ".join(cond1RPaths[pidx]),
                             conds2=" ".join(cond2RPaths[pidx])
                         )
                         #plotName = "Compare DE Counts ({})".format(" ".join(methods))
                         #plotId2Descr[plotName] = "<p>Plots something cool</p>"
 
-                        runSysCall(sysCall, plotName, statsLogger, None, None, args, prefix, methods, deEnrichPlots)
+                        runSysCall(sysCall, plotName, statsLogger, None, outputFilename, args, prefix, methods, deEnrichPlots)
 
 
 
@@ -1013,14 +1046,11 @@ if __name__ == '__main__':
 
                     errMSGs = "YOU SHOULD FIX THE PREFIX"
                     print(errMSGs)
-                    errMSG.add((796, errMSGs))
+                    errMSG.add((1027, errMSGs))
 
                     prefix = "combined"
 
                     allPrefixes = [x for x in prefix2countFile]
-
-
-
 
                     if len(args.prefixes) == 2:
 
@@ -1042,7 +1072,7 @@ if __name__ == '__main__':
                             output=combinedRaw
                         )
 
-                        runSysCall(sysCall, "Merging DE Methods", statsLogger, None, combinedRaw, args, prefix, methods +  ("MapCombined",),
+                        runSysCall(sysCall, "Merging DE Methods", statsLogger, combinedRaw, combinedRaw, args, prefix, methods +  ("MapCombined",),
                                    deEnrichPlots)
 
                         prefix2countFile[prefix] = countDeFile
@@ -1055,6 +1085,8 @@ if __name__ == '__main__':
 
                         runSysCall(sysCall, "Calculate Robust FCs", statsLogger, "DE Methods Overview",
                                    combinedDE + ".rob.", args, prefix, methods +  ("MapCombined",), deEnrichPlots)
+
+                        #os.remove(combinedRaw)
 
                         """
 
@@ -1233,6 +1265,118 @@ if __name__ == '__main__':
                                deEnrichPlots)
                 #args.simulate = True
 
+
+            """
+            
+            ROBUSTNESS EVALUATION
+            
+            """
+            if True:
+
+                allMethodsResults = []
+                allMethodsPrefixes = []
+                allMethodsNames = []
+                for prefix in args.prefixes + ["combined"]:
+                    for methods in performMethods:
+                        sMethodStr = "_".join(methods)
+
+                        idFiles = [x for x in glob(os.path.join(args.save, args.name + "." + prefix + "." + sMethodStr + ".tsv")) if not "_raw" in x]
+                        allMethodsPrefixes.append(prefix)
+
+                        if len(idFiles) != 1:
+                            errMSG.add((1262, "idFiles with length != 1 {}".format(idFiles)))
+
+                        allMethodsResults += idFiles
+                        allMethodsNames.append( "{}+{}".format(prefix, sMethodStr) )
+
+                """
+
+                    ADD EXTERNAL DATA
+
+                """
+
+                if args.additional_de != None and len(args.additional_de) > 0:
+                    for addFile, addPrefix, addMethod in zip(args.additional_de, args.additional_de_prefix, args.additional_de_method):
+                        allMethodsResults += [os.path.abspath(addFile.name)]
+                        allMethodsNames.append("{}+{}".format(addPrefix, addMethod))
+
+                """
+
+                PREPARE ROBUST DATA START
+
+                """
+
+                robustRaw = os.path.join(args.save, args.name + "." + "combined_raw" + "." + "RobustDE" + ".tsv")
+                robustDE = os.path.join(args.save, args.name + "." + "combined" + "." + "RobustDE" + ".tsv")
+
+                sysCall = "python3 {script} --samples {samples} --de {de} --prefixes {prefixes} --output {output}".format(
+                    script=os.path.realpath(os.path.join(scriptMain,"robustness", "mergeDiffregs.py")),
+                    de=" ".join(allMethodsResults),
+                    prefixes=" ".join(["\"{}\"".format(x) for x in allMethodsNames]),
+                    samples=" ".join(args.cond1[0] + args.cond2[0] + args.cond1[1] + args.cond2[1]),
+                    methods="ROB",
+                    output=robustRaw
+                )
+
+                runSysCall(sysCall, "Robust DE Result", statsLogger, robustRaw, robustRaw, args, prefix, ("Robust Results",),
+                           deEnrichPlots)
+
+                #prefix2countFile[prefix] = countDeFile
+                sysCall = "python3 {script} --de {counts} --methods {methods} --output {output}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "calcRobustFCs.py")),
+                    counts=robustRaw,
+                    methods="ROB",
+                    output=robustDE
+                )
+
+                runSysCall(sysCall, "Calculate Robust Results", statsLogger, "Calculate Robust Results",
+                           robustDE + ".rob.", args, prefix,("Robust Results",) , deEnrichPlots)
+
+                #os.remove(robustRaw)
+
+                robustFileHandler = open(robustDE, 'r')
+                args.additional_de.append(robustFileHandler)
+                args.additional_de_prefix.append("RobustDE")
+                args.additional_de_method.append("Robust")
+
+                allMethodsResults += [os.path.abspath(robustFileHandler.name)]
+                allMethodsNames.append("{}+{}".format("RobustDE", "Robust"))
+
+                """
+
+                    ADD EXTERNAL DATA
+
+                """
+
+                """
+
+                PREPARE ROBUST DATA END
+
+                """
+
+
+
+                outputname = os.path.join(args.save, args.name + ".robustness." + "upset")
+
+                sysCall = "python3 {script} --detable {detable} --name {names} --top_n -1 10 100 250 500 1000 --stats {stats} --output {output}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "robustness", "robustCheckDEAnalysis.py")),
+                    detable=" ".join(allMethodsResults),
+                    names=" ".join(["\""+x+"\"" for x in allMethodsNames]),
+                    output=outputname,
+                    stats=" ".join(["ROB_ADJ.PVAL","ROB_log2FC","ROB_log2FC_SIG"])
+                )
+
+                runSysCall(sysCall, None, statsLogger, None, outputname, args, "_".join(args.prefixes), None, deEnrichPlots)
+
+                for statTerm in ["ROB_ADJ.PVAL","ROB_log2FC","ROB_log2FC_SIG"]:
+                    plotName = "Robustness Check of Results (sorted by {})".format(statTerm)
+                    imgGlob = outputname + "*" + statTerm +".png"
+                    plotId2Descr[plotName] = "<p>This plot compares robust DE genes from the used prefix approaches and the combined approach. Genes are sorted by {}</p>" \
+                                             "<p>For the significant logFCs, only genes with an adjusted p-value less than 0.05 are considered.</p>".format(statTerm)
+
+                    runSysCall("echo \"hello\"", plotName, statsLogger, plotName,
+                               imgGlob, args, "_".join(allMethodsNames), ("Robustness Check", ), deEnrichPlots)
+
             #[plotid][method][prefix]
             for method in deEnrichPlots:
                 print(method)
@@ -1280,6 +1424,12 @@ if __name__ == '__main__':
                     args.report.flush()
 
 
+
+
+
+
+
+
         if args.enrichment:
 
             deEnrichPlots = OrderedDefaultDict(lambda: OrderedDefaultDict(lambda: OrderedDefaultDict(list)))
@@ -1301,6 +1451,10 @@ if __name__ == '__main__':
 
             enrichmentPrefixes = args.prefixes + ["combined"]
 
+            totalEnrichCalls = 0
+
+            allEnrichFiles = []
+
             for methods in performMethods:
 
                 if includeMethods != None and not methods in includeMethods:
@@ -1315,16 +1469,51 @@ if __name__ == '__main__':
                     deFile = os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv")
 
                     if prefix == "combined" and not os.path.exists(deFile):
-                        print("Combined file not existing\n" + deFile + "\n", file=sys.stderr)
+                        errstr = "Combined file not existing\n{}".format(deFile)
+                        print(errstr, file=sys.stderr)
+                        errMSG.add((1330, errstr))
                         continue
+
+                    allEnrichFiles.append(
+                        (methods, prefix, deFile)
+                    )
+
+                """
+                ADD ADDITIONAL DE ANALYSES HERE
+                """
+
+                for addFile, addPrefix, addMethod in zip(args.additional_de, args.additional_de_prefix, args.additional_de_method):
+
+                    oldLocation = os.path.abspath(addFile.name)
+                    newLocation = os.path.join(args.save, args.name + "." + addPrefix + "." + methodStr + ".tsv")
+
+                    statsLogger.info("Copying additional DE file from {} to {}".format(oldLocation, newLocation))
+                    copyfile(oldLocation, newLocation)
+
+                    allEnrichFiles.append(
+                        (methods, addPrefix, newLocation)
+                    )
+
+
+
+            if len(allEnrichFiles) > 0:
+                """
+                
+                PERFORM ALL ENRICH ANALYSES
+                
+                """
+
+                for methods, prefix, deFile in allEnrichFiles:
+                    methodStr = "_".join(methods)
+
+                    outputFilename = os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".robust.tsv")
 
                     sysCall = "python3 {script} --de {de} --output {output}".format(
                         script=os.path.realpath(os.path.join(scriptMain, "getRobustFCs.py")),
                         de=deFile,
-                        output=os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".robust.tsv"),
+                        output=outputFilename,
                     )
-
-                    runSysCall(sysCall, "Make Robust ({}, {})".format(prefix, methodStr), statsLogger, None, None, args, prefix,methods, deEnrichPlots)
+                    runSysCall(sysCall, "Make Robust ({}, {})".format(prefix, methodStr), statsLogger, None, outputFilename, args, prefix, methods, deEnrichPlots)
 
                     enrichCalls = []
 
@@ -1332,7 +1521,7 @@ if __name__ == '__main__':
 
                     for direction in ["all", "up", "down"]:
 
-                        sysCall = "Rscript {script} {de} {org} {dir}".format(
+                        sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "runDAVIDAnalysis.R")),
                             de=deFile,
                             org=args.organism_name,
@@ -1343,7 +1532,7 @@ if __name__ == '__main__':
                         if not args.simulate and (args.update and not hasOutfile):
                             enrichCalls.append(sysCall)
 
-                        sysCall = "Rscript {script} {de} {org} {dir}".format(
+                        sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "runGOAnalysis.R")),
                             de=deFile,
                             org=args.organism_mapping,
@@ -1354,7 +1543,7 @@ if __name__ == '__main__':
                             enrichCalls.append(sysCall)
 
                         if args.organism_name != None:
-                            sysCall = "Rscript {script} {de} {org} {dir}".format(
+                            sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
                                 script=os.path.realpath(os.path.join(scriptMain, "runReactomeAnalysis.R")),
                                 de=deFile,
                                 org=args.organism_name,
@@ -1363,7 +1552,7 @@ if __name__ == '__main__':
                             if not args.simulate and (args.update and not hasOutfile):
                                 enrichCalls.append(sysCall)
 
-                        sysCall = "Rscript {script} {de} {org} {dir}".format(
+                        sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "runKeggAnalysis.R")),
                             de=deFile,
                             org=args.organism_name,
@@ -1374,7 +1563,7 @@ if __name__ == '__main__':
                             enrichCalls.append(sysCall)
 
                         if direction == "all":
-                            sysCall = "Rscript {script} {de} {org} {dir}".format(
+                            sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
                                 script=os.path.realpath(os.path.join(scriptMain, "runGOGSEA.R")),
                                 de=deFile,
                                 org=args.organism_mapping,
@@ -1392,7 +1581,9 @@ if __name__ == '__main__':
 
                     #args.simulate = True
 
-                    if not args.simulate:
+                    totalEnrichCalls += len(enrichCalls)
+
+                    if not args.simulate and len(enrichCalls) > 0:
                         with Pool(processes=parallel) as pool:
                             statsLogger.info("Started Parallel Pool with {} processes.".format(parallel))
                             pool.map(runExtProcess, enrichCalls, 1)
@@ -1402,12 +1593,14 @@ if __name__ == '__main__':
 
                     #[method][plotid][prefix]
 
+            #deEnrichFiles[methods][prefix]
+
             statsLogger.info("Fetching Enrichment Data")
-            for methods in includeMethods:
+            for methods in deEnrichFiles:
                 statsLogger.info("Fetching Results for Methods {}".format(methods))
                 methodStr = "_".join(methods)
 
-                for pidx, prefix in enumerate(enrichmentPrefixes):
+                for pidx, prefix in enumerate(deEnrichFiles[methods]):
 
                     deFile = deEnrichFiles[methods][prefix]
 
@@ -1418,15 +1611,16 @@ if __name__ == '__main__':
                     deEnrichTables[methods]["GeneOntology (GSEA)"][prefix] = glob(deFile + ".GeneOntology*gsea.tsv")
 
 
-            for methods in includeMethods:
+            for methods in deEnrichFiles:
                 statsLogger.info("Comparing Methods {}".format(methods))
                 deMethodStr = "_".join(methods)
 
                 allEnrichFiles = []
 
-                for pidx, prefix in enumerate(enrichmentPrefixes):
+                for pidx, prefix in enumerate(deEnrichFiles[methods]):
                     deFile = deEnrichFiles[methods][prefix]
                     allEnrichFiles.append(deFile)
+
 
                 for direction in ["all", "up", "down"]:
 
@@ -1434,7 +1628,7 @@ if __name__ == '__main__':
 
                         resFiles = []
                         for deFile in allEnrichFiles:
-                            outputFile = os.path.join(args.save, args.name + "." + deMethodStr + ".pa_enrich_compare." + methodStr)
+                            outputFile = os.path.join(args.save, "{}.{}.pa_enrich_compare.{}.{}".format(args.name, deMethodStr, direction, methodStr))
 
                             if suffixStr == None:
                                 resFile = deFile + "."+methodStr+"." + direction + ".tsv"
@@ -1443,19 +1637,21 @@ if __name__ == '__main__':
                                 resFile = deFile + "." + methodStr + "." + direction + "." + suffixStr + ".tsv"
                                 outputFile += "." + suffixStr
 
-                            resFiles.append(resFile)
+                            # file might be missing because no relevant pathways were found
+                            if os.path.exists(resFile):
+                                resFiles.append(resFile)
 
 
                         print(methods, direction, outputFile, resFiles)
 
                         sysCall = "python3 {script} --pathways {pathways} --output {output} --top_n 10 50 100 150 --output {output}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "compareEnrichmentAnalysis.py")),
+                            script=os.path.realpath(os.path.join(scriptMain, "enrichment", "compareEnrichmentAnalysis.py")),
                             pathways=" ".join(resFiles),
                             output=outputFile,
                         )
                         print(sysCall)
                         #args.simulate = False
-                        if not args.simulate:
+                        if not args.simulate and (totalEnrichCalls > 0 or len(glob(outputFile + "*.png")) == 0):
                             subprocess.run(sysCall, shell=True, check=True)
                         #args.simulate = True
 
@@ -1463,7 +1659,7 @@ if __name__ == '__main__':
                         headerStr = methodStr.upper()
                         if suffixStr != None:
                             headerStr += " (" + suffixStr + ")"
-                        headerStr += " Comparison"
+                        headerStr += " Comparison ({})".format(direction)
 
                         deEnrichPlots[methods][headerStr]["all"] = glob(outputFile + "*.png")
                         plotId2Descr[headerStr] = "<p>Overlap Comparison for the enrichment analysis for terms/pathways/sets from {}.</p>" \
@@ -1574,7 +1770,7 @@ if __name__ == '__main__':
             log.debug(sysCall)
 
             simulate = args.simulate
-            if args.update and len(glob(plotsPrefix + "*")) > 0:
+            if args.update and len([x for x in glob(plotsPrefix + "*") if not "pickle" in x]) > 0:
                 simulate=True
 
             if not simulate:
@@ -1628,14 +1824,34 @@ if __name__ == '__main__':
 
         performMethods = splitDEMethods(args.de_methods)
 
+        enrichMethod2method2files = defaultdict(lambda: defaultdict(list))
+
+
         for enrichSetFName in glob(enrichPath + "*.enrich"):
 
             enrichName = os.path.splitext(os.path.basename(enrichSetFName))[0]
 
+
             for methods in performMethods:
                 methodStr = "_".join(methods)
 
-                for prefix in args.prefixes + ["combined"]:
+                """
+                
+                COPY ADDITIONAL FILES WHERE WE NEED THEM!
+                
+                """
+                addPrefixes = []
+                for addFile, addPrefix, addMethod in zip(args.additional_de, args.additional_de_prefix, args.additional_de_method):
+                    oldLocation = os.path.abspath(addFile.name)
+                    newLocation = os.path.join(args.save, args.name + "." + addPrefix + "." + methodStr + ".tsv")
+
+                    if not os.path.exists(newLocation):
+                        statsLogger.info("Copying additional DE file from {} to {}".format(oldLocation, newLocation))
+                        copyfile(oldLocation, newLocation)
+
+                    addPrefixes.append(addPrefix)
+
+                for prefix in args.prefixes + ["combined"] + addPrefixes:
                     methodResults = glob(os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv"))
                     methodResult = methodResults[0]
 
@@ -1645,9 +1861,6 @@ if __name__ == '__main__':
         
                     """
                     outputname = os.path.splitext(methodResult)[0] + "." + enrichName + ".setenrich.tsv"
-
-                    inname0 = os.path.join(args.save, args.name + "." + args.prefixes[0] + "." + methodStr + ".tsv")
-                    inname1 = os.path.join(args.save, args.name + "." + args.prefixes[1] + "." + methodStr + ".tsv")
 
                     sysCall = "python3 {script} --de {de} --sets {sets} --output {output}".format(
                         script=os.path.realpath(os.path.join(scriptMain,"mirtools", "setEnrichment.py")),
@@ -1664,6 +1877,8 @@ if __name__ == '__main__':
                     runSysCall(sysCall, mirLogger, plotName,
                                outputname, args, prefix, methods,
                                mirEnrichResults, fexts=["tsv"])
+
+                    enrichMethod2method2files[enrichName][methods].append((outputname, prefix))
 
                     """
                     PLOT
@@ -1682,11 +1897,35 @@ if __name__ == '__main__':
                                mirEnrichResults, append=True, fexts=["png"])
 
 
+
         for methods in performMethods:
             methodStr = "_".join(methods)
 
-            for prefix in args.prefixes + ["combined"]:
-                methodResults = glob(os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv"))
+            """
+
+            COPY ADDITIONAL FILES WHERE WE NEED THEM!
+
+            """
+            addPrefixes = []
+            for addFile, addPrefix, addMethod in zip(args.additional_de, args.additional_de_prefix, args.additional_de_method):
+                oldLocation = os.path.abspath(addFile.name)
+                newLocation = os.path.join(args.save, args.name + "." + addPrefix + "." + methodStr + ".tsv")
+
+                if not os.path.exists(newLocation):
+                    statsLogger.info("Copying additional DE file from {} to {}".format(oldLocation, newLocation))
+                    copyfile(oldLocation, newLocation)
+
+                addPrefixes.append(addPrefix)
+
+
+            for prefix in args.prefixes + ["combined"] +addPrefixes:
+                searchFile = os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv")
+                methodResults = glob(searchFile)
+
+                if len(methodResults) != 1:
+                    print("no such file", searchFile)
+                    exit(0)
+
                 methodResult = methodResults[0]
 
                 """
@@ -1697,11 +1936,14 @@ if __name__ == '__main__':
                 outputname = os.path.splitext(methodResult)[0] + ".mirexplore_enrich."
 
 
-                sysCall = "python3 {script} --detable {detable} --organisms {organisms} --disease {diseases} --output {outputpath}".format(
+                sysCall = "python3 {script} --detable {detable} {organisms} {disease} {cells} {go} {ncit} --output {outputpath}".format(
                     script=os.path.realpath(os.path.join(scriptMain, "mirtools", "fetchMiRExploreGenes.py")),
                     detable=methodResult,
-                    organisms="human mouse",
-                    diseases="DOID:1287",
+                    organisms="--organisms " + "human mouse",
+                    disease="--disease " + " ".join(args.mir_disease) if len(args.mir_disease) > 0 else "",
+                    cells="--cells " + " ".join(args.mir_cells) if len(args.mir_cells) > 0 else "",
+                    go="--go " + " ".join(args.mir_go) if len(args.mir_go) > 0 else "",
+                    ncit="--ncits " + " ".join(args.mir_ncit) if len(args.mir_ncit) > 0 else "",
                     outputpath=outputname + "html"
                 )
 
@@ -1726,9 +1968,39 @@ if __name__ == '__main__':
                     maxelems=20
                 )
 
+                enrichMethod2method2files["miRExplore"][methods].append((outputname, prefix))
+
                 runSysCall(sysCall, mirLogger, plotName,
                            outputname + ".", args, prefix, methods,
                            mirEnrichResults, append=True, fexts=["png"])
+
+
+        """
+        ROBUSTNESS EVAL
+        """
+        for enrichName in enrichMethod2method2files:
+            for methods in enrichMethod2method2files[enrichName]:
+
+                methodFiles = [x[0] for x in enrichMethod2method2files[enrichName][methods]]
+                methodPrefixes = [x[1] for x in enrichMethod2method2files[enrichName][methods]]
+
+                outputname = os.path.join(args.save, args.name + "." + "_".join(methods) + "." + enrichName + ".robustness_check" )
+
+                sysCall = "python3 {script} --tsv {de} --prefixes {prefixes} --output {output}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "mirtools", "plotDirectionalRobustness.py")),
+                    de=" ".join(methodFiles),
+                    prefixes=" ".join(methodPrefixes),
+                    output=outputname
+                )
+
+                plotName = "Robustness Evaluation For {}".format(enrichName)
+                plotId2Descr[plotName] = "<p>This performs a robustness evaluation on the results for the given set.</p>" \
+                                         "<p>Sets with adj. p-value l.t. 0.1 are considered .</p>" \
+                                         "<p></p>"
+
+                runSysCall(sysCall, mirLogger, plotName,
+                           outputname, args, "RobustnessCheck", methods,
+                           mirEnrichResults, fexts=["png"])
 
 
         for method in mirEnrichResults:

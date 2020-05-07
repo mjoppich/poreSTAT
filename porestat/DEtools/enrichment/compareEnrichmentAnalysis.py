@@ -46,6 +46,9 @@ if __name__ == '__main__':
             "NA": None
         })
 
+        if indf == None:
+            continue
+
 
 
         # try to find ID column

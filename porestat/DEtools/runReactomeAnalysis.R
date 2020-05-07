@@ -81,8 +81,8 @@ if (organism == "mouse")
 
 }
 
-print("got egid")
-head(egid)
+#print("got egid")
+#head(egid)
 
 entrezGenes = egid[!is.na(egid$entrez),]
 entrezGenes = as.vector(entrezGenes$entrez)
