@@ -62,14 +62,17 @@ if (organism == "org.Mm.eg.db")
 }
 
 #egid = grcm38 %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
-head(egid)
+#head(egid)
+
+print("Dims of egid")
+print(dim(egid))
 
 egid = merge(x=egid, y=allGenes, by.x="ensgene", by.y="id")
 
+tdf = data.frame(etz=egid$entrez, ens=egid$ensgene, lfc=egid$ROB_log2FC, pval=egid$ROB_ADJ.PVAL)
+print(tdf)
+
 entrezGenes = egid[!is.na(egid$entrez) & !is.na(egid$ensgene) & !is.null(egid$ensgene) & !is.null(egid$ROB_log2FC)& !is.nan(egid$ROB_log2FC) &!is.na(egid$ROB_log2FC),]
-head(entrezGenes)
-
-
 
 #entrezGenesC = entrezGenes$ROB_ADJ.PVAL
 entrezGenesC = as.vector(entrezGenes$ROB_log2FC)
@@ -89,6 +92,7 @@ head(entrezGenesC)
 
 entrezGenesC <- entrezGenesC[!duplicated(names(entrezGenesC))]
 
+print("num entrez genes c")
 print(length(entrezGenesC))
 print("Dup genes")
 print(length(entrezGenesC[duplicated(names(entrezGenesC))]))
@@ -99,7 +103,8 @@ print(length(entrezGenesC[duplicated(names(entrezGenesC))]))
 for (GODB in c("BP", "MF", "CC")) { #
 
 
-    kk <- gseGO(entrezGenesC, organism, keyType=keyType, ont=GODB, pvalueCutoff=0.5, pAdjustMethod="BH")
+    #by DOSE as fgsea has problems with all genes being in one class...
+    kk <- gseGO(entrezGenesC, organism, keyType=keyType, ont=GODB, pvalueCutoff=0.5, pAdjustMethod="BH", by="DOSE")
 
     if (is.null(kk))
     {
