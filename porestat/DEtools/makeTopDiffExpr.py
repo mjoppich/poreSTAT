@@ -69,6 +69,11 @@ if __name__ == "__main__":
     idColName = "Geneid" if "Geneid" in df.keys() else "id"
 
     #print("Id Column", idColName)
+    print(accKeys)
+
+    for akey in accKeys:
+        if not akey in df.keys():
+            print("incorr key", akey)
 
     subsetDF = df[accKeys]
     subsetDF.index = df[[idColName]]
@@ -178,6 +183,7 @@ if __name__ == "__main__":
     """
     HERE IS A LOG!
     """
+    tsneDF = tsneDF.apply(pd.to_numeric, errors='ignore')
     tsneDF = tsneDF.replace(0, np.nan).apply(np.log10).replace(np.nan, 0)
 
     sns.clustermap(tsneDF, figsize=(14, 22), row_cluster=False, yticklabels=1)

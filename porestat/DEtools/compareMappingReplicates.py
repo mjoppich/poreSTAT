@@ -31,9 +31,6 @@ if __name__ == '__main__':
     if not len(args.conditions) == 2:
         argparse.ArgumentError("conditions must have 2 lists")
 
-    if not len(args.conditions[0]) == len(args.conditions[1]):
-        argparse.ArgumentError("conditions must have same length")
-
     if not len(args.prefixes) == 2:
         argparse.ArgumentError("prefixes must have 2 names")
 
@@ -78,15 +75,20 @@ if __name__ == '__main__':
 
         countdatas.append(dfData)
 
-    num_conditions = len(args.conditions[0])
+
+    commonConditions = sorted(set.intersection(*map(set,args.conditions)))
+    num_conditions = len(commonConditions)
+
     fig, axes = plt.subplots(num_conditions, 1, figsize=(12, 24), sharex=True, sharey=True)
     fig.suptitle("Comparison of read counts", fontsize=15)
 
 
     for i in range(0, num_conditions):
 
-        dfCond1 = args.conditions[0][i]
-        dfCond2 = args.conditions[1][i]
+        #dfCond1 = args.conditions[0][i]
+        #dfCond2 = args.conditions[1][i]
+        dfCond1 = commonConditions[i]
+        dfCond2 = commonConditions[i]
 
         cond1Values = []
         cond2Values = []

@@ -23,7 +23,6 @@ import random
 import os
 
 from scipy.optimize import curve_fit
-from scipy.misc import factorial
 
 
 class FoldChangeSimilarityFactory(PSToolInterfaceFactory):

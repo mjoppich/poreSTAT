@@ -149,9 +149,9 @@ if __name__ == "__main__":
         # print(subsetDF.shape)
 
 
-
-
     tsneDF = subsetDF.transpose()
+    tsneDF = tsneDF.apply(pd.to_numeric, errors='ignore')
+    
     dimNames = list(tsneDF.index)
 
     metric = ""
@@ -185,7 +185,9 @@ if __name__ == "__main__":
         metric = "correlation"
         cor = tsneDF.transpose().corr()
 
-
+        print(cor.values)
+        print(tsneDF.transpose().corr())
+        print(tsneDF.transpose().dtypes)
         if np.amax(cor.values) > 1.0:
             #print("Fixing similarity")
             #print(np.amax(cor.values))

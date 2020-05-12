@@ -25,7 +25,8 @@ import os
 
 
 from scipy.optimize import curve_fit
-from scipy.misc import factorial
+
+
 class FoldChangeDistributionFactory(PSToolInterfaceFactory):
 
     def __init__(self, parser, subparsers, which):

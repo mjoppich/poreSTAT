@@ -563,14 +563,18 @@ if __name__ == '__main__':
             if not args.simulate and not (args.update and len(glob(os.path.join(args.diffreg[pidx], "counts.tpm.fpkm.tsv"))) > 0):
                 subprocess.run(sysCall, shell=True, check=True)
 
-            sysCall = "python3 {script} --summary {countfile} --output {outdir}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "visFCSummary.py")),
-                outdir=os.path.join(args.diffreg[pidx], "fcsummary"),
-                countfile=args.counts[pidx].name + ".summary"
-            )
+            
+            visFCInput = args.counts[pidx].name + ".summary"
 
-            runSysCall(sysCall, "Visualise featureCount Summary", caLogger, "FeatureCount Summary",
-                       os.path.join(args.diffreg[pidx], "fcsummary"), args, prefix, caPlots)
+            if os.path.isfile(visFCInput):
+                sysCall = "python3 {script} --summary {countfile} --output {outdir}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "visFCSummary.py")),
+                    outdir=os.path.join(args.diffreg[pidx], "fcsummary"),
+                    countfile=visFCInput
+                )
+
+                runSysCall(sysCall, "Visualise featureCount Summary", caLogger, "FeatureCount Summary",
+                        os.path.join(args.diffreg[pidx], "fcsummary"), args, prefix, caPlots)
 
 
             sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2}".format(

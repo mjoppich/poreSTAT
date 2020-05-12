@@ -100,10 +100,10 @@ if __name__ == '__main__':
             "NA": None
     })
 
-
-    featureCountsColumns = ["Geneid",	"Chr",	"Start",	"End",	"Strand",	"Length"]
-
     allheaders = indf.getHeader()
+    featureCountsColumns = [y for y in ["Geneid", "Chr", "Start", "End", "Strand", "Length"] if y in allheaders]
+
+    
     sampleHeaders = [x for x in allheaders if not x in featureCountsColumns]
 
     outdf = DataFrame()
@@ -139,6 +139,9 @@ if __name__ == '__main__':
 
         for x in featureCountsColumns:
             rowDict[x] = row[x]
+
+        if not curGeneID in geneLengths:
+            print("Missing gene ID", curGeneID)
 
         geneLength = geneLengths.get(curGeneID, 0)
 
