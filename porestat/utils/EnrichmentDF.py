@@ -12,7 +12,7 @@ from ..plots.plotconfig import PlotConfig, PlotSaveTYPE
 from ..plots.poreplot import PorePlot
 import pickle
 from ..tools.PTToolInterface import PSToolException
-
+import shutil
 
 class EnrichmentDF(DataFrame):
 
@@ -158,10 +158,10 @@ class EnrichmentDF(DataFrame):
 
     @property
     def supported_de_methods(self):
-        return ['NOISeq', 'DESeq2', 'DirectDESeq2', 'msEmpiRe', 'limma', 'edgeR']
+        return ['NOISeq', 'DESeq2', 'DirectDESeq2', 'msEmpiRe', 'nlEmpiRe', 'limma', 'edgeR']
 
 
-    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['NOISeq', 'msEmpiRe', 'DESeq2', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", noDErun=False, enhanceSymbol=None, geneLengths=None, norRNA=False):
+    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['NOISeq', 'msEmpiRe', 'nlEmpiRe', 'DESeq2', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None, norRNA=False):
 
 
         filePrefix = prefix
@@ -209,6 +209,16 @@ class EnrichmentDF(DataFrame):
 
                 self.writeEnrichmentBrowserFiles(prepData, replicates, exprFile, pdataFile, fdataFile)
 
+                nlempireDir = None
+                if "nlEmpiRe" in methods:
+
+                    nlempireDir = basePath + "nlempire"
+
+                    os.makedirs(nlempireDir, exist_ok=True)
+                    shutil.copyfile(exprFile, nlempireDir + "/exprs.txt")
+                    shutil.copyfile(fdataFile, nlempireDir + "/f_data.txt")
+                    shutil.copyfile(pdataFile, nlempireDir + "/p_data.txt")
+
                 condResult = {}
 
                 for method in methods: # 'limma' 'edgeR'
@@ -226,8 +236,11 @@ class EnrichmentDF(DataFrame):
 
                     elif method in ['msEmpiRe']:
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/empire_diffreg.R"
-
                         execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+noiseqFile+" "+method+" " + outFile
+
+                    elif method in ['nlEmpiRe']:
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/nlEmpiRe_eset.jar"
+                        execStr = javaPath+" -jar "+scriptPath+" -inputdir {} -cond1 0 -cond2 1 -o {}".format(nlempireDir, outFile)
 
                     elif method in ['NOISeq']:
 
@@ -314,10 +327,23 @@ class EnrichmentDF(DataFrame):
                         return -1
 
 
-                    geneIDidx = recognizeColumnIndex(methDF, ["GENE.ID", "PROBEID"])#methDF.getColumnIndex('GENE.ID') if methDF.columnExists('GENE.ID') else methDF.getColumnIndex('PROBEID')
+                    geneIDidx = recognizeColumnIndex(methDF, ["GENE.ID", "PROBEID", "id"])#methDF.getColumnIndex('GENE.ID') if methDF.columnExists('GENE.ID') else methDF.getColumnIndex('PROBEID')
                     log2FCidx = recognizeColumnIndex(methDF, ["log2FC", "FC"]) #methDF.getColumnIndex('log2FC') if methDF.columnExists('log2FC') else methDF.getColumnIndex('FC')
-                    rawPValidx = recognizeColumnIndex(methDF, ["RAW.PVAL", "PVAL", "ADJ.PVAL"]) # methDF.getColumnIndex('RAW.PVAL') if methDF.columnExists('RAW.PVAL') else methDF.getColumnIndex('ADJ.PVAL')
-                    adjPValidx = methDF.getColumnIndex('ADJ.PVAL')
+                    rawPValidx = recognizeColumnIndex(methDF, ["RAW.PVAL", "PVAL", "fc.pval", "ADJ.PVAL"]) #methDF.getColumnIndex('RAW.PVAL') if methDF.columnExists('RAW.PVAL') else methDF.getColumnIndex('ADJ.PVAL')
+                    adjPValidx = recognizeColumnIndex(methDF, ["ADJ.PVAL", "fc.fdr"]) #methDF.getColumnIndex('ADJ.PVAL')
+
+                    if geneIDidx == -1:
+                        print("could not find geneID")
+
+                    if log2FCidx == -1:
+                        print("could not find log2FC")
+
+                    if rawPValidx == -1:
+                        print("could not find raw PVAL")
+
+                    if adjPValidx == -1:
+                        print("could not find adj PVAL")
+
 
                     print("Combining Method to data row", method)
                     l2FCdata = methDF.toDataRow( geneIDidx, log2FCidx)

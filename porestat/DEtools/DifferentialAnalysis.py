@@ -255,6 +255,8 @@ if __name__ == '__main__':
     parser.add_argument('-sim', '--simulate', action='store_true', default=False, help="run FC part")
     parser.add_argument('-upd', '--update', action='store_true', default=False, help="update run")
 
+    parser.add_argument('--no-R', action="store_true", default=False, help="run no R scripts")
+
     parser.add_argument('-pc', '--prefix-counts', dest="prefix_counts", action='store_true', default=False, help="run FC part")
 
     parser.add_argument('-e', '--enhance', type=argparse.FileType('r'), help='enhancement file', default=open("/mnt/d/dev/data/genomes/ensembl.symbol.mouse.list", "r"))
@@ -856,7 +858,7 @@ if __name__ == '__main__':
                         """
 
 
-            for methods in performMethods:
+            for midx, methods in enumerate(performMethods):
                 prefix2countFile = {}
                 statsLogger.info("Running Methods {}".format(methods))
                 methodStr = "_".join(methods)
@@ -881,6 +883,7 @@ if __name__ == '__main__':
                     runSysCall(sysCall, "Calculate Robust FCs", statsLogger, "DE Methods Overview ({})".format(" ".join(methods)), robustDeFile + ".rob.", args, prefix, methods, deEnrichPlots)
 
 
+                    numberOfSigDEGenes = 100
 
 
                     #makePCA.py --fc report_save/aortas.star.msEmpiRe_DESeq.tsv --output report_save/aortas.star.msEmpiRe_DESeq.tsv.mpca
@@ -897,7 +900,7 @@ if __name__ == '__main__':
                                      "<p>The scatter plot has performed a UMAP transformation and displays these results.</p>".format(
                         " ".join(methods))
 
-                    runSysCall(sysCall, plotName, statsLogger, plotName, robustDeFile + ".mpca.", args, prefix, methods, deEnrichPlots)
+                    runSysCall(sysCall, plotName, statsLogger, plotName, robustDeFile + ".mpca.*.png", args, prefix, methods, deEnrichPlots)
 
                     sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --samples {samples}".format(
                         script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
@@ -912,7 +915,7 @@ if __name__ == '__main__':
                                      "<p>The scatter plot has performed a UMAP transformation and displays these results.</p>".format(
                         " ".join(methods))
 
-                    runSysCall(sysCall, plotName, statsLogger, plotName, robustDeFile + ".all.mpca.", args, prefix, methods, deEnrichPlots)
+                    runSysCall(sysCall, plotName, statsLogger, plotName, robustDeFile + ".all.mpca.*.png", args, prefix, methods, deEnrichPlots)
 
 
                     sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 100 --samples {samples}".format(
@@ -928,24 +931,25 @@ if __name__ == '__main__':
                                                                                                                    "<p>The cluster map plot shows the gene-expression (raw counts) for each selected gene.</p>".format(
                     ms=" ".join(methods))
 
-                    runSysCall(sysCall, "Cluster Top 100 DE Genes by Counts ({})", statsLogger,
+                    runSysCall(sysCall, "Cluster Top 100 DE Genes by Counts ({})".format(" ".join(methods)), statsLogger,
                                "Cluster Top 100 DE Genes by Counts ({})".format(" ".join(
                                    methods)), robustDeFile + ".expr_topde", args, prefix, methods,
                                deEnrichPlots)
 
 
-                    sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --last --ignoreMissing".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "compareCountsPerGene.py")),
-                        counts=robustDeFile,
-                        conds1=" ".join(args.cond1[pidx]),
-                        conds2=" ".join(args.cond2[pidx])
-                    )
-                    plotId2Descr["Compare Counts Per Gene (DE, raw counts)"] = plotId2Descr["Compare Counts Per Gene (raw counts)"] + "" \
-                                                                              "<p>In addition to the previous plot, gene names have here been replaced by gene symbols.</p>"
+                    if midx == 0:
+                        sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --last --ignoreMissing".format(
+                            script=os.path.realpath(os.path.join(scriptMain, "compareCountsPerGene.py")),
+                            counts=robustDeFile,
+                            conds1=" ".join(args.cond1[pidx]),
+                            conds2=" ".join(args.cond2[pidx])
+                        )
+                        plotId2Descr["Compare Counts Per Gene (DE, raw counts)"] = plotId2Descr["Compare Counts Per Gene (raw counts)"] + "" \
+                                                                                "<p>In addition to the previous plot, gene names have here been replaced by gene symbols.</p>"
 
-                    runSysCall(sysCall, "Compare Counts Per Gene (DiffReg/Robust)", statsLogger,
-                               "Compare Counts Per Gene (DE, raw counts)",
-                               robustDeFile + ".cpergenes.", args, prefix, methods, deEnrichPlots)
+                        runSysCall(sysCall, "Compare Counts Per Gene (DiffReg/Robust)", statsLogger,
+                                "Compare Counts Per Gene (DE, raw counts)",
+                                robustDeFile + ".cpergenes.", args, prefix, methods, deEnrichPlots)
 
                     #python3 compareDECounts.py --de $COUNTFILESTAR --counts $STARDIFFREG/count_out_data_msEmpiRe.norm --conditions $COND1RPATHSTAR --conditions $COND2RPATHSTAR --tools ${dems[@]} > $SAVEOUT/$CONDITIONSNAME.star.$JDEMS.directcompare.tsv
 
@@ -966,8 +970,6 @@ if __name__ == '__main__':
                         #plotId2Descr[plotName] = "<p>Plots something cool</p>"
 
                         runSysCall(sysCall, plotName, statsLogger, None, outputFilename, args, prefix, methods, deEnrichPlots)
-
-
 
 
 
@@ -1022,7 +1024,7 @@ if __name__ == '__main__':
 
 
                         runSysCall(sysCall, "Cluster Data", statsLogger, "Cluster {} Counts ({})".format(countType, " ".join(
-                            methods)), robustDeFile + "." + countType + ".mpca", args, prefix, methods, deEnrichPlots)
+                            methods)), robustDeFile + "." + countType + ".mpca.*.png", args, prefix, methods, deEnrichPlots)
 
 
                         sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 100 {ct} --samples {samples}".format(
@@ -1588,10 +1590,12 @@ if __name__ == '__main__':
                     totalEnrichCalls += len(enrichCalls)
 
                     if not args.simulate and len(enrichCalls) > 0:
-                        with Pool(processes=parallel) as pool:
-                            statsLogger.info("Started Parallel Pool with {} processes.".format(parallel))
-                            pool.map(runExtProcess, enrichCalls, 1)
-                        statsLogger.info("Stopped Parallel Pool with {} processes.".format(parallel))
+
+                        if not args.no_R:
+                            with Pool(processes=parallel) as pool:
+                                statsLogger.info("Started Parallel Pool with {} processes.".format(parallel))
+                                pool.map(runExtProcess, enrichCalls, 1)
+                            statsLogger.info("Stopped Parallel Pool with {} processes.".format(parallel))
 
                     #args.simulate = False
 
@@ -1653,9 +1657,8 @@ if __name__ == '__main__':
                             pathways=" ".join(resFiles),
                             output=outputFile,
                         )
-                        print(sysCall)
                         #args.simulate = False
-                        if not args.simulate and (totalEnrichCalls > 0 or len(glob(outputFile + "*.png")) == 0):
+                        if not args.simulate and len(resFiles) > 0 and (totalEnrichCalls > 0 or len(glob(outputFile + "*.png")) == 0):
                             subprocess.run(sysCall, shell=True, check=True)
                         #args.simulate = True
 

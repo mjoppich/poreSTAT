@@ -317,8 +317,8 @@ if __name__ == '__main__':
                 downPref2geneFCP[args.prefixes[fidx]].append((geneSym, geneFC, genePVal))
 
 
-    intersectGenesUp = None
-    intersectGenesDown = None
+    intersectGenesUp = set()
+    intersectGenesDown = set()
 
     print("Sorting")
 
@@ -449,5 +449,22 @@ if __name__ == '__main__':
         print(outfilename)
         myfig.savefig(outfilename, bbox_inches="tight")
 
-    makePlots(upDF, "up")
-    makePlots(downDF, "down")
+    if len(upDF) > 0:
+        makePlots(upDF, "up")
+    else:
+        fig = plt.figure()
+        plt.title("No Data to show")
+        outfilename = args.output + ".up.png"
+        plt.savefig(outfilename, bbox_inches="tight")
+        plt.close()
+
+
+
+    if len(downDF) > 0:
+        makePlots(downDF, "down")
+    else:
+        fig = plt.figure()
+        plt.title("No Data to show")
+        outfilename = args.output + ".down.png"
+        plt.savefig(outfilename, bbox_inches="tight")
+        plt.close()

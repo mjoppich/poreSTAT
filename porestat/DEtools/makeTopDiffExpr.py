@@ -178,6 +178,10 @@ if __name__ == "__main__":
         print(tsneDF.shape)
         print(tsneDF.values)
         print(tsneDF)
+
+        plt.figure()
+        plt.title("No Data To Analyse (no sig genes)")
+        plt.savefig(args.output + ".expr.cmap.png", bbox_inches="tight")
         exit()
 
     """

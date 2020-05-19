@@ -168,6 +168,10 @@ if __name__ == "__main__":
         print(tsneDF.shape)
         print(tsneDF.values)
         print(tsneDF)
+
+        plt.figure()
+        plt.title("No Data To Analyse (no sig genes)")
+        plt.savefig(args.output + ".pca.png", bbox_inches="tight")
         exit()
 
 
@@ -183,7 +187,13 @@ if __name__ == "__main__":
         metric = "euclidean"
     else:
         metric = "correlation"
+
+        print(tsneDF.transpose().head())
         cor = tsneDF.transpose().corr()
+        if cor.isnull().values.any():
+            cor = cor.fillna(-1)
+            print("Attention: NaN in correlation values!")
+        
 
         print(cor.values)
         print(tsneDF.transpose().corr())

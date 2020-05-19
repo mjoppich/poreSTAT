@@ -70,7 +70,7 @@ print(dim(egid))
 egid = merge(x=egid, y=allGenes, by.x="ensgene", by.y="id")
 
 tdf = data.frame(etz=egid$entrez, ens=egid$ensgene, lfc=egid$ROB_log2FC, pval=egid$ROB_ADJ.PVAL)
-print(tdf)
+#print(tdf)
 
 entrezGenes = egid[!is.na(egid$entrez) & !is.na(egid$ensgene) & !is.null(egid$ensgene) & !is.null(egid$ROB_log2FC)& !is.nan(egid$ROB_log2FC) &!is.na(egid$ROB_log2FC),]
 
@@ -92,10 +92,19 @@ head(entrezGenesC)
 
 entrezGenesC <- entrezGenesC[!duplicated(names(entrezGenesC))]
 
+bymethod="fgsea"
+
+if (length(entrezGenesC) < 500)
+{
+    bymethod="DOSE"
+}
+
 print("num entrez genes c")
 print(length(entrezGenesC))
 print("Dup genes")
 print(length(entrezGenesC[duplicated(names(entrezGenesC))]))
+print("By Method")
+print(bymethod)
 
 #like
 #https://www.r-bloggers.com/kegg-enrichment-analysis-with-latest-online-data-using-clusterprofiler/
@@ -104,7 +113,7 @@ for (GODB in c("BP", "MF", "CC")) { #
 
 
     #by DOSE as fgsea has problems with all genes being in one class...
-    kk <- gseGO(entrezGenesC, organism, keyType=keyType, ont=GODB, pvalueCutoff=0.5, pAdjustMethod="BH", by="DOSE")
+    kk <- gseGO(entrezGenesC, organism, keyType=keyType, ont=GODB, pvalueCutoff=0.5, pAdjustMethod="BH", by=bymethod)
 
     if (is.null(kk))
     {

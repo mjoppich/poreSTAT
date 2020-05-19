@@ -138,10 +138,13 @@ if __name__ == '__main__':
             inputSets = [set([y[0] for y in x[1]]) for x in foundRes[topN][compMethod]]
 
             print(topN, compMethod)
-            #print(set.intersection(*inputSets))
+            if len([len(x) for x in inputSets if len(x) > 0]) == 0:
+                fig = plt.figure()
 
-            vennLabels = venn.generate_petal_labels(inputSets)
-            fig, ax = pwcount2function[len(foundRes[topN][compMethod])](vennLabels, names=["{fn} (lq={lqc})".format(fn=x[0], lqc=x[2]) for x in foundRes[topN][compMethod]])
+            else:
+                vennLabels = venn.generate_petal_labels(inputSets)
+                fig, ax = pwcount2function[len(foundRes[topN][compMethod])](vennLabels, names=["{fn} (lq={lqc})".format(fn=x[0], lqc=x[2]) for x in foundRes[topN][compMethod]])
+                
             plt.suptitle("Overlaps for topN={} DE genes (by {})".format(topN, compMethod))
 
             outname = args.output + "." + str(topN) + "." + compMethod
@@ -150,4 +153,5 @@ if __name__ == '__main__':
                 outname += ".png"
 
             plt.savefig(outname, bbox_inches ="tight")
+            plt.close()
 

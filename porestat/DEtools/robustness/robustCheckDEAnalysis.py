@@ -129,10 +129,16 @@ if __name__ == '__main__':
 
                 foundRes[topNID][compMethod].append((args.name[didx], topNIDs, lqCount))
 
+    print("Starting Plotting")
     for topN in foundRes:
+        print("TopN", topN, "methods", [x for x in foundRes[topN]])
         for compMethod in foundRes[topN]:
 
+            print(topN, compMethod, "before sets")
+
             inputSets = [set([y[0] for y in x[1]]) for x in foundRes[topN][compMethod]]
+
+            print(topN, compMethod, "after sets")
 
             method2genes = {}
             for x in foundRes[topN][compMethod]:
@@ -142,7 +148,30 @@ if __name__ == '__main__':
             #print(set(method2genes["RobustDE+Robust"]).difference(method2genes["combined+msEmpiRe_DESeq2"]))
 
             upIn = from_contents(method2genes)
-            plot(upIn, subset_size="auto")
+
+            print(topN, compMethod, "after content")
+
+            lvls = set([x for x in upIn.index.levshape])
+            print("lvls", lvls)
+
+            if len(lvls) <= 2:
+
+                plt.figure()
+                plt.title("no data to plot - maybe only 1 or 2 groups?")
+                outname = args.output + "." + str(topN) + "." + compMethod
+
+                if not outname.endswith(".png"):
+                    outname += ".png"
+
+                plt.savefig(outname, bbox_inches="tight")
+                print("finished plot", outname)
+                plt.close()
+                continue
+
+
+            plot(upIn,show_counts=True, subset_size="auto")
+
+            print(topN, compMethod, "after plot")
 
             plt.title("Method: {} (Top {})".format(compMethod, topN))
 
@@ -152,4 +181,6 @@ if __name__ == '__main__':
                 outname += ".png"
 
             plt.savefig(outname, bbox_inches="tight")
+            print("finished plot", outname)
+            plt.close()
 

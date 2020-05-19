@@ -29,6 +29,7 @@ if __name__ == '__main__':
 
 
     pwcount2function = {
+        1: venn.venn2,
         2: venn.venn2,
         3: venn.venn3,
         4: venn.venn4,
@@ -40,6 +41,8 @@ if __name__ == '__main__':
     foundRes = defaultdict(lambda: list())
 
     for pathwaysFile in args.pathways:
+        print(pathwaysFile.name)
+
         indf = DataFrame.parseFromFile(pathwaysFile.name, skipChar='#', replacements={
             "None": None,
             "": None,
@@ -69,7 +72,11 @@ if __name__ == '__main__':
         topNIDs = []
         for ridx, row in enumerate(indf):
 
-            qvalue = float(row.get("qvalue", row.get("qvalues")))
+            qvaluestr = row.get("qvalue", row.get("qvalues", None))
+            qvalue = 1
+
+            if qvaluestr != None and qvaluestr != "NA":
+                qvalue = float(qvaluestr)
 
             topNIDs.append((row[idColumn], qvalue))
 
@@ -95,6 +102,10 @@ if __name__ == '__main__':
 
 
     for topN in args.top_n:
+
+        if len(foundRes[topN]) == 1:
+            foundRes[topN].append(("Dummy Element",  [(None, None)], 0))
+
         vennLabels = venn.generate_petal_labels([set([y[0] for y in x[1]]) for x in foundRes[topN]])
         fig, ax = pwcount2function[len(foundRes[topN])](vennLabels, names=["{fn} (lq={lqc})".format(fn=x[0], lqc=x[2]) for x in foundRes[topN]])
 

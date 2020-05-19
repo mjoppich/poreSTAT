@@ -42,7 +42,7 @@ class FoldChangeFeatureCountsDistributionFactory(PSToolInterfaceFactory):
                             help='counts summary file', required=False)
 
         parser.add_argument('-v', '--no-analysis', dest='noanalysis', action='store_true', default=False)
-        parser.add_argument('-m', '--methods', type=str, nargs='+', default=['DESeq2', 'DirectDESeq2', 'edgeR', 'limma', 'msEmpiRe'])
+        parser.add_argument('-m', '--methods', type=str, nargs='+', default=['DESeq2', 'DirectDESeq2', 'edgeR', 'limma', 'msEmpiRe', "nlEmpiRe"])
 
         parser.add_argument('-o', '--output', type=FolderType('w'), help='output location, default: std out',
                             required=True)

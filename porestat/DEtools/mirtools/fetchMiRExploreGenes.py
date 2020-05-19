@@ -1701,9 +1701,6 @@ if __name__ == '__main__':
 
             geneSymbol = row[geneSymCol]
 
-            if geneSymbol.startswith("MIR7-3HG"):
-                print(row)
-
             #if geneSymbol.upper().startswith("MIR") and isNumber(geneSymbol[3:]):
             if geneSymbol.upper() in genename2mirs:
 
