@@ -164,6 +164,10 @@ def prepareDescriptions():
                                           "<p>Within a condition/replicates the order and the count frequency of the listed genes should be similar.</p>" \
                                           "<p>If a single gene has a majority of the read counts (g.t. 10% for instance), this is suspicious.</p>"
 
+    plotId2Descr["Count Heatmap"] = "<p>Comparison of gene counts (raw, library-normalized).</p>" \
+                                                      "<p>One sample/condition per column. Genes (y-axis) and samples (x-axis) are clustered (ward method) for similarity.</p>" \
+                                                      "<p>The samples should cluster by condition.</p>"
+
     """
     DE ANALYSIS
 
@@ -676,6 +680,18 @@ if __name__ == '__main__':
 
             runSysCall(sysCall, "Make Count Plots", caLogger, "Compare Raw Counts Distribution",
                        os.path.join(args.diffreg[pidx], "counts.countplot"), args, prefix, caPlots)
+
+            sysCall = "python3 {script} --counts {counts} --groups {conds1} --groups {conds2} --thresholds -1 1 2 --output {output}".format(
+                script=os.path.realpath(os.path.join(scriptMain, "quality", "visCounts.py")),
+                counts=args.counts[pidx].name,
+                conds1=" ".join(args.cond1[pidx]),
+                conds2=" ".join(args.cond2[pidx]),
+                output=os.path.join(args.diffreg[pidx], "count_heatmap")
+            )
+
+            runSysCall(sysCall, "Count Heatmap", caLogger, "Count Heatmap",
+                       os.path.join(args.diffreg[pidx], "count_heatmap.expr_plot"), args, prefix, caPlots)
+
 
             sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "compareCountsPerGene.py")),
