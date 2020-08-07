@@ -71,10 +71,13 @@ class DataBaseAccessor:
         return jsonRes
 
     @classmethod
-    def fetch_mirna_interactions(cls, requestDict, MIRNASTRPARTS=[miRNAPART.MATURE, miRNAPART.ID]):
+    def fetch_mirna_interactions(cls, requestDict, MIRNASTRPARTS=[miRNAPART.MATURE, miRNAPART.ID], verbose=False):
 
         if not "sentences" in requestDict:
             requestDict["sentences"] = "FALSE"
+
+        if verbose:
+            print(json.dumps(requestDict))
 
         jsonRes = cls.fetchSimple(requestDict)
 
@@ -94,6 +97,15 @@ class DataBaseAccessor:
 
             except:
                 pass
+
+
+            if 'rel_interaction' in rel:
+                if not rel["rel_interaction"] == "MIR_GENE":
+                    continue
+
+            if 'rel_category' in rel:
+                if not rel["rel_category"] in ["DOWN", "NEU"]:
+                    continue
 
             edge = (source, target)
 
@@ -1776,7 +1788,8 @@ if __name__ == '__main__':
         else:
             print("Fetching mirnas")
             mirnaHits = DataBaseAccessor.fetch_mirna_interactions(
-                mirnaContextDict
+                mirnaContextDict,
+                MIRNASTRPARTS=[miRNAPART.MATURE, miRNAPART.ID, miRNAPART.PRECURSOR]
             )
 
             with open(args.output.name + '.mirnafetch.pickle', 'wb') as f:
@@ -1785,12 +1798,15 @@ if __name__ == '__main__':
 
         if not REFETCHDATA and os.path.exists(args.output.name + ".genefetch.pickle"):
 
-            with open('genefetch.pickle', 'rb') as f:
+            with open(args.output.name + ".genefetch.pickle", 'rb') as f:
                 geneHits = pickle.load(f)
         else:
             print("Fetching genes")
+            print(geneContextDict)
+
             geneHits = DataBaseAccessor.fetch_mirna_interactions(
-                geneContextDict
+                geneContextDict,
+                MIRNASTRPARTS=[miRNAPART.MATURE, miRNAPART.ID, miRNAPART.PRECURSOR]
             )
 
             with open(args.output.name + '.genefetch.pickle', 'wb') as f:
@@ -1799,9 +1815,16 @@ if __name__ == '__main__':
 
         print("All Fetched")
 
+        print("Gene Hits", len(geneHits))
+        print("miRNA Hits", len(mirnaHits))
+
         allLogFC = [deMIRs[x][0] for x in deMIRs] + [deGenes[x][0] for x in deGenes]
         minLogFC = min(allLogFC)
         maxLogFC = max(allLogFC)
+
+        print("minLogFC", minLogFC)
+        print("maxLogFC", maxLogFC)
+
 
         mgG = miRGeneGraph({
             "minLogFC": minLogFC,
