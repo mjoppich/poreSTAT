@@ -312,6 +312,11 @@ elements: {
                       "Edge Types: <table>" + elemsStr + "</table>" +
                       "Neighbour Types: <table>" + neighbourStr + "</table>";
 
+              if ( nodeData["type"] == "mirna")
+              {
+                content.innerHTML += "All Target Genes: " + nodeData["all_targets"];
+              }
+
               return content;
             }
           });

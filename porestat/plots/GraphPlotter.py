@@ -110,7 +110,11 @@ class GraphPlot:
 
             for x in nodeAttr:
                 if not x in plotAttr:
-                    plotAttr[x] = nodeAttr[x]
+                    # TODO one should use a more general solution here!
+                    if type(nodeAttr[x]) in [set, tuple]:
+                        plotAttr[x] = list(nodeAttr[x])
+                    else:
+                        plotAttr[x] = nodeAttr[x]
 
             graphNodes.append(plotAttr)
 
