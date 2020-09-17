@@ -84,7 +84,7 @@ class ExperimentLs(ParallelPSTReportableInterface):
         propDict = localEnv[runid]
         userRun = fileObj.user_filename_input()
 
-        propDict['NAMES']['USER_RUN_NAME'].add(userRun);
+        propDict['NAMES']['USER_RUN_NAME'].add(userRun)
 
         fastq = fileObj.getFastQ()
 
@@ -120,13 +120,13 @@ class ExperimentLs(ParallelPSTReportableInterface):
             allLengths = []
             countByType = Counter()
 
-            for type in parallelResult[runid]['TYPE']:
+            for rtype in parallelResult[runid]['TYPE']:
 
-                lengths = parallelResult[runid]['TYPE'][type]
+                lengths = parallelResult[runid]['TYPE'][rtype]
 
                 allLengths += lengths
 
-                countByType[type] += len(lengths)
+                countByType[rtype] += len(lengths)
 
             fileCount = len(allLengths)
             avgLength = sum(allLengths) / fileCount

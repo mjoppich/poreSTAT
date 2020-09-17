@@ -301,7 +301,7 @@ class PlotConfig:
                     if lgd == None:
                         continue
 
-                    lgd.draggable()
+                    lgd.set_draggable(True)
 
                     makeTightLayout = makeTightLayout and lgd._bbox_to_anchor == None
 

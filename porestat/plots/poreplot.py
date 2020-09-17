@@ -821,7 +821,7 @@ class PorePlot:
             bins = max([len(x) for x in someData])
 
 
-        linebc, bins, patches = ax.hist(someData, bins, histtype='step', cumulative=1, normed=normed, stacked=False, label=labels, orientation=plotDir)
+        linebc, bins, patches = ax.hist(someData, bins, histtype='step', cumulative=1, density=normed, stacked=False, label=labels, orientation=plotDir)
         ax.set_title(title)
 
         if xlabel != None:

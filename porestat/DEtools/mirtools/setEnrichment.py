@@ -7,7 +7,7 @@ import sys, os
 
 from statsmodels.stats.multitest import multipletests
 
-sys.path.insert(0, "/mnt/d/dev/git/poreSTAT/")
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
 
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 
@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
     sym2approvSym = {}
 
-    with open("/mnt/d/dev/data/genomes/hgnc2sym2ens2uniprot") as fin:
+    with open(str(os.path.dirname(os.path.realpath(__file__))) + "/../../data/" + "hgnc2sym2ens2uniprot") as fin:
 
         for line in fin:
             line = line.strip().split("\t")

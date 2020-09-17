@@ -80,6 +80,69 @@ class Fast5TYPE(Enum):
 
 class Fast5FileException(Exception):
     pass
+class Fast5FileTYPE(Enum):
+    SINGLE = 'SINGLE_FASTA'
+    MULTIFASTA = 'MULTI_FASTA'
+
+    def __str__(self):
+        return self.name
+
+class MFast5File:
+
+    def _open(self, keep_open):
+
+        self.hdf5file = h5py.File(self.filename, 'r')
+        self.type = self._guessType()
+
+    def __init__(self, path, keep_file_open = False):
+
+        self.hdf5file = None
+        self.filename = path
+        self.type = None
+        self.iterPaths = []
+        self.is_open = self._open(keep_file_open)
+
+        #print(self.type)
+
+    def _guessType(self):
+
+        cntGrpsMulti = 0
+        cntGrpsSingle = 0
+
+        allIterPaths = list()
+        for grp in self.hdf5file:
+
+            if grp.startswith("read_"):
+                cntGrpsMulti += 1
+                if not grp in allIterPaths:
+                    allIterPaths.append(grp)
+            else:
+                cntGrpsSingle += 1
+
+        if cntGrpsSingle == 0:
+            self.iterPaths = list(allIterPaths)
+            return Fast5FileTYPE.MULTIFASTA
+
+        self.iterPaths = ["/"]
+        return Fast5FileTYPE.SINGLE
+
+    def __len__(self):
+        return len(self.iterPaths)
+        
+    def __iter__(self):
+
+        self.iterIdx = 0
+        return self
+
+    def __next__(self):
+
+        if self.iterIdx >= len(self.iterPaths):
+            raise StopIteration
+
+        iPath = self.iterPaths[self.iterIdx]
+        self.iterIdx += 1
+        return Fast5File(self.hdf5file[iPath], path=iPath)
+
 
 class Fast5File:
 
@@ -98,12 +161,12 @@ class Fast5File:
     @classproperty
     def analyses_paths(cls):
         return OrderedDict([
-            (Fast5TYPE.BASECALL_2D, '/Analyses/Basecall_2D_%03d/'),
-            (Fast5TYPE.BASECALL_1D_COMPL, '/Analyses/Basecall_1D_%03d/'),
-            (Fast5TYPE.BASECALL_1D, '/Analyses/Basecall_1D_%03d/'),
-            (Fast5TYPE.BASECALL_RNN_1D, '/Analyses/Basecall_RNN_1D_%03d/'),
-            (Fast5TYPE.BARCODING, '/Analyses/Barcoding_%03d/'),
-            (Fast5TYPE.PRE_BASECALL, '/Analyses/EventDetection_%03d/')
+            (Fast5TYPE.BASECALL_2D, './Analyses/Basecall_2D_%03d/'),
+            (Fast5TYPE.BASECALL_1D_COMPL, './Analyses/Basecall_1D_%03d/'),
+            (Fast5TYPE.BASECALL_1D, './Analyses/Basecall_1D_%03d/'),
+            (Fast5TYPE.BASECALL_RNN_1D, './Analyses/Basecall_RNN_1D_%03d/'),
+            (Fast5TYPE.BARCODING, './Analyses/Barcoding_%03d/'),
+            (Fast5TYPE.PRE_BASECALL, './Analyses/EventDetection_%03d/')
             #(Fast5TYPE.UNKNOWN, "")
         ])
 
@@ -121,26 +184,22 @@ class Fast5File:
 
         ])
 
-    def __init__(self, path, group=0, keep_file_open = False):
+    def __init__(self, h5grp, path=None, group=0, keep_file_open = False):
 
-        self.filename = path
         self.type = None
+        self.filename = path
 
         self.sequence_paths = {}
         self.winner = Fast5TYPE.BASECALL_1D
 
-        self.hdf5file = None
-        self.is_open = self._open(keep_file_open)
+        self.hdf5file = h5grp
+        self.type = self._guessType()
 
         self.pore = (-1, -1)
         self.timestamp = 0
         self.readnum = 0
         self.read_length = 0
 
-    def _open(self, keep_open):
-
-        self.hdf5file = h5py.File(self.filename, 'r')
-        self.type = self._guessType()
 
         #self.printGroupsAttribs()
 
@@ -153,7 +212,7 @@ class Fast5File:
     def _guessType(self):
 
         for filetype in Fast5File.analyses_paths:
-
+            
             analyses_path = Fast5File.analyses_paths[filetype]
 
             group = -1
@@ -173,31 +232,35 @@ class Fast5File:
                 continue
 
             analyses_group = analyses_path % group
-            seqpath = self.join_paths(analyses_group, Fast5File.sequence_paths[filetype])
 
+            seqpath = self.join_paths(analyses_group, Fast5File.sequence_paths[filetype])
+    
             if not seqpath in self.hdf5file:
-                continue
+                #try alternative version
+                seqpath = self.join_paths(analyses_group, "BaseCalled_template")
+
+                if not seqpath in self.hdf5file:
+                    continue
 
             self.sequence_paths = {}
 
             # get analyses_group . 'basecall_1d'
             if filetype == Fast5TYPE.BASECALL_2D:
 
-                basecallAttrib = self._get_attribute(analyses_group, 'basecall_1d')
-
+                
+                basecallAttrib = self._get_attribute(analyses_group, 'basecall_1d')                
                 # if that returns None, attrib not existant => no 2D basecall
-                if basecallAttrib == None:
-                    continue
+                if basecallAttrib != None:
+                    
+                    basecall1dpath = basecallAttrib #basecall1dpath = '/Analyses/' + basecallAttrib
+                    self.sequence_paths[Fast5TYPE.BASECALL_1D] = self.join_paths( basecall1dpath , "BaseCalled_template" )
+                    self.sequence_paths[Fast5TYPE.BASECALL_1D_COMPL] = self.join_paths( basecall1dpath , "BaseCalled_complement" )
 
-                basecall1dpath = basecallAttrib #basecall1dpath = '/Analyses/' + basecallAttrib
+                    eventpath = '/' + self._get_attribute(basecall1dpath, 'event_detection', "Analyses/EventDetection_000")
+                    self.sequence_paths[Fast5TYPE.PRE_BASECALL] = eventpath
 
-                self.sequence_paths[Fast5TYPE.BASECALL_1D] = self.join_paths( basecall1dpath , "BaseCalled_template" )
-                self.sequence_paths[Fast5TYPE.BASECALL_1D_COMPL] = self.join_paths( basecall1dpath , "BaseCalled_complement" )
+
                 self.sequence_paths[Fast5TYPE.BASECALL_2D] = seqpath
-
-                eventpath = '/' + self._get_attribute(basecall1dpath, 'event_detection', "Analyses/EventDetection_000")
-                self.sequence_paths[Fast5TYPE.PRE_BASECALL] = eventpath
-
                 self.winner = Fast5TYPE.BASECALL_2D
 
             elif filetype == Fast5TYPE.BASECALL_1D_COMPL:
@@ -237,14 +300,19 @@ class Fast5File:
             # set up available sequences
 
             # sanity check
+            ftypeEjected=False
             for path in self.sequence_paths:
 
                 temp_path = self.sequence_paths[path]
                 exists = temp_path in self.hdf5file
 
-                if not exists:
+                if not exists and not path == Fast5TYPE.PRE_BASECALL:
                     #print( temp_path + " " + str(temp_path in self.hdf5file))
-                    pass
+                    ftypeEjected=True
+                    
+            if ftypeEjected:
+                #print("Eject ftype", filetype)
+                continue
 
             return filetype
 
@@ -254,20 +322,9 @@ class Fast5File:
 
         if readType == None:
             readType = self.winner
-
+       
         return self._read_fastq(readType)
 
-    def getFastA(self, readType=None):
-
-        if readType == None:
-            readType = self.winner
-
-        fastq = self._read_fastq(readType)
-
-        if fastq != None:
-            return fastq.to_fasta()
-
-        return None
 
     def _get_signal(self):
 
@@ -343,18 +400,27 @@ class Fast5File:
             return None
 
     def getSampleFrequency(self):
-        return int(self._get_attribute('/UniqueGlobalKey/context_tags', 'sample_frequency', 4000))
+        
+        if "context_tags" in self.hdf5file:
+            return int(self._get_attribute('context_tags', 'sample_frequency', 4000)) 
+        else:
+            return int(self._get_attribute('/UniqueGlobalKey/context_tags', 'sample_frequency', 4000))
 
     def getExperimentStartTime(self):
 
-        timeAttribData = self._get_attribute('/UniqueGlobalKey/tracking_id', 'exp_start_time', None)
+
+        if "tracking_id" in self.hdf5file:
+            timeAttribData = self._get_attribute('tracking_id', 'exp_start_time', None)
+        else:
+            timeAttribData = self._get_attribute('/UniqueGlobalKey/tracking_id', 'exp_start_time', None)
 
         try:
             timestamp = int(timeAttribData)
             return timestamp
         except:
             try:
-                parsedTime = dateutil.parser.parse(timeAttribData)
+                
+                parsedTime = dateutil.parser.parse(str(timeAttribData))
                 timestamp = parsedTime.timestamp()
                 return int(timestamp)
 
@@ -365,13 +431,28 @@ class Fast5File:
 
     def readCreateTime(self):
 
+
         expStartTime = self.getExperimentStartTime()
         sampleFrequency = self.getSampleFrequency()
+
+        #print(expStartTime)
+        #print(sampleFrequency)
 
         if expStartTime == None:
             return None
 
+        #self.printGroupsAttribs()
         startTimes = self._read_attrib('start_time')
+
+        #print(startTimes)
+
+        if startTimes == None:
+            path = "/Analyses/EventDetection_000/Reads/"+self.readID()
+            startTimes = self._get_attribute(path, "start_time", None)
+            
+
+        if startTimes == None:
+            return None
 
         if type(startTimes) == list:
             vReturn = [x + expStartTime for x in startTimes]
@@ -387,27 +468,41 @@ class Fast5File:
         try:
             path = "/Raw/Reads/"
 
-            readsGroup = self.hdf5file[path]
+            if not path in self.hdf5file:
+                path = "/Analyses/EventDetection_000/Reads/"    
 
-            storedReads = readsGroup.keys()
+            if not path in self.hdf5file:
+                path = "Raw"    
 
-            readNum = -1
-            singleRead = True
-            if len(storedReads) > 1:
-                singleRead = False
 
-                readNum = set()
+            if path != "Raw":
 
-            for read in storedReads:
+                readsGroup = self.hdf5file[path]
+                storedReads = readsGroup.keys()
 
-                seqRead = self.hdf5file[path + read]
+                readNum = -1
+                singleRead = True
+                if len(storedReads) > 1:
+                    singleRead = False
 
-                if singleRead:
-                    return seqRead.attrs[attribname]
-                else:
-                    readNum.add(seqRead.attrs[attribname])
+                    readNum = set()
 
-            return readNum
+                for read in storedReads:
+
+                    seqRead = self.hdf5file[path + read]
+
+                    if singleRead:
+                        return seqRead.attrs[attribname]
+                    else:
+                        readNum.add(seqRead.attrs[attribname])
+
+                return readNum
+            
+            else:
+                
+                readsGroup = self.hdf5file[path]
+                return readsGroup.attrs[attribname]
+
 
         except:
 
@@ -433,33 +528,48 @@ class Fast5File:
 
     def user_filename_input(self):
         """
-
         :return: user_filename_input from UniqueGlobalKey/context_tags
         """
-        return self._get_attribute("/UniqueGlobalKey/context_tags/", 'user_filename_input')
+        if "context_tags" in self.hdf5file:
+            if "user_filename_input" in self.hdf5file["context_tags"].attrs:
+                return self._get_attribute('context_tags', 'user_filename_input', None)
+            else:
+                return self._get_attribute('tracking_id', 'sample_id', None)
+        else:
+
+            if "user_filename_input" in self.hdf5file["/UniqueGlobalKey/context_tags"].attrs:
+                return self._get_attribute('/UniqueGlobalKey/context_tags', 'user_filename_input', None)
+            else:
+                return self._get_attribute('/UniqueGlobalKey/tracking_id', 'sample_id', None)
+            
 
     def readNumber(self):
         """
-
         :return: read number, or set of read numbers (if multiple reads in file)
         """
+
         return int(self._read_attrib('read_number'))
 
     def readID(self):
         """
-
         :return: read number, or set of read numbers (if multiple reads in file)
         """
         return self._read_attrib('read_id').decode("utf-8")
 
 
     def runID(self):
+        if "tracking_id" in self.hdf5file:
+            return self._get_attribute('tracking_id', 'run_id')
+        else:
+            return self._get_attribute('/UniqueGlobalKey/tracking_id', 'run_id')
 
-        return self._get_attribute("/UniqueGlobalKey/tracking_id/", 'run_id')
 
     def channelID(self):
 
-        return int(self._get_attribute("/UniqueGlobalKey/channel_id/", 'channel_number'))
+        if "channel_id" in self.hdf5file:
+            return int(self._get_attribute('channel_id', 'channel_number', 4000)) 
+        else:
+            return int(self._get_attribute('/UniqueGlobalKey/channel_id', 'channel_number', 4000))
 
 
     def _read_main_fastq(self):
@@ -507,15 +617,23 @@ class Fast5Directory:
         if not os.path.isdir(path):
             raise ValueError("Given path is not a directory: " + path)
 
-        self.path = makePath(path)
-        self.filesIT = glob.iglob(self.path + "*.fast5")
+        self.path = os.path.abspath(path)#Path(path)
+
+        print(self.path)
+        self.filesIT = glob.glob(self.path +"/" + "**/*.fast5", recursive=True)
+        self.filesIT.sort(key=os.path.getctime)
 
     def collect(self):
 
         for nextFile in self.filesIT:
 
-            yield Fast5File(nextFile)
+            f5file = MFast5File(nextFile)
 
+            if f5file.type == Fast5FileTYPE.MULTIFASTA:
+                print("Loaded", nextFile)
+
+            for read in f5file:
+                yield read
 
 if __name__ == "__main__":
 

@@ -754,8 +754,8 @@ class miRGeneGraph:
             strict_opp_dir = len(strictGenes)
             savedElem.append( str(strict_opp_dir) )
 
-            savedElem.append( str(ovaPval[nodeIdx]) )
-            savedElem.append( str(ovaAdjPval[nodeIdx]) )
+            savedElem.append( ovaPval[nodeIdx] )
+            savedElem.append( ovaAdjPval[nodeIdx] )
 
             retRatio.append(tuple(savedElem))
 

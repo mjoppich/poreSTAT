@@ -34,7 +34,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     # using Clang
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     # using GCC
-    SET( CMAKE_OPENMP_LIBRARY_NAME "omp")
+    # SET( CMAKE_OPENMP_LIBRARY_NAME "omp")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     # using Intel C++
     SET( CMAKE_OPENMP_LIBRARY_NAME "")

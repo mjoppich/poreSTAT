@@ -42,7 +42,7 @@ class NucleotideDistribution(ParallelPSTReportableInterface):
         super(NucleotideDistribution, self).__init__( args )
 
         self.nucTypes = [
-            'A','C','T','G','N'
+            'A','C','G','T','U','N'
          ]
 
 
