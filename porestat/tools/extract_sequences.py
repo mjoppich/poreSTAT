@@ -18,6 +18,9 @@ class ExtractSequencesFactory(PSToolInterfaceFactory):
         parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser.add_argument('-mr', '--mreads', nargs='+', type=str, help='multi-read files', required=False)
+
+
         parser.add_argument('--fasta', dest='fasta', action='store_true', default=False)
         parser.add_argument('--fastq', dest='fastq', action='store_true', default=True)
         parser.add_argument('-u', '--user_run', dest='user_run', action='store_true', default=False)

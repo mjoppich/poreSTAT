@@ -38,6 +38,7 @@ class ReportFactory(PSToolInterfaceFactory):
         parser = subparsers.add_parser('summary', help='read performance summary')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser.add_argument('-mr', '--mreads', nargs='+', type=str, help='multi-read files', required=False)
 
         parser.add_argument('-o', '--output', type=str, help='output folder for report', required=True)
         parser.add_argument('-n', '--output-name', type=str, help='output name', required=False)
@@ -96,7 +97,7 @@ class ReportAnalysis(ParallelPSTInterface):
             ('LENGTH', LengthHistogram(args)),
             ('NUCLEOTIDES', NucleotideDistribution(args)),
             ('QUALITY DISTRIBUTION', QualityDistribution(args)),
-            ('QUALITY BY POSITION', QualityPosition(args)),
+            #('QUALITY BY POSITION', QualityPosition(args)),
             ('KMER DISTRIBUTION', KmerHistogram( self.patchArgs(self._makeArguments(args), 'KMER DISTRIBUTION'))),
             ('KMER DISTRIBUTION/Assembly', KmerHistogram( self.patchArgs(self._makeArguments(args), 'KMER DISTRIBUTION/Assembly')))
         ])

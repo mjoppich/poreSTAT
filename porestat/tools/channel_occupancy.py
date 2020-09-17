@@ -28,6 +28,8 @@ class ChannelOccupancyFactory(PSToolInterfaceFactory):
         parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan')
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser.add_argument('-mr', '--mreads', nargs='+', type=str, help='multi-read files', required=False)
+
         parser.add_argument('-e', '--experiments', nargs='+', type=str, help='experiments to list')
         parser.add_argument('-u', '--user_run', dest='user_run', action='store_true', default=False)
         parser.add_argument('--print-histogram', action='store_true', default=False)

@@ -18,7 +18,6 @@ class SquigglePlotFactory(PSToolInterfaceFactory):
     def _addParser(self, subparsers, which):
         parser = subparsers.add_parser(which, help=which + ' help')
         parser.add_argument('-r', '--read', type=argparse.FileType('r'), help='minion read folder', required=False)
-
         parser.set_defaults(func=self._prepObj)
 
         return parser

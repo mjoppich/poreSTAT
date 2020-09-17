@@ -20,7 +20,7 @@ class ParallelPSTInterface(PSToolInterface):
         inputs = self.prepareInputs(self.args)
         environment = self.prepareEnvironment(self.args)
 
-        ll = MapReduce(4)
+        ll = MapReduce(8)
         result = ll.exec( inputs, self.execParallel, environment, self.chunkSize, self.joinParallel)
 
         iEnd = time.time()

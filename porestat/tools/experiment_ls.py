@@ -26,6 +26,8 @@ class ExperimentLsFactory(PSToolInterfaceFactory):
 
         parser.add_argument('-f', '--folders', nargs='+', type=FolderType('r'), help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=FolderType('r'), help='minion read folder', required=False)
+        parser.add_argument('-mr', '--mreads', nargs='+', type=str, help='multi-read files', required=False)
+
         parser.add_argument('-u', '--user-run', dest='user_run', action='store_true', default=False)
 
         parser.add_argument('-ot', '--output-type', default=ExportTYPE.TSV, action=ExportTYPEAction)

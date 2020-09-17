@@ -33,6 +33,8 @@ class TimelineReadsFactory(PSToolInterfaceFactory):
         parser = subparsers.add_parser(which, help=which+' help')
         parser.add_argument('-f', '--folders', nargs='+', type=str, help='folders to scan', required=False)
         parser.add_argument('-r', '--reads', nargs='+', type=str, help='minion read folder', required=False)
+        parser.add_argument('-mr', '--mreads', nargs='+', type=str, help='multi-read files', required=False)
+
         parser.add_argument('-o', '--out', action='store', type=argparse.FileType('w'), default=None)
 
         parser = PlotConfig.addParserArgs(parser)

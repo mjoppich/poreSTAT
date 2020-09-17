@@ -614,14 +614,17 @@ class Fast5Directory:
 
     def __init__(self, path):
 
-        if not os.path.isdir(path):
-            raise ValueError("Given path is not a directory: " + path)
+        if not os.path.isdir(path) and not os.path.exists(path):
+            raise ValueError("Given path is not a directory or does not exist: " + path)
 
         self.path = os.path.abspath(path)#Path(path)
-
-        print(self.path)
-        self.filesIT = glob.glob(self.path +"/" + "**/*.fast5", recursive=True)
-        self.filesIT.sort(key=os.path.getctime)
+        
+        self.filesIT = None
+        if os.path.isdir(path):
+            self.filesIT = glob.glob(self.path +"/" + "**/*.fast5", recursive=True)
+            self.filesIT.sort(key=os.path.getctime)
+        else:
+            self.filesIT = [self.path]
 
     def collect(self):
 

@@ -89,14 +89,19 @@ class PSToolInterface:
 
     def manage_folders_reads(self, args):
 
-        if (args.folders == None and args.reads == None):
+        if (args.folders == None and args.reads == None and args.mreads == None):
             eprint("error: Either folders or reads must be set!")
-            raise PSToolException("bla")
+            raise PSToolException("error: Either folders or reads must be set!")
 
         if args.folders != None:
             folders = args.folders
         else:
             folders = []
+
+        if args.mreads != None:
+
+            for mread in args.mreads:
+                folders.append(mread)
 
         if args.reads != None:
 
