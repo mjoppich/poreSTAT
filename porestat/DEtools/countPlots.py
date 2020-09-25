@@ -65,46 +65,25 @@ def makeplot(plotdata, filename, stats, outname):
 
     plt.close()
 
-    minCount = 1
+    for minCount in [1,10,20]:
 
-    print()
-    print("All Counts pseudocount+"+str(minCount))
-    print()
+        print()
+        print("All Counts pseudocount+"+str(minCount))
+        print()
 
-    plt.figure()
+        plt.figure()
 
-    for idx, sample in enumerate(plotdata):
-        counts = [x[1] for x in plotdata[sample] if x[1] >= minCount+pseudoCount]
-        print(sample, len(counts), len([x for x in counts if x >= minCount+pseudoCount]))
+        for idx, sample in enumerate(plotdata):
+            counts = [x[1] for x in plotdata[sample] if x[1] >= minCount+pseudoCount]
+            print(sample, len(counts), len([x for x in counts if x >= minCount+pseudoCount]))
+            stats[sample]["genes_with_mincount_" + str(minCount)] = len(counts)
+            plt.hist(counts, int(maxlen), color=colors[idx], normed=False,cumulative =True, label=sample + " ("+str(len(counts))+")", histtype="step" )
 
-        stats[sample]["genes_with_mincount_" + str(minCount)] = len(counts)
-
-        plt.hist(counts, int(maxlen), color=colors[idx], normed=False,cumulative =True, label=sample + " ("+str(len(counts))+")", histtype="step" )
-
-    plt.legend()
-    plt.xscale("log")
-    plt.title("Histogram of read counts with count >=" + str(minCount))
-    plt.savefig(outname + ".countplot"+str(minCount)+".png")
-    plt.close()
-    minCount = 20
-
-    print()
-    print("All Counts pseudocount+"+str(minCount))
-    print()
-
-    plt.figure()
-
-    for idx, sample in enumerate(plotdata):
-        counts = [x[1] for x in plotdata[sample] if x[1] >= minCount+pseudoCount]
-        print(sample, len(counts), len([x for x in counts if x >= minCount+pseudoCount]))
-        stats[sample]["genes_with_mincount_" + str(minCount)] = len(counts)
-        plt.hist(counts, int(maxlen), color=colors[idx], normed=False,cumulative =True, label=sample + " ("+str(len(counts))+")", histtype="step" )
-
-    plt.legend()
-    plt.xscale("log")
-    plt.title("Histogram of read counts with count >=" + str(minCount))
-    plt.savefig(outname + ".countplot"+str(minCount)+".png")
-    plt.close()
+        plt.legend()
+        plt.xscale("log")
+        plt.title("Histogram of read counts with count >=" + str(minCount))
+        plt.savefig(outname + ".countplot"+str(minCount)+".png")
+        plt.close()
 
     return stats
 

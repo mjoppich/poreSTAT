@@ -131,18 +131,23 @@ class EnrichmentDF(DataFrame):
         return prepData
 
 
-    def writepDataFile(self, file, replicates):
+    def writepDataFile(self, fname, replicates):
 
-        with open(file, 'w') as pdataFile:
-
+        with open(fname, 'w') as pdataFile:
             for ridx, replicate in enumerate(replicates):
                 for sample in replicates[replicate]:
                     pdataFile.write(sample + "\t" + str(ridx) + "\n")
 
+        with open(fname + ".paired", 'w') as pdataFile:
+            pdataFile.write("{}\t{}\t{}\n".format("name", "condition", "sample"))
+            for ridx, replicate in enumerate(replicates):
+                for sidx, sample in enumerate(replicates[replicate]):
+                    pdataFile.write(sample + "\t" + str(ridx) + "\t" + str(sidx) + "\n")
 
-    def writefDataFile(self, file, prepData):
 
-        with open(file, 'w') as fdataFile:
+    def writefDataFile(self, fname, prepData):
+
+        with open(fname, 'w') as fdataFile:
             sampleCount = len(prepData[0])
             for line in prepData[1:]:
                 fdataFile.write( "\t".join( [line[0]] * sampleCount) + "\n")
@@ -158,10 +163,10 @@ class EnrichmentDF(DataFrame):
 
     @property
     def supported_de_methods(self):
-        return ['NOISeq', 'DESeq2', 'DirectDESeq2', 'msEmpiRe', 'nlEmpiRe', 'limma', 'edgeR']
+        return ['NOISeq', 'DESeq2', 'DirectDESeq2', 'DirectDESeq2Paired', 'msEmpiRe', 'nlEmpiRe', 'limma', 'edgeR']
 
 
-    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['NOISeq', 'msEmpiRe', 'nlEmpiRe', 'DESeq2', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None, norRNA=False):
+    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['msEmpiRe', 'nlEmpiRe', 'DESeq2', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None, norRNA=False, noMtRNA=False):
 
 
         filePrefix = prefix
@@ -234,13 +239,17 @@ class EnrichmentDF(DataFrame):
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/deseq_direct.R"
                         execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" " + outFile
 
+                    elif method in ['DirectDESeq2Paired']:
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/deseq_direct_paired.R"
+                        execStr = rscriptPath+" "+scriptPath+" "+noiseqFile+" "+pdataFile+".paired" +" " + outFile
+
                     elif method in ['msEmpiRe']:
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/empire_diffreg.R"
                         execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+noiseqFile+" "+method+" " + outFile
 
                     elif method in ['nlEmpiRe']:
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/nlEmpiRe_eset.jar"
-                        execStr = javaPath+" -jar "+scriptPath+" -inputdir {} -cond1 0 -cond2 1 -o {}".format(nlempireDir, outFile)
+                        execStr = javaPath+" -jar "+scriptPath+" -inputdir {} -cond1 1 -cond2 0 -o {}".format(nlempireDir, outFile)
 
                     elif method in ['NOISeq']:
 

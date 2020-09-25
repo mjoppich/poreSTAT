@@ -146,28 +146,31 @@ if __name__ == "__main__":
 
         if args.num != -1:
             subsetDF = subsetDF.nlargest(args.num, columns=accKeys)
+
+        else:
+            print("Taking subsetDF as is.")
         # print(subsetDF.shape)
 
+    print("subsetDF shape", subsetDF.shape)
 
     tsneDF = subsetDF.transpose()
+
+    tsneDF = tsneDF.replace(to_replace=[None], value=0)
+    tsneDF = tsneDF.replace(to_replace=["None"], value=0)
     tsneDF = tsneDF.apply(pd.to_numeric, errors='ignore')
+
+
+    tsneDF.to_csv('/tmp/output2.tsv',sep='\t', quoting=None)
     
     dimNames = list(tsneDF.index)
 
     metric = ""
 
-    #print("tsne shape")
-    #print(tsneDF.shape)
-
-    #print("tsne values")
-    #print(tsneDF.values)
-
-
     if tsneDF.shape[1] < 2:
         print("No data to analyse.")
         print(tsneDF.shape)
-        print(tsneDF.values)
-        print(tsneDF)
+        #print(tsneDF.values)
+        #print(tsneDF)
 
         plt.figure()
         plt.title("No Data To Analyse (no sig genes)")
@@ -188,16 +191,16 @@ if __name__ == "__main__":
     else:
         metric = "correlation"
 
-        print(tsneDF.transpose().head())
+        #print(tsneDF.transpose().head())
         cor = tsneDF.transpose().corr()
         if cor.isnull().values.any():
             cor = cor.fillna(-1)
             print("Attention: NaN in correlation values!")
         
 
-        print(cor.values)
-        print(tsneDF.transpose().corr())
-        print(tsneDF.transpose().dtypes)
+        #print(cor.values)
+        #print(tsneDF.transpose().corr())
+        #print(tsneDF.transpose().dtypes)
         if np.amax(cor.values) > 1.0:
             #print("Fixing similarity")
             #print(np.amax(cor.values))
@@ -289,7 +292,7 @@ if __name__ == "__main__":
 
     columns = ['pca_%i' % i for i in range(pcaComponents)]
     df_pca = pd.DataFrame(pca.transform(tsneDF), columns=columns, index=tsneDF.index)
-    print(df_pca.head())
+    #print(df_pca.head())
 
 
     plt.figure(figsize=(12, 12))

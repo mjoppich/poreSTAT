@@ -105,9 +105,10 @@ if __name__ == '__main__':
 
             if df1row[comCol] != df2row[comCol]:
                 print("CHG", comCol)
-                df12CommonCols.remove(comCol)
-                df1UniqueCols.append(comCol)
-                df2UniqueCols.append(comCol)
+                #no idea why this was here?
+                #df12CommonCols.remove(comCol)
+                #df1UniqueCols.append(comCol)
+                #df2UniqueCols.append(comCol)
 
 
     df1UniqueCols = sorted(df1UniqueCols)
