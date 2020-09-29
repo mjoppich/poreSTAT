@@ -39,12 +39,18 @@ keyType = "ENTREZID"
 
 if (organism == "org.Mm.eg.db")
 {
+    suppressMessages(suppressWarnings(require(org.Mm.eg.db)))
+    orgDB = org.Hs.eg.db
+
     annotTable = grcm38
     egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
 
 } else if (organism == "org.Hs.eg.db")
 {
+    suppressMessages(suppressWarnings(require(org.Hs.eg.db)))
+    orgDB = org.Hs.eg.db
+
     annotTable = grch38
     egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
@@ -52,6 +58,7 @@ if (organism == "org.Mm.eg.db")
 {
 
     suppressMessages(suppressWarnings(require(org.Sc.sgd.db)))
+    orgDB = org.Sc.sgd.db
 
 
     allEntrez = sapply(allGeneIDs, function(x) {get(x, org.Sc.sgdENTREZID)} )
@@ -113,7 +120,7 @@ for (GODB in c("BP", "MF", "CC")) { #
 
 
     #by DOSE as fgsea has problems with all genes being in one class...
-    kk <- gseGO(entrezGenesC, organism, keyType=keyType, ont=GODB, pvalueCutoff=0.5, pAdjustMethod="BH", by=bymethod)
+    kk <- gseGO(entrezGenesC, orgDB, keyType=keyType, ont=GODB, pvalueCutoff=0.5, pAdjustMethod="BH", by=bymethod)
 
     if (is.null(kk))
     {
