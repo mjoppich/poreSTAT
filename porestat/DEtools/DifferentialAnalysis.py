@@ -580,7 +580,7 @@ if __name__ == '__main__':
             caLogger.info("Running SubSample {} ({})".format(pidx, prefix))
 
             sysCall = "python3 {script} --fc {countfile} --output {outdir} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna --fpkm --tpm".format(
-                script=os.path.realpath(os.path.join(scriptMain, "calculateExpressionValues.py")),
+                script=os.path.realpath(os.path.join(scriptMain, "prepare", "calculateExpressionValues.py")),
                 outdir=os.path.join(args.diffreg[pidx], "counts.tpm.fpkm.tsv"),
                 countfile=args.counts[pidx].name,
                 enhancePath=args.enhance.name,
@@ -598,7 +598,7 @@ if __name__ == '__main__':
 
             if os.path.isfile(visFCInput):
                 sysCall = "python3 {script} --summary {countfile} --output {outdir}".format(
-                    script=os.path.realpath(os.path.join(scriptMain, "visFCSummary.py")),
+                    script=os.path.realpath(os.path.join(scriptMain,"quality", "visFCSummary.py")),
                     outdir=os.path.join(args.diffreg[pidx], "fcsummary"),
                     countfile=visFCInput
                 )
@@ -632,7 +632,7 @@ if __name__ == '__main__':
 
             outPrefix = os.path.join(args.diffreg[pidx], "empire_norm_counts.compLogFC")
             sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "compareLogFC.py")),
+                script=os.path.realpath(os.path.join(scriptMain,"quality", "compareLogFC.py")),
                 counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
                 conds1=" ".join(cond1RPaths[pidx]),
                 conds2=" ".join(cond2RPaths[pidx]),
@@ -645,7 +645,7 @@ if __name__ == '__main__':
 
 
             sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "compareLogFC.py")),
+                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareLogFC.py")),
                 counts=args.counts[pidx].name,
                 conds1=" ".join(args.cond1[pidx]),
                 conds2=" ".join(args.cond2[pidx]),
@@ -662,7 +662,7 @@ if __name__ == '__main__':
 
 
             sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "compareInterLogFCs.py")),
+                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareInterLogFCs.py")),
                 counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
                 conds1=" ".join(cond1RPaths[pidx]),
                 conds2=" ".join(cond2RPaths[pidx]),
@@ -677,7 +677,7 @@ if __name__ == '__main__':
                        os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm.interlogfc."), args, prefix, caPlots)
 
             sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "compareInterLogFCs.py")),
+                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareInterLogFCs.py")),
                 counts=args.counts[pidx].name,
                 conds1=" ".join(args.cond1[pidx]),
                 conds2=" ".join(args.cond2[pidx]),
@@ -874,7 +874,7 @@ if __name__ == '__main__':
 
                         outPrefix = os.path.join(args.save, args.name +  ".compare_mappers" + countSuffix)
                         sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --prefixes {prefixes} --output {output}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "compareMappingReplicates.py")),
+                            script=os.path.realpath(os.path.join(scriptMain, "quality", "compareMappingReplicates.py")),
                             counts=" ".join([os.path.join(args.diffreg[prefixIdx1], "counts.tpm.fpkm.tsv"), os.path.join(args.diffreg[prefixIdx2], "counts.tpm.fpkm.tsv")]),
                             conds1=" ".join([x +countAdd for x in args.cond1[prefixIdx1]] + [x + countAdd for x in args.cond2[prefixIdx1]]),
                             conds2=" ".join([x +countAdd for x in args.cond1[prefixIdx2]] + [x + countAdd for x in args.cond2[prefixIdx2]]),
@@ -911,7 +911,7 @@ if __name__ == '__main__':
 
                     prefix2countFile[prefix] = countDeFile
                     sysCall = "python3 {script} --de {counts} --methods {methods} --output {output}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "calcRobustFCs.py")),
+                        script=os.path.realpath(os.path.join(scriptMain, "robustness", "calcRobustFCs.py")),
                         counts=countDeFile,
                         methods=" ".join(methods),
                         output=robustDeFile
@@ -931,7 +931,7 @@ if __name__ == '__main__':
 
 
                     sysCall = "python3 {script} --fc {counts} --output {output} --num -1 --samples {samples}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
+                        script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
                         counts=robustDeFile,
                         samples=" ".join(args.cond1[pidx] + args.cond2[pidx] ),
                         output=robustDeFile + ".expr_all.mpca"
@@ -953,7 +953,7 @@ if __name__ == '__main__':
 
                     #makePCA.py --fc report_save/aortas.star.msEmpiRe_DESeq.tsv --output report_save/aortas.star.msEmpiRe_DESeq.tsv.mpca
                     sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 --samples {samples}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
+                        script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
                         counts=robustDeFile,
                         samples=" ".join(args.cond1[pidx] + args.cond2[pidx] ),
                         output=robustDeFile + ".mpca"
@@ -968,7 +968,7 @@ if __name__ == '__main__':
                     runSysCall(sysCall, plotName, statsLogger, plotName, robustDeFile + ".mpca.*.png", args, prefix, methods, deEnrichPlots)
 
                     sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --samples {samples}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
+                        script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
                         counts=robustDeFile,
                         samples=" ".join(args.cond1[pidx] + args.cond2[pidx]),
                         output=robustDeFile + ".all.mpca"
@@ -1026,7 +1026,7 @@ if __name__ == '__main__':
                         sysCall = "python3 {script} --de {de} --counts {counts} --conditions {conds1} --conditions {conds2} --tools {methods} --output {output}".format(
                             de=countDeFile,
                             counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
-                            script=os.path.realpath(os.path.join(scriptMain, "compareDECounts.py")),
+                            script=os.path.realpath(os.path.join(scriptMain, "de_comparison", "compareDECounts.py")),
                             methods=" ".join(methods),
                             output=outputFilename,
                             conds1=" ".join(cond1RPaths[pidx]),
@@ -1079,7 +1079,7 @@ if __name__ == '__main__':
                         """
 
                         sysCall = "python3 {script} --fc {counts} --output {output} --num -1 --{ct} --samples {samples}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
+                            script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
                             counts=robustDeFile,
                             samples=" ".join(args.cond1[pidx] + args.cond2[pidx] ),
                             output=robustDeFile + "." + countType + ".expr_all.mpca",
@@ -1099,7 +1099,7 @@ if __name__ == '__main__':
                                    robustDeFile + "." + countType + ".expr_all.mpca.*.png", args, prefix, methods, deEnrichPlots)
 
                         sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 --{ct} --samples {samples}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
+                            script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
                             counts=robustDeFile,
                             samples=" ".join(args.cond1[pidx] + args.cond2[pidx] ),
                             output=robustDeFile + "." + countType + ".mpca",
@@ -1181,7 +1181,7 @@ if __name__ == '__main__':
 
                         prefix2countFile[prefix] = countDeFile
                         sysCall = "python3 {script} --de {counts} --methods {methods} --output {output}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "calcRobustFCs.py")),
+                            script=os.path.realpath(os.path.join(scriptMain, "robustness", "calcRobustFCs.py")),
                             counts=combinedRaw,
                             methods=" ".join(methods),
                             output=combinedDE
@@ -1204,7 +1204,7 @@ if __name__ == '__main__':
                         inname1 = os.path.join(args.save, args.name + "." + args.prefixes[1] +"."+ methodStr + ".tsv")
 
                         sysCall = "python3 {script} --counts {counts} --prefixes {prefixes} --output {output}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "compareRankPlots.py")),
+                            script=os.path.realpath(os.path.join(scriptMain, "de_comparison", "compareRankPlots.py")),
                             counts=inname0 + " " + inname1,
                             prefixes=" ".join(args.prefixes),
                             output=outputname
@@ -1264,7 +1264,7 @@ if __name__ == '__main__':
                             """
                             outPrefix = combinedDE + "." + countType + ".mpca"
                             sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 {ct} --samples {samples}".format(
-                                script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
+                                script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
                                 counts=combinedDE,
                                 methods=" ".join(methods),
                                 output=outPrefix,
@@ -1294,7 +1294,7 @@ if __name__ == '__main__':
                             """
                             outPrefix = combinedDE + "." + countType + ".all_expr.mpca"
                             sysCall = "python3 {script} --fc {counts} --output {output} --num -1 {ct} --samples {samples}".format(
-                                script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
+                                script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
                                 counts=combinedDE,
                                 methods=" ".join(methods),
                                 output=outPrefix,
@@ -1326,7 +1326,7 @@ if __name__ == '__main__':
                             """
                             outPrefix = combinedDE + "." + countType + ".all.mpca"
                             sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB {ct} --samples {samples}".format(
-                                script=os.path.realpath(os.path.join(scriptMain, "makePCA.py")),
+                                script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
                                 counts=combinedDE,
                                 methods=" ".join(methods),
                                 output=outPrefix,
@@ -1385,7 +1385,7 @@ if __name__ == '__main__':
                         allMethodPrefixes += glob(os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv"))
 
                     sysCall = "python3 {script} --detable {detable} --top_n 10 100 250 500 1000 --stats {stats} --output {output}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "compareDifferentialAnalysis.py")),
+                        script=os.path.realpath(os.path.join(scriptMain, "de_comparison", "compareDifferentialAnalysis.py")),
                         detable=" ".join(allMethodPrefixes),
                         output=outputname,
                         stats=statTerm
@@ -1459,7 +1459,7 @@ if __name__ == '__main__':
 
                 #prefix2countFile[prefix] = countDeFile
                 sysCall = "python3 {script} --de {counts} --methods {methods} --output {output}".format(
-                    script=os.path.realpath(os.path.join(scriptMain, "calcRobustFCs.py")),
+                    script=os.path.realpath(os.path.join(scriptMain, "robustness", "calcRobustFCs.py")),
                     counts=robustRaw,
                     methods="ROB",
                     output=robustDE
