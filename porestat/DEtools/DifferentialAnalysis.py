@@ -608,7 +608,7 @@ if __name__ == '__main__':
 
 
             sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "compareReplicates.py")),
+                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
                 counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
                 conds1=" ".join(cond1RPaths[pidx]),
                 conds2=" ".join(cond2RPaths[pidx])
@@ -619,7 +619,7 @@ if __name__ == '__main__':
 
 
             sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "compareReplicates.py")),
+                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
                 counts=args.counts[pidx].name,
                 conds1=" ".join(args.cond1[pidx]),
                 conds2=" ".join(args.cond2[pidx]),
