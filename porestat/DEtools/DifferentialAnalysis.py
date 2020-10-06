@@ -694,7 +694,7 @@ if __name__ == '__main__':
 
 
             sysCall = "python3 {script} --counts {counts} --groups {conds1} --groups {conds2} --output {output}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "countPlots.py")),
+                script=os.path.realpath(os.path.join(scriptMain, "quality", "countPlots.py")),
                 counts=args.counts[pidx].name,
                 conds1=" ".join(args.cond1[pidx]),
                 conds2=" ".join(args.cond2[pidx]),
@@ -1045,7 +1045,7 @@ if __name__ == '__main__':
                         spConds2 = [x + "." + countType for x in args.cond2[pidx]]
 
                         sysCall = "python3 {script} --counts {counts} --groups {conds1} --groups {conds2} --output {output}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "countPlots.py")),
+                            script=os.path.realpath(os.path.join(scriptMain, "quality", "countPlots.py")),
                             counts=countDeFile,
                             conds1=" ".join(spConds1),
                             conds2=" ".join(spConds2),
@@ -1165,7 +1165,7 @@ if __name__ == '__main__':
                         combinedSamples = combinedSamples_1 + combinedSamples_2
 
                         sysCall = "python3 {script} {prefix_counts} --samples {samples} --de1 {counts1} --de2 {counts2} --prefix1 {prefix1} --prefix2 {prefix2} --output {output}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "mergeDiffreg.py")),
+                            script=os.path.realpath(os.path.join(scriptMain, "prepare", "mergeDiffreg.py")),
                             counts1=prefix2countFile[allPrefixes[0]],
                             counts2=prefix2countFile[allPrefixes[1]],
                             prefix1=allPrefixes[0],
@@ -1650,7 +1650,7 @@ if __name__ == '__main__':
                     outputFilename = os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".robust.tsv")
 
                     sysCall = "python3 {script} --de {de} --output {output}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "getRobustFCs.py")),
+                        script=os.path.realpath(os.path.join(scriptMain,"prepare", "getRobustFCs.py")),
                         de=deFile,
                         output=outputFilename,
                     )
