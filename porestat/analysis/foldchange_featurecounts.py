@@ -51,7 +51,10 @@ class FoldChangeFeatureCountsDistributionFactory(PSToolInterfaceFactory):
 
         parser.add_argument('-e', '--enhanced', type=argparse.FileType('r'), default=None)
         parser.add_argument('-l', '--lengths', type=argparse.FileType('r'), default=None)
+
         parser.add_argument('-rrna', '--no-rrna', dest='norrna', action='store_true', default=False)
+        parser.add_argument('-rmtrna', '--remove-mtrna', dest='removemtrna', action='store_true', default=False)
+
         parser.add_argument('-fpkm', '--fpkm', dest='fpkm', action='store_true', default=False)
         parser.add_argument('-tpm', '--tpm', dest='tpm', action='store_true', default=False)
 
@@ -90,6 +93,9 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
         if args.norrna and biotypes == None:
             raise argparse.ArgumentParser().error("removal of rRNA requires --enhanced!")
 
+        if args.removemtrna and biotypes == None:
+            raise argparse.ArgumentParser().error("removal of mtRNA requires --enhanced!")
+
         if args.fpkm and gene2length == None:
             raise argparse.ArgumentParser().error("calculation of FPKM requires --lengths!")
 
@@ -125,6 +131,10 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                     if biotypes != None and args.norrna:
                         geneColIdx = subDf.getColumnIndex("gene")
                         subDf.filterRows(lambda x: x[geneColIdx] in biotypes and not "rRNA" in biotypes[x[geneColIdx]][1] )
+
+                    if biotypes != None and args.removemtrna:
+                        geneColIdx = subDf.getColumnIndex("gene")
+                        subDf.filterRows(lambda x: x[geneColIdx] in biotypes and not "Mt_" in biotypes[x[geneColIdx]][1] )
 
                     if os.path.isdir(condElement) or os.path.isfile(condElement):
                         subDf.setFilepath(os.path.abspath(condElement))
@@ -342,7 +352,8 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                                                                                noDErun=args.noanalysis,
                                                                                enhanceSymbol=geneEnhancement,
                                                                                geneLengths=geneLengths,
-                                                                               norRNA=args.norrna
+                                                                               norRNA=args.norrna,
+                                                                               noMtRNA=args.removemtrna
                                                                                )
 
             self.prepareHTMLOut(createdComparisons, replicates, args)

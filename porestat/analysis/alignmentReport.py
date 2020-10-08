@@ -28,7 +28,7 @@ import dill as pickle
 
 import pysam
 
-
+#python3 scripts/poreAnalysis.py report --load-parallel-result /mnt/g/sequ_into_demo/9_COVID_RNA/pass.3.pickle --sam /mnt/g/sequ_into_demo/9_COVID_RNA/reads.sam --read-info /mnt/g/sequ_into_demo/9_COVID_RNA/reads.info --gtf /mnt/g/sequ_into_demo/9_COVID_RNA/Sars_cov_2.ASM985889v3.100.gtf --fasta /mnt/g/sequ_into_demo/9_COVID_RNA/Sars_cov_2.ASM985889v3.dna.toplevel.fa --output /mnt/g/sequ_into_demo/9_COVID_RNA/sam_analysis
 
 class ReportFactory(PSToolInterfaceFactory):
 
