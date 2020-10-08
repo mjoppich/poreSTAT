@@ -11,11 +11,9 @@ class FileStubType(object):
     def __init__(self, mode):
 
         assert mode in ('r','w','t')# or hasattr(type,'__call__')
-
         self._mode = mode
 
     def __call__(self, values):
-
         prospective_dir=values
 
         prospective_path = os.path.dirname(prospective_dir)
@@ -36,6 +34,14 @@ class FileStubType(object):
                     return prospective_dir
                 else:
                     raise argparse.ArgumentTypeError("writable_dir:{0} is not a writable dir".format(prospective_dir))
+            
+            else:
+                abspath = os.path.abspath(prospective_dir)
+
+                print(abspath, os.path.exists(os.path.dirname(abspath)))
+
+                if os.path.exists(os.path.dirname(abspath)):
+                    return abspath
 
 
 class FolderType(object):

@@ -18,6 +18,21 @@ public:
         this->m_iCIGARLength = iCIGARLength;
     }
 
+    /**
+     * \brief returns string description: [start end] cDel length
+     *
+     * */
+    virtual std::string toString(char cDel = ' ')
+    {
+
+        std::stringstream oStringStream;
+        oStringStream << this->getStart() << cDel << this->getEnd() << cDel << this->getLength() << cDel << this->m_cCIGAR << cDel << this->m_iCIGARLength;
+        oStringStream.flush();
+
+        return oStringStream.str();
+
+    }
+
     ~ReadRegion()
     {
         if (this->pReadRegion != NULL)

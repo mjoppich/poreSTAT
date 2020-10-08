@@ -51,7 +51,7 @@ public:
         bam1_t* pRes = bam_init1();
 
 
-
+        m_iNumThreads = omp_get_max_threads();
 
         int iActiveTasks = 0;
 
@@ -107,6 +107,40 @@ public:
 
 #pragma omp task shared(iActiveTasks)
                         {
+//#pragma omp critical
+                            std::cout << "Currently tasking in task " << omp_get_thread_num() << std::endl;
+                            std::vector<PythonReadStats> oLocalRes;
+                            oLocalRes.reserve(pReads->size());
+
+                            for (size_t i = 0; i < pReads->size(); ++i)
+                            {
+                                this->process(pReads->at(i), 0, &oLocalRes);
+                            }
+
+                            this->deleteReads(pReads);
+
+#pragma omp critical
+                            {
+
+                                pResultStats->insert(pResultStats->end(), oLocalRes.begin(), oLocalRes.end());
+                                --iActiveTasks;
+                            }
+
+
+                        }
+
+                        pReads = new std::vector<bam1_t*>();
+
+
+                    }
+
+                }
+
+                if (pReads->size() > 0)
+                {
+
+#pragma omp task shared(iActiveTasks)
+                        {
 #pragma omp critical
                             std::cout << "Currently tasking in task " << omp_get_thread_num() << std::endl;
                             std::vector<PythonReadStats> oLocalRes;
@@ -129,11 +163,6 @@ public:
 
 
                         }
-
-                        pReads = new std::vector<bam1_t*>();
-
-
-                    }
 
                 }
 
@@ -302,6 +331,14 @@ protected:
                         sRefRegion = this->pFASTAReader->retrieveSequence(pMRegion, sAlignedSeqName);
                         sReadRegion = sReadSeq.substr(pMRegion->pReadRegion->getStart(), pMRegion->pReadRegion->getLength()-1);
 
+                        /*
+                        std::cerr << "Region " << pMRegion->toString() << std::endl;
+                        std::cerr << "ChrName" << sAlignedSeqName << std::endl;
+                        std::cerr << "Ref    " << sRefRegion << std::endl;
+                        std::cerr << "Read   " << sReadRegion << std::endl;
+                        */
+                        
+
                         char* pSeqC = (char*) malloc(sizeof(char) * (sAlignedSeqName.size()+1));
                         sAlignedSeqName.copy(pSeqC, sAlignedSeqName.size());
                         pSeqC[sAlignedSeqName.size()] = '\0';
@@ -327,6 +364,16 @@ protected:
                             char cRead = sReadRegion[j];
                             // because some references use atgc aswell to express uncertainty ... :|
                             char cRef = toupper(sRefRegion[j]);
+
+                            if ((cRead <= 64) || (cRead >= 91))
+                            {
+                                std::cerr << "error character in read " << sReadName << " " << cRead << " -> " << cRef << std::endl;
+                            }
+
+                            if ((cRef <= 64) || (cRef >= 91))
+                            {
+                                std::cerr << "error character in ref " << sReadName << " " << cRead << " -> " << cRef << std::endl;
+                            }
 
 
                             if (cRead == cRef)
@@ -453,6 +500,11 @@ protected:
             std::vector<PythonReadStats>* pReads = (std::vector<PythonReadStats>*) pData;
             pReads->push_back(oStatsObj);
 
+        } else {
+
+            PythonReadStats oStatsObj = pReadStats->toPython();
+            std::vector<PythonReadStats>* pReads = (std::vector<PythonReadStats>*) pData;
+            pReads->push_back(oStatsObj);
         }
 
         delete pReadStats;

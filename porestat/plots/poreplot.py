@@ -972,7 +972,8 @@ class PorePlot:
 
     @classmethod
     def plotSingleBoxplot(cls, data, title, ax):
-        ax.boxplot(data, notch=True, patch_artist=True)
+        ax.boxplot(data, notch=True, showmeans=True, patch_artist=False, showfliers=False)
+        ax.set_ylim([min([0, min(data)]), max(data)])
         ax.set_title(title)
 
     @classmethod

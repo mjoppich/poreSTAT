@@ -4,7 +4,7 @@ import pysam
 
 import HTSeq
 
-from porestat.analysis.ParallelAlignment import MapReduceAlignment
+from porestat.utils.Parallel import MapReduce
 from porestat.utils import eprint
 from ..tools.ParallelPTTInterface import ParallelPSTInterface
 
@@ -20,6 +20,7 @@ class ParallelAlignmentPSTReportableInterface(ParallelPSTInterface):
     def handleEntity(self, headers, samStrings, envs):
         pass
 
+
     def exec(self):
 
         iStart = time.time()
@@ -27,7 +28,10 @@ class ParallelAlignmentPSTReportableInterface(ParallelPSTInterface):
         iEnd = time.time()
         eprint("Preparing Inputs: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd - iStart))))
 
-        llResults = self.execParallel(inputs, None)
+        print(inputs)
+        environment = self.prepareEnvironment(self.args)
+        ll = MapReduce(8)
+        llResults = ll.exec( inputs, self.execParallel, environment, self.chunkSize, self.joinParallel)
         iEnd = time.time()
         eprint("Exec Parallel: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd - iStart))))
 

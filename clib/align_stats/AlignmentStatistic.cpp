@@ -22,9 +22,9 @@ void AlignmentStatistics::loadFASTA(char* pFastaFile)
     this->m_pFASTAFile = new std::string(pFastaFile);
 
     std::cout << "Loading fasta file:" << *(this->m_pFASTAFile) << std::endl;
-
     this->pReader = new FASTAreader(this->m_pFASTAFile, NULL);
-    
+    this->pReader->loadAllSequences();
+
 }
 
 void AlignmentStatistics::processFiles(int n_samples, char** pFilenames)

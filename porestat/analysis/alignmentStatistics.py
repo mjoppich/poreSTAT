@@ -2,11 +2,13 @@ import pysam
 
 import HTSeq
 import argparse
+import time
 
 import pickle
 import sys
 from collections import defaultdict
 from porestat.utils.ArgParseExt import FileStubType, FolderType
+from porestat.utils import eprint
 
 from porestat.tools.kmer_coverage import KmerHistogram
 from .ParallelAlignmentPSTReportableInterface import ParallelAlignmentPSTReportableInterface
@@ -151,6 +153,9 @@ class CAlignmentStatistics(object):
 
         charStr = ctypes.cast(fp, ctypes.c_char_p)
 
+        print("WARNING: this is not designed to load multiple fasta!")
+
+        print("Loading Fasta File", fastaPath)
         lib.AlignmentStatistics_load_fasta(self.obj, charStr)
 
     def processFiles(self, vals):
@@ -160,7 +165,9 @@ class CAlignmentStatistics(object):
         for x in vals:
             reader = pysam.Samfile(x.name, "rb", check_sq=False)
             samHeader = reader.header
-            sam2header[x.name] = samHeader
+
+            sam2header[x.name] = samHeader.to_dict()
+            print(samHeader.to_dict())
 
 
         vals = [x.name.encode('utf-8') for x in vals]
@@ -178,7 +185,7 @@ class CAlignmentStatistics(object):
 
         allElems = [x for x in s.contents]
 
-        print("Processing C Results")
+        print("Processing C++ Results")
 
         readResults = {}
 
@@ -263,6 +270,10 @@ class CAlignmentStatistics(object):
 
             substCounter = Counter()
             for x in ntSubst:
+                #print(x)
+                #print(x.src, chr(x.src))
+                #print(x.tgt, chr(x.tgt))
+                #print(x.count)
                 substCounter[(x.src.decode(), x.tgt.decode())] = x.count
 
 
@@ -289,7 +300,7 @@ class CAlignmentStatistics(object):
 
             readResults[readStat.read_id] = readStat
 
-
+        print("Finished C++ Results", len(readResults), len(sam2header))
 
         return readResults, sam2header
 
@@ -314,7 +325,7 @@ class AlignmentStatisticAnalysisFactory(PSToolInterfaceFactory):
         parser.add_argument('--errork', dest="errork", nargs=1, type=int, default=5, required=False)
         parser.add_argument('--perfectk', dest="perfectk", nargs=1, type=int, default=21, required=False)
 
-        parser.add_argument('-q', '--read-type', nargs='+', dest='read_type', action=Fast5TYPEAction, default=None)
+        #parser.add_argument('-q', '--read-type', nargs='+', dest='read_type', action=Fast5TYPEAction, default=None)
         parser.add_argument('-v', '--violin', dest='violin', action='store_true', default=False)
 
         parser.add_argument('-o', '--output', type=FolderType('w'), help='output folder for report', required=True)
@@ -417,12 +428,26 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
         return gcCount / len(readSeq)
 
+    def getRead2Type(self):
+        
+        r2t = {}
+
+        if self.hasArgument('read_info', self.args) and self.args.readInfo:
+            idIdx = self.args.readInfo.getColumnIndex("READ_ID")
+            typeIdx = self.args.readInfo.getColumnIndex("TYPE")
+
+            for row in self.args.readInfo.data:
+                r2t[ row[idIdx] ] = row[typeIdx]
+
+
+        return r2t
+
 
     def getReadInfo(self, readName):
 
-        if self.hasArgument('read_type', self.args) and self.args.read_type:
+        if self.hasArgument('read_info', self.args) and self.args.readInfo:
 
-            readInfo = self.args.readInfo.findRow('SAM_READ_NAME', readName)
+            readInfo = self.args.readInfo.findRow('READ_ID', readName)
             if readInfo != None:
                 readType = Fast5TYPE[ readInfo[ "TYPE" ] ]
                 readID = readInfo[ "READ_ID" ]
@@ -439,6 +464,21 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
         self.genomicArray[HTSeq.GenomicInterval( chrom, start, end, "." )] += 1
 
+    def joinParallel(self, existResult, newResult, oEnvironment):
+
+        print("Joining Results")
+        
+        if existResult is None:
+            existResult = {"align": {}, "sam2header": {}}
+
+        alignRes = newResult[0]
+        sam2hRes = newResult[1]
+
+        existResult["align"].update(alignRes)
+        existResult["sam2header"].update(sam2hRes)
+
+        return existResult
+
 
     def execParallel(self, data, environment):
         """
@@ -454,30 +494,51 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
 
         alignResults = {}
-
-        self.sam2header = {}
+        sam2HeaderResults = {}
 
         for samFile in data:
-            print("Processing samFile", samFile)
+            print("Processing samFile", samFile.name)
             readStats, sam2header = statMaker.processFiles([samFile])
-            for x in sam2header:
-                self.sam2header[x] = sam2header[x]
             print("Received data", len(readStats))
 
-            for readID in readStats:
-                readStats[readID].read_type, _ = self.getReadInfo(readID)
+            for x in sam2header:
+                sam2HeaderResults[x] = sam2header[x]
+
+            print("Applying Read Info")
+            readId2Type = self.getRead2Type()
+            for rid,readID in enumerate(readStats):
+                if rid % 100000 == 0:
+                    print("Processing read", rid)
+                readStats[readID].read_type = readId2Type.get(readID, "Unknown")
+
+            print("got", len(readStats), "readstats")
+            print("Finished Processing", samFile.name)
+            alignResults[samFile.name] = readStats
 
 
-            print("Finished Processing", samFile)
-            alignResults[samFile] = readStats
+        return {"align": alignResults, "sam2header": sam2HeaderResults}
 
 
-        return alignResults
+    def exec(self):
+
+        iStart = time.time()
+        inputs = self.prepareInputs(self.args)
+        iEnd = time.time()
+        eprint("Preparing Inputs: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd - iStart))))
+
+        print(inputs)
+        environment = self.prepareEnvironment(self.args)
+        llResults = self.execParallel(inputs, environment)
+        iEnd = time.time()
+        eprint("Exec Parallel: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd - iStart))))
+
+        self.makeResults(llResults, None, self.args)
+        iEnd = time.time()
+        eprint("Results Time: " + str(time.strftime('%H:%M:%S [HH:MM:SS]', time.gmtime(iEnd-iStart))))
 
 
     def getSeqNameFromId(self, samFileName, seqid):
-
-        return self.sam2header[samFileName].get_reference_name(seqid)
+        return self.sam2header[samFileName]["SQ"][seqid]["SN"]
 
 
     @classmethod
@@ -485,16 +546,17 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
         return sum(elems) / len(elems)
 
-    def makeResults(self, allFilesResult, oEnvironment, args):
+    def makeResults(self, alignSam2HRes, oEnvironment, args):
         """
-
-
-
         :param allFilesResult:
         :param oEnvironment:
         :param args:
         :return:
         """
+
+        allFilesResult = alignSam2HRes["align"]
+        self.sam2header = alignSam2HRes["sam2header"]
+
 
         print("Preparing results")
 
@@ -572,7 +634,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
 
 
-            args.pltcfg.addHTMLPlot("<h2>" + str(fileName.name) + "</h2>\n")
+            args.pltcfg.addHTMLPlot("<h2>" + str(fileName) + "</h2>\n")
             args.pltcfg.addHTMLPlot("<h3>All Reads Overview</h3>\n")
 
             allReads = allFilesResult[fileName]
@@ -586,12 +648,13 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 elem = allReads[x]
 
                 if elem.aligned == True:
+
                     allAlignedReads[x] = elem
                     alignedIDs.add(elem.read_id)
 
                     for cov in elem.coverages:
 
-                        covChr = self.getSeqNameFromId(fileName.name, cov.seqid)
+                        covChr = self.getSeqNameFromId(fileName, cov.seqid)
 
                         if not covChr in readCoverage.chrom_vectors:
                             readCoverage.add_chrom(covChr)
@@ -634,7 +697,9 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
             plotDict = {'All Reads': plotDataDict}
 
-            PorePlot.plotBars(plotDict, fileName.name + ": Alignment Result", "", "Count", pltcfg=args.pltcfg)
+            print("Reads by status", plotDataDict)
+
+            PorePlot.plotBars(plotDict, fileName + ": Alignment Result", "", "Count", pltcfg=args.pltcfg)
 
             overviewByAligned = defaultdict(Counter)
 
@@ -658,11 +723,11 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             print(overviewByAligned)
 
             if len(overviewByAligned) > 0:
-                PorePlot.plotBars(overviewByAligned, fileName.name + ": Alignment Result By Type", "", "Count", pltcfg=args.pltcfg)
+                PorePlot.plotBars(overviewByAligned, fileName + ": Alignment Result By Type", "", "Count", pltcfg=args.pltcfg)
 
+            #kmerCounter = defaultdict(lambda: Counter())
 
             totalCounter = defaultdict(list)
-            kmerCounter = defaultdict(lambda: Counter())
             perfectCounter = Counter()
 
             allReadInfos = defaultdict(list)
@@ -670,9 +735,30 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
             ntSubstitutions = Counter()
 
-            for x in allReads:
+            alignedIdx = 0
+            
+            allReadInfos['READ_IDENTITY'] = [(None, None)] * len(alignedIDs)
+            allReadInfos['ALIGNMENT_IDENTITY'] = [(None, None)] * len(alignedIDs)
+            allReadInfos['MATCHED_LONGEST_LENGTH'] = [(None, None)] * len(alignedIDs)
+            allReadInfos['READ_MATCHED_GC_CONTENT'] = [(None, None)] * len(alignedIDs)
+            allReadInfos['REF_MATCHED_GC_CONTENT'] = [(None, None)] * len(alignedIDs)
+            allReadInfos['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH'] = [(None, None)] * len(alignedIDs)
+            allReadInfos['REF_MATCHED_GC_CONTENT_TO_READ_LENGTH'] = [(None, None)] * len(alignedIDs)
+
+            allReadInfos['READ_ALIGN_QUAL_TO_READ_LENGTH'] = [(None, None)] * len(alignedIDs)
+            allReadInfos['SEQ_QUAL_MIN_TO_READ_LENGTH'] = [(None, None)] * len(alignedIDs)
+            allReadInfos['READ_ALIGN_QUAL_TO_SEQ_QUAL_MIN'] = [(None, None)] * len(alignedIDs)
+            allReadInfos['READ_ALIGN_QUAL_TO_SEQ_QUAL_MEAN'] = [(None, None)] * len(alignedIDs)
+            
+            for ridx, x in enumerate(allReads):
+
+                if ridx % 100000 == 0:
+                    print("Processing Read", ridx)
 
                 elem = allReads[x]
+
+                if not elem.aligned:
+                    continue
 
 
                 """
@@ -684,26 +770,25 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 }
                 """
 
-                allReadInfos['READ_IDENTITY'].append((elem.read_identity, elem.read_length))
-                allReadInfos['ALIGNMENT_IDENTITY'].append((elem.ref_identity, elem.read_length))
-                allReadInfos['MATCHED_LONGEST_LENGTH'].append(elem.longest_matched_stretch)
+                allReadInfos['READ_IDENTITY'][alignedIdx] = (elem.read_identity, elem.read_length)
+                allReadInfos['ALIGNMENT_IDENTITY'][alignedIdx] = (elem.ref_identity, elem.read_length)
+                allReadInfos['MATCHED_LONGEST_LENGTH'][alignedIdx] = elem.longest_matched_stretch
 
-                allReadInfos['READ_MATCHED_GC_CONTENT'] += [(elem.read_gc, sum(elem.cigar_lengths['M']))]
-                allReadInfos['REF_MATCHED_GC_CONTENT'] += [(elem.ref_gc, sum(elem.cigar_lengths['M']))]
+                allReadInfos['READ_MATCHED_GC_CONTENT'][alignedIdx] = (elem.read_gc, sum(elem.cigar_lengths['M'])) 
+                allReadInfos['REF_MATCHED_GC_CONTENT'][alignedIdx] = (elem.ref_gc, sum(elem.cigar_lengths['M'])) 
 
 
-                allReadInfos['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH'].append( ( elem.read_gc  , elem.read_length)  )
-                allReadInfos['REF_MATCHED_GC_CONTENT_TO_READ_LENGTH'].append(  (  elem.ref_gc, elem.ref_length)    )
+                allReadInfos['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH'][alignedIdx] = ( elem.read_gc  , elem.read_length)  
+                allReadInfos['REF_MATCHED_GC_CONTENT_TO_READ_LENGTH'][alignedIdx] = (  elem.ref_gc, elem.ref_length)     
 
                 totalReadBases += elem.read_length
 
-                allReadInfos['READ_ALIGN_QUAL_TO_READ_LENGTH'].append(  (elem.align_quality, elem.read_length) )
-                allReadInfos['SEQ_QUAL_MIN_TO_READ_LENGTH'].append(     (elem.seqqual_min, elem.read_length))
-                allReadInfos['READ_ALIGN_QUAL_TO_SEQ_QUAL_MIN'].append( (elem.align_quality, elem.seqqual_min) )
-                allReadInfos['READ_ALIGN_QUAL_TO_SEQ_QUAL_MEAN'].append(
-                    (elem.align_quality, elem.seqqual_median))
+                allReadInfos['READ_ALIGN_QUAL_TO_READ_LENGTH'][alignedIdx] = (elem.align_quality, elem.read_length)   
+                allReadInfos['SEQ_QUAL_MIN_TO_READ_LENGTH'][alignedIdx] = (elem.seqqual_min, elem.read_length)     
+                allReadInfos['READ_ALIGN_QUAL_TO_SEQ_QUAL_MIN'][alignedIdx] = (elem.align_quality, elem.seqqual_min)   
+                allReadInfos['READ_ALIGN_QUAL_TO_SEQ_QUAL_MEAN'][alignedIdx] = (elem.align_quality, elem.seqqual_median)
 
-                perfectCounter += elem.perfect_kmers
+                perfectCounter.update(elem.perfect_kmers)
 
                 for cl in elem.cigar_lengths:
                     totalCounter[cl] += elem.cigar_lengths[cl]
@@ -711,8 +796,11 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 #for x in elem.perfect_kmers:
                 #    kmerCounter[x] += elem.perfect_kmers[x]
 
-                for mm in elem.nt_substitutions:
-                    ntSubstitutions[mm] += elem.nt_substitutions[mm]
+                ntSubstitutions.update(elem.nt_substitutions)
+                #for mm in elem.nt_substitutions:
+                #    ntSubstitutions[mm] += elem.nt_substitutions[mm]
+
+                alignedIdx += 1
 
 
             overallIdentity = (sum(totalCounter["E"]) / totalReadBases) * 100
@@ -883,10 +971,10 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
 
 
-            if self.hasArgument('read_type', args) and args.read_type:
+            if self.hasArgument('read_info', args) and args.readInfo:
 
                 obsInfo = {
-                    'RUNID': fileName.name + "_perfect",
+                    'RUNID': fileName + "_perfect",
                     'USER_RUN_NAME': "perfect",
                     'KMERCOUNTS': perfectCounter
                 }
@@ -895,11 +983,11 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 kmerDF.setTitle("<h3>k-mer histogram: perfectly aligned (k={})</h3>".format(args.perfectk))
                 args.pltcfg.makeTable(kmerDF)
 
-
+                """
                 for evtype in kmerCounter:
 
                     obsInfo = {
-                        'RUNID': fileName.name + "_" + str(evtype),
+                        'RUNID': fileName + "_" + str(evtype),
                         'USER_RUN_NAME': evtype,
                         'KMERCOUNTS': kmerCounter[evtype]
                     }
@@ -907,6 +995,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     kmerDF = KmerHistogram.dfSummary(obsInfo, args.mc)
                     kmerDF.setTitle("<h3>k-mer histogram: sequence before CIGAR " + evtype + " (k={})</h3>".format(args.errork))
                     args.pltcfg.makeTable(kmerDF)
+                """
 
 
 
@@ -977,44 +1066,80 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
             allReadInfos = defaultdict(lambda: defaultdict(list))
 
-            totalReadBases = Counter()
+            allReadTypes = set()
+            alignedByReadType = Counter()
+            for ridx, x in enumerate(allReads):
 
-            for x in allReads:
+                if ridx % 100000 == 0:
+                    print("Precalculating by Read Type; Processing Read", ridx)
 
                 elem = allReads[x]
+                readType = str(elem.read_type)
+                allReadTypes.add(readType)
+
+                if elem.aligned:
+                    alignedByReadType[readType] += 1
+
+
+            for readType in allReadTypes:
+
+                allReadInfos[readType]['READ_IDENTITY'] = [(None, None)] * (alignedByReadType[readType])
+                allReadInfos[readType]['ALIGNMENT_IDENTITY'] = [(None, None)] * (alignedByReadType[readType])
+                allReadInfos[readType]['MATCHED_LONGEST_LENGTH'] = [(None, None)] * (alignedByReadType[readType])
+                allReadInfos[readType]['READ_MATCHED_GC_CONTENT'] = [(None, None)] * (alignedByReadType[readType])
+                allReadInfos[readType]['REF_MATCHED_GC_CONTENT'] = [(None, None)] * (alignedByReadType[readType])
+                allReadInfos[readType]['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH'] = [(None, None)] * (alignedByReadType[readType])
+                allReadInfos[readType]['REF_MATCHED_GC_CONTENT_TO_READ_LENGTH'] = [(None, None)] * (alignedByReadType[readType])
+
+                allReadInfos[readType]['READ_ALIGN_QUAL_TO_READ_LENGTH'] = [(None, None)] * (alignedByReadType[readType])
+                allReadInfos[readType]['SEQ_QUAL_MIN_TO_READ_LENGTH'] = [(None, None)] * (alignedByReadType[readType])
+                allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MIN'] = [(None, None)] * (alignedByReadType[readType])
+                allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MEAN'] = [(None, None)] * (alignedByReadType[readType])
+
+
+            totalReadBases = Counter()
+
+            alignedIdx = Counter()
+
+            for ridx, x in enumerate(allReads):
+
+                if ridx % 100000 == 0:
+                    print("Processing Read", ridx)
+
+                elem = allReads[x]
+
+                if not elem.aligned:
+                    continue
+
                 readType = str(elem.read_type)
 
                 #allReadInfos[readType] = mergeDicts(allReadInfos[readType], allReadInfo)
 
-                allReadInfos[readType]['READ_IDENTITY'].append((elem.read_identity, elem.read_length))
-                allReadInfos[readType]['ALIGNMENT_IDENTITY'].append((elem.ref_identity, elem.read_length))
+                allReadInfos[readType]['READ_IDENTITY'][alignedIdx[readType]] = (elem.read_identity, elem.read_length)
+                allReadInfos[readType]['ALIGNMENT_IDENTITY'][alignedIdx[readType]] = (elem.ref_identity, elem.read_length)
 
                 totalReadBases[readType] += elem.read_length
 
-                allReadInfos[readType]['READ_MATCHED_GC_CONTENT'] += [(elem.read_gc, sum(elem.cigar_lengths['M']))]
-                allReadInfos[readType]['REF_MATCHED_GC_CONTENT'] += [(elem.ref_gc, sum(elem.cigar_lengths['M']))]
+                allReadInfos[readType]['READ_MATCHED_GC_CONTENT'][alignedIdx[readType]] = (elem.read_gc, sum(elem.cigar_lengths['M']))
+                allReadInfos[readType]['REF_MATCHED_GC_CONTENT'][alignedIdx[readType]] = (elem.ref_gc, sum(elem.cigar_lengths['M']))
 
-                allReadInfos[readType]['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH'].append(( elem.read_gc  , elem.read_length))
-                allReadInfos[readType]['REF_MATCHED_GC_CONTENT_TO_READ_LENGTH'].append(( elem.ref_gc  , elem.ref_length))
+                allReadInfos[readType]['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH'][alignedIdx[readType]] = ( elem.read_gc  , elem.read_length)
+                allReadInfos[readType]['REF_MATCHED_GC_CONTENT_TO_READ_LENGTH'][alignedIdx[readType]] = ( elem.ref_gc  , elem.ref_length)
 
-                allReadInfos[readType]['READ_ALIGN_QUAL_TO_READ_LENGTH'].append(
-                    (elem.align_quality, elem.read_length))
-                allReadInfos[readType]['SEQ_QUAL_MIN_TO_READ_LENGTH'].append(
-                    (elem.seqqual_min, elem.read_length))
-                allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MIN'].append(
-                    (elem.align_quality, elem.seqqual_min))
+                allReadInfos[readType]['READ_ALIGN_QUAL_TO_READ_LENGTH'][alignedIdx[readType]] = (elem.align_quality, elem.read_length)
+                allReadInfos[readType]['SEQ_QUAL_MIN_TO_READ_LENGTH'][alignedIdx[readType]] = (elem.seqqual_min, elem.read_length)
+                allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MIN'][alignedIdx[readType]] = (elem.align_quality, elem.seqqual_min)
 
-                allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MEAN'].append(
-                    (elem.align_quality, elem.seqqual_median))
+                allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MEAN'][alignedIdx[readType]] = (elem.align_quality, elem.seqqual_median)
 
+                alignedIdx[readType] += 1
 
-                perfectCounter[readType] += elem.perfect_kmers
+                perfectCounter[readType].update(elem.perfect_kmers)
 
                 for cl in elem.cigar_lengths:
                     totalCounter[readType][cl] += elem.cigar_lengths[cl]
 
-                for mmk in elem.mm2kmer:
-                    kmersByReadType[readType][mmk] += elem.mm2kmer[mmk]
+                kmersByReadType[readType].update(elem.mm2kmer)
 
                 #for x in elem.nt_substitutions:
                 #    ntSubstitutions[read_type][x] += elem.nt_substitutions[x]
@@ -1022,8 +1147,8 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             print(sum([allReads[x].read_length for x in allReads if
                  allReads[x].aligned and allReads[x].read_type == Fast5TYPE.BASECALL_2D]))
 
-            for x in totalReadBases:
-                print(x, totalReadBases[x])
+            for readType in totalReadBases:
+                print(readType, totalReadBases[x])
 
             for readType in totalCounter:
 
@@ -1035,7 +1160,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     continue
 
                 obsInfo = {
-                    'RUNID': fileName.name + "_" + str(readType) + "_perfect",
+                    'RUNID': fileName + "_" + str(readType) + "_perfect",
                     'USER_RUN_NAME': "perfect",
                     'KMERCOUNTS': perfectCounter[readType]
                 }
@@ -1048,7 +1173,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     print(rtype)
 
                     obsInfo = {
-                        'RUNID': fileName.name + "_" + str(readType) + "_" + str(rtype),
+                        'RUNID': fileName + "_" + str(readType) + "_" + str(rtype),
                         'USER_RUN_NAME': rtype,
                         'KMERCOUNTS': kmersByReadType[readType][rtype]
                     }
@@ -1110,46 +1235,46 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                 READ IDENTITY, ALIGNMENT IDENTITY, MATCHED GC CONTENT, MAX MATCHED PART
                 """
 
-                xReadID = [x[0] for x in allReadInfos[readType]['READ_IDENTITY']]
-                yReadID = [x[1] for x in allReadInfos[readType]['READ_IDENTITY']]
+                xReadID = [x[0] for x in allReadInfos[readType]['READ_IDENTITY'] if not None in x]
+                yReadID = [x[1] for x in allReadInfos[readType]['READ_IDENTITY'] if not None in x]
                 PorePlot.plot_scatter_densities(xReadID, yReadID, "Read Identity vs Read Length ({})".format(str(readType)), "Read Identity", "Read Length [bp]", pltcfg=args.pltcfg)
 
-                xReadID = [x[0] for x in allReadInfos[readType]['ALIGNMENT_IDENTITY']]
-                yReadID = [x[1] for x in allReadInfos[readType]['ALIGNMENT_IDENTITY']]
+                xReadID = [x[0] for x in allReadInfos[readType]['ALIGNMENT_IDENTITY'] if not None in x]
+                yReadID = [x[1] for x in allReadInfos[readType]['ALIGNMENT_IDENTITY'] if not None in x]
                 PorePlot.plot_scatter_densities(xReadID, yReadID, "Alignment Identity vs Alignment Length  ({})".format(str(readType)), "Alignment Identity", "Alignment Length [bp]", pltcfg=args.pltcfg)
 
-                xReadID = [x[0] for x in allReadInfos[readType]['READ_MATCHED_GC_CONTENT']]
-                yReadID = [x[1] for x in allReadInfos[readType]['READ_MATCHED_GC_CONTENT']]
+                xReadID = [x[0] for x in allReadInfos[readType]['READ_MATCHED_GC_CONTENT'] if not None in x]
+                yReadID = [x[1] for x in allReadInfos[readType]['READ_MATCHED_GC_CONTENT'] if not None in x]
                 PorePlot.plot_scatter_densities(xReadID, yReadID, "Read Matched GC Content vs Aligned Seq Length ({})".format(str(readType)), "GC Content", "Aligned Sequence Length [bp]", pltcfg=args.pltcfg)
 
-                xReadID = [x[0] for x in allReadInfos[readType]['REF_MATCHED_GC_CONTENT']]
-                yReadID = [x[1] for x in allReadInfos[readType]['REF_MATCHED_GC_CONTENT']]
+                xReadID = [x[0] for x in allReadInfos[readType]['REF_MATCHED_GC_CONTENT'] if not None in x]
+                yReadID = [x[1] for x in allReadInfos[readType]['REF_MATCHED_GC_CONTENT'] if not None in x]
                 PorePlot.plot_scatter_densities(xReadID, yReadID, "Reference Matched GC Content vs Aligned Seq Length ({})".format(str(readType)), "GC Content", "Aligned Sequence Length [bp]", pltcfg=args.pltcfg)
 
-                xReadID = [x[0] for x in allReadInfos[readType]['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH']]
-                yReadID = [x[1] for x in allReadInfos[readType]['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH']]
+                xReadID = [x[0] for x in allReadInfos[readType]['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH'] if not None in x]
+                yReadID = [x[1] for x in allReadInfos[readType]['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH'] if not None in x]
                 PorePlot.plot_scatter_densities(xReadID, yReadID, "Read Matched GC Content vs Read Length ({})".format(str(readType)), "GC Content", "Read Length [bp]", pltcfg=args.pltcfg)
 
-                xReadID = [x[0] for x in allReadInfos[readType]['REF_MATCHED_GC_CONTENT_TO_READ_LENGTH']]
-                yReadID = [x[1] for x in allReadInfos[readType]['REF_MATCHED_GC_CONTENT_TO_READ_LENGTH']]
+                xReadID = [x[0] for x in allReadInfos[readType]['REF_MATCHED_GC_CONTENT_TO_READ_LENGTH'] if not None in x]
+                yReadID = [x[1] for x in allReadInfos[readType]['REF_MATCHED_GC_CONTENT_TO_READ_LENGTH'] if not None in x]
                 PorePlot.plot_scatter_densities(xReadID, yReadID, "Reference Matched GC Content vs Read Length ({})".format(str(readType)), "GC Content", "Read Length [bp]", pltcfg=args.pltcfg)
 
-                xReadID = [x[0] for x in allReadInfos[readType]['READ_ALIGN_QUAL_TO_READ_LENGTH']]
-                yReadID = [x[1] for x in allReadInfos[readType]['READ_ALIGN_QUAL_TO_READ_LENGTH']]
+                xReadID = [x[0] for x in allReadInfos[readType]['READ_ALIGN_QUAL_TO_READ_LENGTH'] if not None in x]
+                yReadID = [x[1] for x in allReadInfos[readType]['READ_ALIGN_QUAL_TO_READ_LENGTH'] if not None in x]
                 PorePlot.plot_scatter_densities(xReadID, yReadID, "Read Align Quality vs Read Length ({})".format(str(readType)), "Read Align Quality", "Read Lenght [bp]", pltcfg=args.pltcfg)
 
-                xReadID = [x[0] for x in allReadInfos[readType]['SEQ_QUAL_MIN_TO_READ_LENGTH']]
-                yReadID = [x[1] for x in allReadInfos[readType]['SEQ_QUAL_MIN_TO_READ_LENGTH']]
+                xReadID = [x[0] for x in allReadInfos[readType]['SEQ_QUAL_MIN_TO_READ_LENGTH'] if not None in x]
+                yReadID = [x[1] for x in allReadInfos[readType]['SEQ_QUAL_MIN_TO_READ_LENGTH'] if not None in x]
                 PorePlot.plot_scatter_densities(xReadID, yReadID, "Minimum Sequence Quality vs Read Length (min value of read, {})".format(str(readType)), "Minimum Sequence Quality", "Read Length [bp]", pltcfg=args.pltcfg)
 
 
-                xReadID = [x[0] for x in allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MIN']]
-                yReadID = [x[1] for x in allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MIN']]
+                xReadID = [x[0] for x in allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MIN'] if not None in x]
+                yReadID = [x[1] for x in allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MIN'] if not None in x]
                 PorePlot.plot_scatter_densities(xReadID, yReadID, "Alignment Quality vs Minimum Sequence Quality ({})".format(str(readType)), "Alignment Quality", "Sequence Quality (min value of read)", pltcfg=args.pltcfg)
 
 
-                xReadID = [x[0] for x in allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MEAN']]
-                yReadID = [x[1] for x in allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MEAN']]
+                xReadID = [x[0] for x in allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MEAN'] if not None in x]
+                yReadID = [x[1] for x in allReadInfos[readType]['READ_ALIGN_QUAL_TO_SEQ_QUAL_MEAN'] if not None in x]
                 PorePlot.plot_scatter_densities(xReadID, yReadID, "Alignment Quality vs Mean Sequence Quality", "Alignment Quality", "Sequence Quality (mean value of read)", pltcfg=args.pltcfg)
 
 

@@ -37,7 +37,7 @@ class MapReduce:
 
                     else:
 
-                        if resultObj == None:
+                        if resultObj is None:
                             resultObj = []
 
                         resultObj.append(result)

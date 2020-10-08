@@ -52,6 +52,7 @@ public:
 
         m_pIndexToPosition = new std::map<std::string, size_t>();
         m_pIndexToSeqLength = new std::map<std::string, size_t>();
+        m_pSequences = new std::map<std::string, std::string>();
 
 
         if (pIndexFile == NULL)
@@ -80,6 +81,36 @@ public:
 
         SAFEDEL(m_pIndexToSeqLength)
         SAFEDEL(m_pIndexToPosition)
+        SAFEDEL(m_pSequences)
+
+    }
+
+    void loadAllSequences()
+    {
+        std::vector<std::string>* pLines = Utils::readByLine( m_pIndexFile );
+
+        std::cout << "Fasta Index File" << pLines->size() << std::endl;
+
+        for (uint32_t i = 0; i < pLines->size(); ++i)
+        {
+
+            std::vector<std::string> vLineContent = StringUtils::split(pLines->at(i), '\t');
+
+            if (vLineContent.size() != 5)
+                continue;
+
+            std::string sIndex = vLineContent.at(0);
+            size_t iSeqStart = std::stoul(vLineContent[2]);
+            size_t iSeqLength = std::stoul(vLineContent[1]);
+            
+            std::string sSeq = this->retrieveSequence(iSeqStart,0, iSeqLength);
+
+            std::pair<std::string, std::string> oSeq( sIndex, sSeq );
+            m_pSequences->insert(oSeq);
+
+
+
+        }
 
     }
 
@@ -290,6 +321,8 @@ protected:
 
     std::map<std::string, size_t>* m_pIndexToPosition;
     std::map<std::string, size_t>* m_pIndexToSeqLength;
+
+    std::map<std::string, std::string>* m_pSequences;
 
 
 };

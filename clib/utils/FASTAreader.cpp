@@ -71,7 +71,7 @@ void FASTAreader::parseIndexFile() {
 
     std::vector<std::string>* pLines = Utils::readByLine( m_pIndexFile );
 
-    std::cout << pLines->size() << std::endl;
+    std::cout << "Fasta Index File" << pLines->size() << std::endl;
 
     uint32_t iLineLength = 0;
 
@@ -93,11 +93,9 @@ void FASTAreader::parseIndexFile() {
 
         std::pair<std::string, size_t> oSeqLength(sIndex, iSeqLength);
         m_pIndexToSeqLength->insert(oSeqLength);
-
     }
 
     this->setLineLength(iLineLength);
-
 }
 
 std::string *FASTAreader::readFromFile(size_t iPositionInFile, size_t iChars) {
@@ -138,11 +136,21 @@ std::string *FASTAreader::readFromFile(size_t iPositionInFile, size_t iChars) {
     free(aBuffer);
     fclose ( pFile );
 
+    std::replace( pReturn->begin(), pReturn->end(), 'U', 'T');
+    std::replace( pReturn->begin(), pReturn->end(), 'u', 't');
+
     return pReturn;
 
 }
 
 std::string FASTAreader::retrieveSequence(GenomicRegion* pRegion, std::string& sChromIdentifier) {
+
+    if (this->m_pSequences->size() > 0)
+    {
+        std::string sSeq = this->m_pSequences->find(sChromIdentifier)->second;
+        return sSeq.substr(pRegion->getStart()-1, pRegion->getLength());
+    }
+
 
     size_t iFileStart = this->getPosition( &sChromIdentifier );
 

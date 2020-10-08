@@ -133,7 +133,6 @@ class ReportAnalysis(ParallelAlignmentPSTReportableInterface):
         globalEnv = envs[1]
         localEnv = envs[2]
 
-
         for samReadAlignment in stringReads:
 
             aln = pysam.AlignedSegment.fromstring(str, samReadAlignment, samHeader)
