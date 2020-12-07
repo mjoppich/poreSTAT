@@ -89,10 +89,6 @@ if __name__ == '__main__':
                             cond12count = 0.1
 
                         rowfc = math.log2(cond11count/cond12count)
-
-                        if "Geneid" in row and row['Geneid'] == 'ENSMUSG00000002944':
-                            print(sconditions[i], sconditions[j], rowfc)
-
                         cond1counts.append(rowfc)
 
                     plt.hist(cond1counts, bins=len(cond1counts), label=sconditions[i] + " vs " + sconditions[j]  + " (n="+str(len(cond1counts))+")", density=True, cumulative=True, histtype="step")

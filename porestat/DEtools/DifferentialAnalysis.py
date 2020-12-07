@@ -12,6 +12,7 @@ from multiprocessing import Pool
 
 sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../")
 
+from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 from porestat.utils.OrderedDefaultDictClass import OrderedDefaultDict
 
 
@@ -264,8 +265,8 @@ if __name__ == '__main__':
 
     parser.add_argument('-pc', '--prefix-counts', dest="prefix_counts", action='store_true', default=False, help="run FC part")
 
-    parser.add_argument('-e', '--enhance', type=argparse.FileType('r'), help='enhancement file', default=open("/mnt/d/dev/data/genomes/ensembl.symbol.mouse.list", "r"))
-    parser.add_argument('-l', '--lengths', type=argparse.FileType('r'), help='lengths file', default=open("/mnt/d/dev/data/genomes/ensembl.symbol.mouse.lengths.list", "r"))
+    parser.add_argument('-e', '--enhance', type=argparse.FileType('r'), help='enhancement file', default=None)
+    parser.add_argument('-l', '--lengths', type=argparse.FileType('r'), help='lengths file', default=None)
 
     parser.add_argument('-m', '--de_methods', nargs='+', type=str, help="differential methods for analysis. If combination, write DESeq;msEmpiRe")
     parser.add_argument('-em', '--enrich-methods', nargs='+', type=str, default=None, required=False,
@@ -277,17 +278,24 @@ if __name__ == '__main__':
     parser.add_argument('-ap', '--additional_de_prefix', nargs='+', type=str, default=[])
     parser.add_argument('-am', '--additional_de_method', nargs='+', type=str, default=[])
 
-
+    parser.add_argument('-rd', '--run-david', action='store_true', default=False, help="only if true david analysis is performed.")
 
 
     parser.add_argument('-cnp', '--condition-no-path', dest='condition_no_path', action='store_true', default=False)
     parser.add_argument('-sn', '--synthetic-names', dest='synthetic_names', action='store_true', default=False)
+    parser.add_argument('-anc', '--use-only-existant-conds', dest='use_only_existant_conds', action='store_true', default=False)
 
     parser.add_argument('-r', '--report', type=argparse.FileType('w'), required=True, help='report files')
 
     parser.add_argument('--parallel', type=int, required=False, default=4)
 
     args = parser.parse_args()
+
+    if args.enhance == None:
+        args.enhance = open("/mnt/d/dev/data/genomes/ensembl.symbol.mouse.list", "r")
+
+    if args.lengths == None:
+        args.lengths = open("/mnt/d/dev/data/genomes/ensembl.symbol.mouse.lengths.list", "r")
 
     if args.all:
         args.fold_changes = True
@@ -467,12 +475,40 @@ if __name__ == '__main__':
 
 
 
+    if args.use_only_existant_conds:
+        def to_noempty(x):
+            return (x.encode('ascii', 'ignore')).decode("utf-8")
+
+        def check_counts_conditions(count_matrix, conds1, conds2):
+
+            print("Checking count file", count_matrix.name)
+            print("Looking for conditions 1:", conds1)
+            print("Looking for conditions 2:", conds2)
+
+            indf = DataFrame.parseFromFile(count_matrix.name, skipChar='#', replacements={
+                "None": None,
+                "": None,
+                "NA": None
+            })
+            inHeaders = indf.getHeader()
+
+            conds1 = [to_noempty(x) for x in conds1 if to_noempty(x) in inHeaders]
+            conds2 = [to_noempty(x) for x in conds2 if to_noempty(x) in inHeaders]
+
+            print("Accepted for conditions 1:", conds1)
+            print("Accepted for conditions 2:", conds2)
+
+            return conds1, conds2
+
+
+        for i in range(0, len(args.counts)):
+            args.cond1[i], args.cond2[i] = check_counts_conditions(args.counts[i], args.cond1[i], args.cond2[i])
+    
     cond1RPaths = conditions2rpath(args.cond1)
     cond2RPaths = conditions2rpath(args.cond2)
 
-    print(cond1RPaths)
-    print(cond2RPaths)
-
+    print("cond1RPaths", cond1RPaths)
+    print("cond2RPaths",cond2RPaths)
 
     logging.root.setLevel(logging.DEBUG)
 
@@ -1442,6 +1478,8 @@ if __name__ == '__main__':
 
                 """
 
+                prefix = "combined"
+
                 robustRaw = os.path.join(args.save, args.name + "." + "combined_raw" + "." + "RobustDE" + ".tsv")
                 robustDE = os.path.join(args.save, args.name + "." + "combined" + "." + "RobustDE" + ".tsv")
 
@@ -1499,7 +1537,7 @@ if __name__ == '__main__':
 
                 outputname = os.path.join(args.save, args.name + ".robustness." + "upset")
 
-                sysCall = "python3 {script} --detable {detable} --name {names} --top_n -1 10 100 250 500 1000 --stats {stats} --output {output}".format(
+                sysCall = "python3 {script} --detable {detable} --denames {names} --top_n -1 10 100 250 500 1000 --stats {stats} --output {output}".format(
                     script=os.path.realpath(os.path.join(scriptMain, "robustness", "robustCheckDEAnalysis.py")),
                     detable=" ".join(allMethodsResults),
                     names=" ".join(["\""+x+"\"" for x in allMethodsNames]),
@@ -1563,12 +1601,6 @@ if __name__ == '__main__':
 
                     args.report.write(tableOut + "\n")
                     args.report.flush()
-
-
-
-
-
-
 
 
         if args.enrichment:
@@ -1662,16 +1694,17 @@ if __name__ == '__main__':
 
                     for direction in ["all", "up", "down"]:
 
-                        sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "R_enrich", "runDAVIDAnalysis.R")),
-                            de=deFile,
-                            org=args.organism_name,
-                            dir=direction
-                        )
+                        if args.run_david:
+                            sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
+                                script=os.path.realpath(os.path.join(scriptMain, "R_enrich", "runDAVIDAnalysis.R")),
+                                de=deFile,
+                                org=args.organism_name,
+                                dir=direction
+                            )
 
-                        hasOutfile = len(glob(deFile + ".david." + direction + "*")) > 0
-                        if not args.simulate and (args.update and not hasOutfile):
-                            enrichCalls.append(sysCall)
+                            hasOutfile = len(glob(deFile + ".david." + direction + "*")) > 0
+                            if not args.simulate and (args.update and not hasOutfile):
+                                enrichCalls.append(sysCall)
 
                         sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "R_enrich", "runGOAnalysis.R")),
@@ -1724,6 +1757,9 @@ if __name__ == '__main__':
 
                     totalEnrichCalls += len(enrichCalls)
 
+                    statsLogger.info("Before Processing Enrichment: {} enrichCalls.".format(len(enrichCalls)))
+                    statsLogger.info("Before Processing Enrichment: simulate is .".format(args.simulate))
+
                     if not args.simulate and len(enrichCalls) > 0:
 
                         if not args.no_R:
@@ -1747,7 +1783,9 @@ if __name__ == '__main__':
 
                     deFile = deEnrichFiles[methods][prefix]
 
-                    deEnrichTables[methods]["DAVID"][prefix] = glob(deFile + ".david*.tsv")
+                    if args.run_david:
+                        deEnrichTables[methods]["DAVID"][prefix] = glob(deFile + ".david*.tsv")
+
                     deEnrichTables[methods]["KEGG"][prefix] = glob(deFile + ".kegg*.tsv")
                     deEnrichTables[methods]["REACTOME"][prefix] = glob(deFile + ".reactome*.tsv")
                     deEnrichTables[methods]["GeneOntology (overrepresentation)"][prefix] = glob(deFile + ".GeneOntology*goenrich.tsv")
@@ -1767,7 +1805,11 @@ if __name__ == '__main__':
 
                 for direction in ["all", "up", "down"]:
 
-                    for methodStr, suffixStr in [("david", None), ("kegg", None), ("reactome", None), ("GeneOntology.BP", "goenrich"), ("GeneOntology.CC", "goenrich"), ("GeneOntology.MF", "goenrich"), ("GeneOntology.BP", "gsea"), ("GeneOntology.CC", "gsea"), ("GeneOntology.MF", "gsea"),]:
+                    fileAssocs = [("kegg", None), ("reactome", None), ("GeneOntology.BP", "goenrich"), ("GeneOntology.CC", "goenrich"), ("GeneOntology.MF", "goenrich"), ("GeneOntology.BP", "gsea"), ("GeneOntology.CC", "gsea"), ("GeneOntology.MF", "gsea"),]
+                    if args.run_david:
+                        fileAssocs = [("david", None)] + fileAssocs
+
+                    for methodStr, suffixStr in fileAssocs:
 
                         resFiles = []
                         for deFile in allEnrichFiles:

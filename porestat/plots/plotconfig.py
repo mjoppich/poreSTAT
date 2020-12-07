@@ -5,6 +5,7 @@ from enum import Enum
 import matplotlib.pyplot as plt
 import mpld3
 from mpld3 import plugins
+import re
 
 from porestat.utils.DataFrame import DataFrame, ExportTYPE
 from ..utils.ArgParseExt import FileStubType
@@ -134,8 +135,8 @@ class PlotConfig:
         self.d3js = None
         self.mpld3js=None
 
-        self.d3js = mpld3.getD3js()
-        self.mpld3js = mpld3.getmpld3js(True)
+        self.d3js = self.getD3js()
+        self.mpld3js = self.getmpld3js()
 
         self.createdPlots = []
         self.createdPlotsIDCount = 0
@@ -146,6 +147,12 @@ class PlotConfig:
                     'height': "750px",
                     'width': "50vw"
                 }
+
+    def getmpld3js(self):
+        return "/usr/local/lib/python3.8/dist-packages/mpld3-0.3.1.dev1-py3.8.egg/mpld3/js/mpld3.v0.3.1.dev1.js"
+
+    def getD3js(self):
+        return "/usr/local/lib/python3.8/dist-packages/mpld3-0.3.1.dev1-py3.8.egg/mpld3/js/d3.v3.min.js"        
 
     def __str__(self):
 
@@ -327,8 +334,8 @@ class PlotConfig:
 
 
 
-        d3js = mpld3.getD3js()
-        mpld3js = mpld3.getmpld3js(True)
+        d3js = self.getD3js()
+        mpld3js = self.getmpld3js()
         mathjaxJS = os.path.join(str(os.path.dirname(os.path.realpath(__file__))), "../data/MathJax.js")
         mathjaxSVGJS = os.path.join(str(os.path.dirname(os.path.realpath(__file__))), "../data/MathJaxSVG.js")
 
@@ -360,6 +367,22 @@ class PlotConfig:
                     * {
                         font-family: "Arial", Verdana, sans-serif;
                         }
+
+
+                    /* fixes axes colormap */
+                    .mpld3-axes g {
+                        transform: translate(-501.6px, -52.8px) rotate(180deg) translate(658px, -475px);
+                        transform-origin: 100% 0%
+                    }
+
+                    .mpld3-xgrid {
+                        color: darkgray;
+                    }
+
+                    .mpld3-ygrid {
+                        color: darkgray;
+                    }
+
                     </style>
                         
                     <script type="text/x-mathjax-config">
@@ -390,11 +413,112 @@ class PlotConfig:
                 <body>
                 """.format(mpld3jsURL=outMPLD3JS, d3jsURL=outD3JS, mathjaxURL=outMathJaxJS, mathjaxSVGURL=outMathJaxSVGJS))
 
-            for x in self.createdPlots:
-                htmlFile.write(x + "\n")
+            setAlphaFunc = """
 
+        function set_alphas(d, is_over){
+            for(var i=0; i<d.mpld3_elements.length; i++){
+                var type = d.mpld3_elements[i].constructor.name;
+
+                if(type =="mpld3_Line"){
+                    var current_alpha = d.mpld3_elements[i].props.alpha;
+                    var current_alpha_unsel = current_alpha * alpha_unsel;
+                    var current_alpha_over = current_alpha * alpha_over;
+                    d3.select(d.mpld3_elements[i].path[0][0])
+                        .style("stroke-opacity", is_over ? current_alpha_over :
+                                                (d.visible ? current_alpha : current_alpha_unsel))
+                        .style("stroke-width", is_over ?
+                                alpha_over * d.mpld3_elements[i].props.edgewidth : d.mpld3_elements[i].props.edgewidth);
+                } else if((type=="mpld3_PathCollection")||
+                         (type=="mpld3_Markers")){
+                    var current_alpha = d.mpld3_elements[i].props.alphas[0];
+                    var current_alpha_unsel = current_alpha * alpha_unsel;
+                    var current_alpha_over = current_alpha * alpha_over;
+                    d3.selectAll(d.mpld3_elements[i].pathsobj[0])
+                        .style("stroke-opacity", is_over ? current_alpha_over :
+                                                (d.visible ? current_alpha : current_alpha_unsel))
+                        .style("fill-opacity", is_over ? current_alpha_over :
+                                                (d.visible ? current_alpha : current_alpha_unsel));
+                } else if(type=="mpld3_Path"){
+                    var current_alpha = d.mpld3_elements[i].props.alpha;
+                    var current_alpha_unsel = current_alpha * alpha_unsel;
+                    var current_alpha_over = current_alpha * alpha_over;
+                    d3.select(d.mpld3_elements[i].path._groups[0][0])
+                        .style("stroke-opacity", is_over ? current_alpha_over :
+                                                (d.visible ? current_alpha : current_alpha_unsel))
+                        .style("fill-opacity", is_over ? current_alpha_over :
+                                                (d.visible ? current_alpha : current_alpha_unsel))
+
+                 }else{
+                    console.log(type + " not yet supported");
+                }
+            }
+        };
+
+            """
+
+            getColorFunc = """
+        function get_color(d){
+            var type = d.mpld3_elements[0].constructor.name;
+            var color = "black";
+            if(type =="mpld3_Line"){
+                color = d.mpld3_elements[0].props.edgecolor;
+            } else if((type=="mpld3_PathCollection")||
+                      (type=="mpld3_Markers")){
+                color = d.mpld3_elements[0].props.facecolors[0];
+            } else if(type=="mpld3_Path"){
+                color = d.mpld3_elements[0].props.facecolor;
+            }else{
+                console.log(type + " not yet supported");
+            }
+            return color;
+        };
+            """
+
+            for x in self.createdPlots:
+
+                #print("looking for not yet supported")
+                
+                if False:
+                    # set_alpha
+                    endPos = 0
+                    finalX = ""
+
+                    for m in re.finditer(r"function set_alphas\(d, is_over\)\{", x):
+
+                        funcStart = m.start()
+                        finalX += x[endPos:funcStart]
+
+                        endPos = x.find("};", funcStart)+2
+
+                        finalX += setAlphaFunc
+
+                    finalX += x[endPos:]
+
+
+                    # colors
+                    endPos = 0
+                    finalXX = ""
+
+                    for m in re.finditer(r"function get_color\(d\)\{", finalX):
+
+                        funcStart = m.start()
+                        
+                        finalXX += finalX[endPos:funcStart]
+                        endPos = finalX.find("};", funcStart)+2
+
+                        finalXX += getColorFunc
+
+                    finalXX += finalX[endPos:]
+
+                    finalXX = finalXX.replace('"width": 640.0, "height": 480.0', '"width": 1000.0, "height": 600.0')
+                else:
+                    finalXX = x
+
+                htmlFile.write(finalXX + "\n")
                 htmlFile.flush()
 
             htmlFile.write( "<script type=\"text/javascript\" src=\"{mathjaxSVGURL}\"></script>".format(mathjaxSVGURL=outMathJaxSVGJS))
             htmlFile.write("</body></html>\n")
+
+
 

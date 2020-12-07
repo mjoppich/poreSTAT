@@ -61,6 +61,6 @@ if __name__ == '__main__':
             upIn = from_contents(allFileData)
             plot(upIn, subset_size="auto")
 
-            plt.title("Overlap for {} elements (pval < {}".format(dir, pvalThreshold))
+            plt.title("Overlap for {} elements (pval < {})".format(dir, pvalThreshold))
 
             plt.savefig(outname, bbox_inches="tight")

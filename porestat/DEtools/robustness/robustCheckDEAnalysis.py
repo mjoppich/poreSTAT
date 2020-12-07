@@ -21,14 +21,16 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('-d', '--detable', nargs='+', type=argparse.FileType('r'), required=True, help='DE files')
-    parser.add_argument('-name', '--name', nargs='+', type=str, required=True, help="name for DE files")
+    parser.add_argument('-dn', '--denames', nargs='+', type=str, required=True, help="name for DE files")
     parser.add_argument('-n', '--top_n', type=int, nargs='+', required=False, default=100)
     parser.add_argument('-o', '--output', type=str, required=False, help="output base")
     parser.add_argument('-s', '--stats', type=str, nargs="+", required=False, default=allowedStats)
 
+    print(sys.argv)
+
     args = parser.parse_args()
 
-    if len(args.detable) != len(args.name):
+    if len(args.detable) != len(args.denames):
         print("Mismatch in detable and name lenghts")
         exit(-1)
 
@@ -95,9 +97,6 @@ if __name__ == '__main__':
                             if ePValue > 0.05:
                                 continue
 
-                        if row["id"] == "ENSG00000120885":
-                            print(detableFile.name, row["id"], eValue, ePValue)
-
                         topNIDs.append((eid, eValue))
 
                     except:
@@ -120,14 +119,14 @@ if __name__ == '__main__':
 
                     topNIDs = topNIDs[:topN]
 
-                print(detableFile.name, args.name[didx], compMethod, valColumn, topN, lqCount)
+                print(detableFile.name, args.denames[didx], compMethod, valColumn, topN, lqCount)
 
                 topNID = topN
 
                 if topN == -1:
                     topNID = "all"
 
-                foundRes[topNID][compMethod].append((args.name[didx], topNIDs, lqCount))
+                foundRes[topNID][compMethod].append((args.denames[didx], topNIDs, lqCount))
 
     print("Starting Plotting")
     for topN in foundRes:
@@ -149,9 +148,9 @@ if __name__ == '__main__':
 
             upIn = from_contents(method2genes)
 
-            print(topN, compMethod, "after content")
+            print(topN, compMethod, "after content", [x for x in method2genes], upIn.index.values)
 
-            lvls = set([x for x in upIn.index.levshape])
+            lvls = set([x for x in upIn.index.values])
             print("lvls", lvls)
 
             if len(lvls) <= 2:

@@ -15,7 +15,7 @@ from statsmodels.stats.multitest import multipletests
 from scipy.stats import hypergeom
 sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
-from porestat.DEtools.miRNAUtils import miRNA, miRNAPART, isNumber
+from porestat.DEtools.mirtools.miRNAUtils import miRNA, miRNAPART, isNumber
 from porestat.plots.GraphPlotter import GraphPlot
 
 
@@ -108,7 +108,9 @@ class DataBaseAccessor:
                         hasCanonicalRegEvidence = True
 
                 else:
-                    hasCanonicalRegEvidence = True
+
+                    if not ev.get("data_source", "") in ["DIANA"]:
+                        hasCanonicalRegEvidence = True
 
 
             if hasCanonicalRegEvidence:
@@ -162,7 +164,7 @@ class miRGeneGraph:
                 for mir in allMIRs:
                     if objMir.accept(mir):
                         nodeData = allMIRs.get(mir, None)
-                        # print("Matching", nodeName, "with", mir)
+                        #print("Matching", nodeName, "with", mir)
                         break
 
                 nodeType = "mirna"
@@ -272,9 +274,6 @@ class miRGeneGraph:
 
                 srcData, srcDE = self.findDataForNode(edge[0], edge[0] in genename2mirs)
                 tgtData, tgtDE = self.findDataForNode(edge[1], edge[1] in genename2mirs) # was edge[1], edge[0]
-
-                if "-544" in edge[0] or "-544" in edge[1]:
-                    print("544", edge)
 
                 if srcData != None and tgtData != None:
 
@@ -1888,7 +1887,7 @@ if __name__ == '__main__':
 
         print("DE GENES", len(deGenes))
 
-        REFETCHDATA = False
+        REFETCHDATA = True
 
         mirnaContextDict = {"mirna": [x for x in deMIRs]}
         for x in contextDict:
@@ -1948,47 +1947,6 @@ if __name__ == '__main__':
 
         print("Create Graph")
         mgGraph = mgG.createGraph(mirnaHits, geneHits, genename2mirs)
-
-
-        def extractMiRNAs(graph):
-            allMirs = set()
-            # number of genes for each mirna
-            for node in graph.nodes():
-                nodeData = graph.node[node]["attr_dict"]
-
-                if nodeData["type"] != "mirna":
-                    continue
-
-                allMirs.add(node)
-
-            return allMirs
-
-
-        print("Fetch miRNA Genes")
-        allMiRNAs = extractMiRNAs(mgGraph)
-
-        mirnaUpdateDict = {"mirna": [x for x in allMiRNAs]}
-        for x in contextDict:
-            mirnaUpdateDict[x] = contextDict[x]
-
-        if not REFETCHDATA and os.path.exists(args.output.name + ".mirnaupdate.pickle"):
-            with open(args.output.name + '.mirnaupdate.pickle', 'rb') as f:
-                mirnaHits = pickle.load(f)
-        else:
-            print("Fetching mirnas")
-            print(mirnaUpdateDict)
-
-            mirnaHits = DataBaseAccessor.fetch_mirna_interactions(
-                mirnaUpdateDict,
-                MIRNASTRPARTS=[miRNAPART.MATURE, miRNAPART.ID, miRNAPART.PRECURSOR]
-            )
-
-            with open(args.output.name + '.mirnaupdate.pickle', 'wb') as f:
-                pickle.dump(mirnaHits, f)
-                print("Wrote out mirnafetch")
-
-        print("Update Graph")
-        mgGraph = mgG.createGraph(mirnaHits, None, genename2mirs, graph=mgGraph)
 
         print("Impute Graph")
         mgG.imputeGraph(mgGraph)

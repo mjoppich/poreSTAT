@@ -206,7 +206,7 @@ def main(args):
     if "gene_biotype" in gc:
         exonData.append("gene_biotype")
 
-    exon = gc.ix[idx, exonData] #gene_name
+    exon = gc.loc[idx, exonData] #gene_name
 
     # Convert columns to proper types.
     exon.start = exon.start.astype(int)

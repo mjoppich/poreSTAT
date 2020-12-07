@@ -64,7 +64,7 @@ out.file <- commandArgs()[10]
 
 
 message("Reading data ...")
-eset <- read.eset(exprs.file, pdat.file, fdat.file)
+eset <- readSE(exprs.file, pdat.file, fdat.file)
 
 message("Removing genes with low read count ...")
 #eset <- eset[rowSums(exprs(eset), na.rm = TRUE) > ncol(eset),]

@@ -94,7 +94,7 @@ class ReadCountAnalysis(ParallelPSTInterface):
         self.readGenomeAnnotation(args)
 
         # TODO fix write out not overwriting header ...
-        self.writeLinesToOutput(args.output, "\t".join(['gene', 'coverage', 'coverage_rank', 'read_counts', 'read_counts_rank']) + "\n", mode='w')
+        self.writeLinesToOutput(args.output, "\t".join(['gene', 'coverage', 'coverage_rank', 'primary_read_count', 'primary_read_rank', 'read_counts', 'read_counts_rank']) + "\n", mode='w')
 
 
         return args.sam
@@ -287,6 +287,15 @@ class ReadCountAnalysis(ParallelPSTInterface):
             plotData['read_count'] = [x.read_count for x in parallelResult]
             PorePlot.plotCumHistogram(plotData, [x for x in plotData], 'Read Count Plot', bins=len(parallelResult),
                                       pltcfg=args.pltcfg)
+
+            plotData = Counter()
+            for x in parallelResult:
+                plotData[x.name] = x.read_count
+
+            doPlotData = {"Read Count": {}}
+            for x in plotData.most_common(20):
+                doPlotData["Read Count"][x[0]] =  x[1]
+            PorePlot.plotBars(doPlotData, "Read Counts", "xlabel", "ylabel", xlabelrotation="vertical", pltcfg=args.pltcfg)
 
 
 

@@ -55,7 +55,7 @@ for (rPackage in requiredPackages) {
 
 #message("Loading ", rPackage)
 #suppressWarnings(suppressPackageStartupMessages(library(rPackage)))
-
+set.seed(418)
 
 
 
