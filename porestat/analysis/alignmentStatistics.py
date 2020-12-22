@@ -1,5 +1,5 @@
 import pysam
-
+import numpy as np
 import HTSeq
 import argparse
 import time
@@ -802,11 +802,16 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
                 alignedIdx += 1
 
+            # I = Insertion
+            # D = Deletion
+            # M = Match (either exact or not)
+            # E = Exact Match
+            # Z = Inexact Match
 
             overallIdentity = (sum(totalCounter["E"]) / totalReadBases) * 100
-            alignedIdentity = (sum(totalCounter["E"]) / (sum(totalCounter['E']) + sum(totalCounter['Z']))) * 100
+            alignedMatch = (sum(totalCounter["M"]) / (totalReadBases)) * 100
+            matchedIdentity = (sum(totalCounter["E"]) / sum(totalCounter['M'])) * 100
 
-            alignedIdentity = (sum(totalCounter["E"]) / sum(totalCounter['M'])) * 100
             insertedPerAligned = (sum(totalCounter["I"]) / sum(totalCounter['M'])) * 100
             deletedPerAligned = (sum(totalCounter["D"]) / sum(totalCounter['M'])) * 100
             substitutedPerAligned = (sum(totalCounter["Z"]) / sum(totalCounter['M'])) * 100
@@ -827,7 +832,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
 
 
-                for type in allFeatureArrays:
+                for ftype in allFeatureArrays:
 
                     featureCovered = 0
                     readsCovered = 0
@@ -835,7 +840,7 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     missingChromsInReadCoverage = set()
 
 
-                    fga = allFeatureArrays[type]
+                    fga = allFeatureArrays[ftype]
 
                     for featurePart in fga.steps():
 
@@ -862,12 +867,12 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
                     print("Missing Chromosomes in ReadCoverage:",  missingChromsInReadCoverage)
 
                     featureDF.addRow(DataRow.fromDict({
-                        'Name': 'Featuretype Coverage ({})'.format(type),
+                        'Name': 'Featuretype Coverage ({})'.format(ftype),
                         'Value': fmtStr.format(featureCovered/refLength)
                     }))
 
                     featureDF.addRow(DataRow.fromDict({
-                        'Name': 'Featuretype Covered By Reads ({})'.format(type),
+                        'Name': 'Featuretype Covered By Reads ({})'.format(ftype),
                         'Value': fmtStr.format(readsCovered/featureCovered)
                     }))
 
@@ -907,46 +912,46 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
             statdf.addColumns(['Name', 'Value'])
 
             statdf.addRow(DataRow.fromDict({
-                'Name': 'Overall Identity',
+                'Name': 'Overall Identity (Exact/All)',
                 'Value': fmtStr.format(overallIdentity)
             }))
 
             statdf.addRow(DataRow.fromDict({
-                'Name': 'Aligned Identity',
-                'Value': fmtStr.format(alignedIdentity)
+                'Name': 'Matching Bases (M/All)',
+                'Value': fmtStr.format(alignedMatch)
             }))
 
             statdf.addRow(DataRow.fromDict({
-                'Name': 'Identical bases per 100 aligned bases', # = / M * 100
-                'Value': fmtStr.format(alignedIdentity)
+                'Name': 'Matched Identity/Identical bases per 100 aligned bases (E/M)',
+                'Value': fmtStr.format(matchedIdentity)
             }))
 
             statdf.addRow(DataRow.fromDict({
-                'Name': 'Inserted bases per 100 aligned bases',
+                'Name': 'Inserted bases per 100 aligned bases (I/M)',
                 'Value': fmtStr.format(insertedPerAligned)
             }))
 
             statdf.addRow(DataRow.fromDict({
-                'Name': 'Deleted bases per 100 aligned bases',
+                'Name': 'Deleted bases per 100 aligned bases (D/M)',
                 'Value': fmtStr.format(deletedPerAligned)
             }))
 
             statdf.addRow(DataRow.fromDict({
-                'Name': 'Substituted bases per 100 aligned bases',
+                'Name': 'Substituted bases per 100 aligned bases (Z/M)',
                 'Value': fmtStr.format(substitutedPerAligned)
             }))
 
-            addedGC = sum([x[0]*x[1] for x in allReadInfos['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH']])
-            addedLength = sum([x[1] for x in allReadInfos['READ_MATCHED_GC_CONTENT_TO_READ_LENGTH']])
+            addedGC = sum([x[0]*x[1] for x in allReadInfos['READ_MATCHED_GC_CONTENT']])
+            addedLength = sum([x[1] for x in allReadInfos['READ_MATCHED_GC_CONTENT']])
 
             statdf.addRow(DataRow.fromDict({
-                'Name': 'Avg GC content of Aligned Read Sequence',
-                'Value': fmtStr.format(addedGC/addedLength)
+                'Name': 'Avg GC content of Matched/Aligned Read Sequence',
+                'Value': fmtStr.format(100.0*addedGC/addedLength)
             }))
 
             statdf.addRow(DataRow.fromDict({
                 'Name': 'Avg GC content of Reference Sequence',
-                'Value': fmtStr.format(gcContentRef/refLength)
+                'Value': fmtStr.format(100.0*gcContentRef/refLength)
             }))
 
 
@@ -1010,7 +1015,9 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
                 xReadID = [x[0] for x in allReadInfos['ALIGNMENT_IDENTITY']]
                 yReadID = [x[1] for x in allReadInfos['ALIGNMENT_IDENTITY']]
-                PorePlot.plot_scatter_densities(xReadID, yReadID, "Alignment Identity vs Alignment Length", "Alignment Identity", "Alignment Length [bp]", pltcfg=args.pltcfg)
+                print("Mean Align Identity", np.mean(xReadID), np.median(xReadID))
+                print("Mean Read Length", np.mean(yReadID), np.median(yReadID))
+                PorePlot.plot_scatter_densities(xReadID, yReadID, "Alignment Identity vs Read Length", "Alignment Identity", "Read Length [bp]", pltcfg=args.pltcfg)
 
                 xReadID = [x[0] for x in allReadInfos['READ_MATCHED_GC_CONTENT']]
                 yReadID = [x[1] for x in allReadInfos['READ_MATCHED_GC_CONTENT']]
@@ -1241,7 +1248,9 @@ class AlignmentStatisticAnalysis(ParallelAlignmentPSTReportableInterface):
 
                 xReadID = [x[0] for x in allReadInfos[readType]['ALIGNMENT_IDENTITY'] if not None in x]
                 yReadID = [x[1] for x in allReadInfos[readType]['ALIGNMENT_IDENTITY'] if not None in x]
-                PorePlot.plot_scatter_densities(xReadID, yReadID, "Alignment Identity vs Alignment Length  ({})".format(str(readType)), "Alignment Identity", "Alignment Length [bp]", pltcfg=args.pltcfg)
+                print("Mean Align Identity", np.mean(xReadID), np.median(xReadID))
+                print("Mean Read Length", np.mean(yReadID), np.median(yReadID))
+                PorePlot.plot_scatter_densities(xReadID, yReadID, "Alignment Identity vs Read Length  ({})".format(str(readType)), "Alignment Identity", "Read Length [bp]", pltcfg=args.pltcfg)
 
                 xReadID = [x[0] for x in allReadInfos[readType]['READ_MATCHED_GC_CONTENT'] if not None in x]
                 yReadID = [x[1] for x in allReadInfos[readType]['READ_MATCHED_GC_CONTENT'] if not None in x]

@@ -10,7 +10,9 @@ from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
 import umap
 import sklearn.metrics.pairwise as pairwise
-import scipy.spatial as sp, scipy.cluster.hierarchy as hc
+import scipy.spatial as sp
+import scipy.stats as st
+import scipy.cluster.hierarchy as hc
 
 import logging
 
@@ -29,6 +31,8 @@ if __name__ == "__main__":
 
     parser.add_argument('-s', '--suffix', nargs='+', type=str, default=[".bam", ".sam"])   
     parser.add_argument('-g', '--groups', action='append', nargs='+', default=None)
+
+    parser.add_argument('-sc', '--scaled', action='store_true', default=False)
 
     parser.add_argument('-n', '--num', type=int, default=-1)
     parser.add_argument('-t', '--tuple', type=int, nargs='+', default=[-3, -2])
@@ -105,7 +109,7 @@ if __name__ == "__main__":
     for gidx, grp in enumerate(args.groups):
         for elem in grp:
             if not elem in df.keys():
-                print("incorr key", akey)
+                print("incorr key", elem, df.keys())
 
             colColors.append(colors[gidx % 3])
        
@@ -113,18 +117,25 @@ if __name__ == "__main__":
     subsetDF = df[allsamples]
     subsetDF.index = df[[idColName]]
     # because after merging combined, some genes may be None
-    subsetDF = subsetDF.replace("None", np.nan)
-    subsetDF = subsetDF.fillna(0)
+    #subsetDF = subsetDF.replace("None", np.nan)
+    #subsetDF = subsetDF.fillna(0)
     subsetDF[subsetDF.keys()] = subsetDF[subsetDF.keys()].apply(pd.to_numeric, errors='coerce', axis=1)
 
     addNote=""
     if not args.fpkm and not args.tpm:
         logging.info("Estimated library sizes:\n{}".format(subsetDF.sum()))
-        scaleFactor = 10000
+
+        libSizeFactor = int(np.log10(max(subsetDF.sum())))
+
+        scaleFactor = 10 ** libSizeFactor
         subsetDF = (subsetDF / subsetDF.sum()) * scaleFactor
+        addNote+=" (lib-size normed counts, scale {})".format(scaleFactor)
 
-        addNote=" (lib-size normed counts, scale {})".format(scaleFactor)
+    if args.scaled:
+        subsetDF = subsetDF.apply(st.zscore)
+        addNote += " (scaled)"
 
+        subsetDF.to_excel("test.xlsx")
 
     gene2symbol = {}
 
@@ -146,10 +157,10 @@ if __name__ == "__main__":
             targetCols = []
             for topdeElem in args.top_de:
                 targetCols += [x for x in df.keys() if x.startswith(topdeElem) and x.endswith("log2FC")]
-            #print("Target cols", targetCols)
+            print("Target cols", targetCols)
 
             targetColsPVal = [x.replace("log2FC", "ADJ.PVAL") for x in targetCols]
-            #print("Target cols pval", targetColsPVal)
+            print("Target cols pval", targetColsPVal)
 
             id2val = defaultdict(lambda: 0)
             for index, row in df.iterrows():
@@ -173,28 +184,18 @@ if __name__ == "__main__":
             selGenesDown = topGenesDE[max(len(topGenesDE) - int(args.num / 2), 0):]
             selGenesDown = [(x[0],) for x in selGenesDown if x[1] <= 0]
 
-            #print("Upreg genes", len(selGenesUp))
-            #print("Downreg genes", len(selGenesDown))
-
             downSubset = subsetDF.loc[subsetDF.index.isin(selGenesDown)]
             dfDown = pd.DataFrame(downSubset, columns=subsetDF.keys())
 
             upSubset = subsetDF.loc[subsetDF.index.isin(selGenesUp)]
             dfUp = pd.DataFrame(upSubset, columns=subsetDF.keys())
 
-            #print(dfDown.shape)
-            #print(dfUp.shape)
-
             subsetDF = pd.concat([dfDown, dfUp], ignore_index=False)
 
-            #print("After up", subsetDF.shape)
-
-            #print("after down", subsetDF.shape)
-            #print(subsetDF.shape)
-
         else:
-            subsetDF = subsetDF.nlargest(args.num, columns=allsamples)
-            #print(subsetDF.shape)
+            subsetDF = subsetDF.sort_values(allsamples, key=lambda x: x.abs()).head(n=args.num)
+
+
 
 
     if len(gene2symbol) > 0:
@@ -208,10 +209,6 @@ if __name__ == "__main__":
 
         assert (len(dfIndex) == len(symIndex))
         subsetDF.index = symIndex
-
-
-
-
 
     tsneDF = subsetDF
     dimNames = list(tsneDF.index)
@@ -236,7 +233,20 @@ if __name__ == "__main__":
     HERE IS A LOG!
     """
     tsneDF = tsneDF.apply(pd.to_numeric, errors='ignore')
-    tsneDF = tsneDF.replace(0, np.nan).apply(np.log10).replace(np.nan, 0)
+    
+    if args.scaled:
+        cutoff = max(tsneDF.median().abs()*2)
+
+        thrshld = 0.25
+        tsneDF[tsneDF>cutoff] = cutoff
+        tsneDF[tsneDF<-cutoff] = -cutoff
+
+        addNote += " (cutoff={})".format(round(cutoff, 5))
+    else:
+        tsneDF = tsneDF.replace(0, np.nan).apply(np.log10).replace(np.nan, 0)
+
+    tsneDF.to_excel("test2.xlsx")
+
 
     sns.clustermap(tsneDF, figsize=(14, 22),col_colors = colColors, row_cluster=True, yticklabels=1)
 

@@ -58,6 +58,10 @@ class FoldChangeFeatureCountsDistributionFactory(PSToolInterfaceFactory):
         parser.add_argument('-fpkm', '--fpkm', dest='fpkm', action='store_true', default=False)
         parser.add_argument('-tpm', '--tpm', dest='tpm', action='store_true', default=False)
 
+        parser.add_argument('-anc', '--allow-nonexistant-cond', dest='allow_nonexistant_cond', action='store_true', default=False)
+
+    
+
         parser = PlotConfig.addParserArgs(parser)
         parser.set_defaults(func=self._prepObj)
 
@@ -124,7 +128,9 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                 condName = condGroup[0]
                 for condElement in condGroup:
 
-                    print(condName, condElement)
+                    print(condName, condElement, condElement in allheaders)
+                    if args.allow_nonexistant_cond and not condElement in allheaders:
+                        continue
 
                     subDf = df.selectColumns({"Geneid": "gene", condElement: "count"})
 
@@ -333,12 +339,12 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                             rowUpdates.append(rowData)
 
                         #condRows = condDataSample.namedRows(geneNames, interestCols)
-
                         #condRow = condDataSample.toDataRow(geneNames, geneCounts)
 
                         conditions.append(sampleName)
                         condReplicates.append(sampleName)
 
+                        print("Add Condition", sampleName, rowUpdates[0])
                         self.condData.addConditions(rowUpdates, sampleName)
 
                     replicates[condition] = condReplicates

@@ -30,6 +30,16 @@ if __name__ == '__main__':
             "NA": None
         })
 
+        inHeaders = indf.getHeader()
+        genesymname = None
+
+        if "gene_symbol" in inHeaders:
+            genesymname = "gene_symbol"
+        elif "Geneid" in inHeaders:
+            genesymname = "Geneid"
+        else:
+            genesymname = "id"
+
         print(detableFile.name)
 
         allMethods = args.methods

@@ -2,7 +2,7 @@ import os
 import shutil
 from collections import defaultdict
 from enum import Enum
-
+import operator
 from jinja2 import Template
 from openpyxl import Workbook
 
@@ -13,7 +13,6 @@ from .Numbers import toNumber, isNumber
 import random
 import argparse
 
-import operator
 from copy import deepcopy
 
 class DataFrameException(Exception):

@@ -24,11 +24,9 @@ if __name__ == "__main__":
 
     parser.add_argument('-cos', '--cosine', action='store_true', default=False, help="activate cosine similarity")
     parser.add_argument('-man', '--manhattan', action='store_true', default=False, help="activate manhattan similarity")
-    parser.add_argument('-eucl', '--euclidean', action='store_true', default=False,
-                        help="activate manhattan similarity")
+    parser.add_argument('-eucl', '--euclidean', action='store_true', default=False, help="activate manhattan similarity")
 
-    parser.add_argument('-td', '--top_de', nargs="+", type=str, default=None,
-                        help="instead of largest expression, top differential genes from method (must have --num)")
+    parser.add_argument('-td', '--top_de', nargs="+", type=str, default=None, help="instead of largest expression, top differential genes from method (must have --num)")
 
     parser.add_argument('-s', '--suffix', nargs='+', type=str, default=[".bam", ".sam"])
     parser.add_argument('-s2', '--samples', nargs='+', type=str, default=None)

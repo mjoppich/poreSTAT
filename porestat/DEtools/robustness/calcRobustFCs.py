@@ -65,9 +65,16 @@ if __name__ == '__main__':
         headername2idx = {}
 
         indfHeader = indf.getHeader()
+        genesymname = None
+
+        if "gene_symbol" in indfHeader:
+            genesymname = "gene_symbol"
+        elif "Geneid" in indfHeader:
+            genesymname = "Geneid"
+        else:
+            genesymname = "id"
 
         col2idx = {x: indf.getColumnIndex(x) for x in indfHeader}
-
         for x in col2idx:
             print(x, col2idx[x])
 
@@ -82,7 +89,6 @@ if __name__ == '__main__':
 
             if hsplit[-1] in ["RAW.PVAL", "ADJ.PVAL", "log2FC"]:
                 availMethods.add(hsplit[0])
-
                 methodCol2Idx[(hsplit[0], hsplit[-1])].append(hidx)
 
         print(availMethods)
@@ -143,7 +149,7 @@ if __name__ == '__main__':
                     
                     
                     if float(adjPval) < args.cutoff:
-                        method2genes[method].add(line[0])
+                        method2genes[method].add( line[col2idx[genesymname]] )
 
                     if not method in args.methods:
                         continue
@@ -169,36 +175,6 @@ if __name__ == '__main__':
 
 
             else:
-                lowestPositive = 1000
-                lowestNegative = -1000
-
-                posCount = 0
-                negCount = 0
-
-                for lfc in methodsLog2FCs:
-                    if lfc < 0:
-                        negCount += 1
-
-                        if abs(lfc) < abs(lowestNegative):
-                            lowestNegative = lfc
-
-                    elif lfc > 0:
-                        posCount += 1
-
-                        if abs(lfc) < abs(lowestPositive):
-                            lowestPositive = lfc
-
-                if posCount == negCount:
-
-                    robustLog2FC = 0
-
-                elif posCount > negCount and negCount <= 2 and len(methodsLog2FCs) > 4:
-                    robustLog2FC = lowestPositive
-
-                elif negCount > posCount and posCount <= 2 and len(methodsLog2FCs) > 4:
-                    robustLog2FC = lowestNegative
-
-
                 robustLog2FC = 0
                 robustRawPval = 1
                 robustAdjPval = 1
@@ -227,8 +203,6 @@ if __name__ == '__main__':
 
 
         indf.applyToRow(makeRobFC)
-
-        print(signCount)
 
         fcPvals = []
         fcPvalsSig = []
@@ -264,6 +238,7 @@ if __name__ == '__main__':
         print("Writing out DF", args.output[fidx].name)
         indf.export(args.output[fidx].name)
 
+        # explicitly sets an empty set
         for method in availMethods:
             if not method in method2genes:
                 method2genes[method] = set()
@@ -271,8 +246,11 @@ if __name__ == '__main__':
         for x in method2genes:
             print(x, len(method2genes[x]))
 
-        plt.title("Overlap of called genes per mehtod")
+        plt.title("Overlap of called genes per method")
         upIn = from_contents(method2genes)
+        print( upIn.index )
+        print( upIn.index.levels )
+
         plot(upIn, subset_size="auto") 
 
         plt.savefig(args.output[fidx].name + ".rob.upset.png", bbox_inches="tight")

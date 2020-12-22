@@ -54,7 +54,7 @@ def makeplot(plotdata, filename, stats, outname):
         acounts = len([x for x in counts if x >= 1+pseudoCount])
         print(sample, len(counts), acounts)
         stats[sample]["genes_with_count"] = len(counts)
-        plt.hist(counts, int(maxlen), color=colors[idx], normed=False,cumulative =True, label=sample + " ("+str(len(counts))+", "+str(acounts)+")", histtype="step" )
+        plt.hist(counts, int(maxlen), color=colors[idx], density=False,cumulative =True, label=sample + " ("+str(len(counts))+", "+str(acounts)+")", histtype="step" )
 
 
     plt.legend()
@@ -77,7 +77,7 @@ def makeplot(plotdata, filename, stats, outname):
             counts = [x[1] for x in plotdata[sample] if x[1] >= minCount+pseudoCount]
             print(sample, len(counts), len([x for x in counts if x >= minCount+pseudoCount]))
             stats[sample]["genes_with_mincount_" + str(minCount)] = len(counts)
-            plt.hist(counts, int(maxlen), color=colors[idx], normed=False,cumulative =True, label=sample + " ("+str(len(counts))+")", histtype="step" )
+            plt.hist(counts, int(maxlen), color=colors[idx], density=False,cumulative =True, label=sample + " ("+str(len(counts))+")", histtype="step" )
 
         plt.legend()
         plt.xscale("log")

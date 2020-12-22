@@ -43,6 +43,14 @@ if __name__ == '__main__':
         })
 
         inHeaders = indf.getHeader()
+        genesymname = None
+
+        if "gene_symbol" in inHeaders:
+            genesymname = "gene_symbol"
+        elif "Geneid" in inHeaders:
+            genesymname = "Geneid"
+        else:
+            genesymname = "id"
 
         #if not args.gene in inHeaders:
         #    print("Unknown gene id column", args.gene)
@@ -124,7 +132,7 @@ if __name__ == '__main__':
                         cond1count = row[conditions[i]]
                         cond2count = row[conditions[j]]
 
-                        gene = row["Geneid"]
+                        gene = row[genesymname]
 
                         cond1countsRaw[gene] = cond1count
                         cond2countsRaw[gene] = cond2count
@@ -240,7 +248,7 @@ if __name__ == '__main__':
                 repPercs.append(str(cnt0Name))
 
                 totalCount = sum([cnter[x] for x in cnter])
-                repPercs.append(str(totalCountgit))
+                repPercs.append(str(totalCount))
 
                 print(cond, "\t".join(repPercs), sep="\t")
                     

@@ -32,8 +32,9 @@ class EnrichmentDF(DataFrame):
             for y in x:
                 allCols.add(y)
 
-        self.addColumns(sorted(allCols), default=None, ignoreDuplicates=True)
+        print("Adding Conditions", sorted(allCols))
 
+        self.addColumns(sorted(allCols), default=None, ignoreDuplicates=True)
         self.updateRowIndexed("id", condDatas, ignoreMissingCols=True, addIfNotFound=True)
 
 
@@ -99,6 +100,7 @@ class EnrichmentDF(DataFrame):
 
         print(cond1Samples)
         print(cond2Samples)
+        print(self.column2idx)
 
         header = ['gene'] + cond1Samples + cond2Samples
         prepData = [tuple(header)]

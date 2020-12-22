@@ -288,6 +288,11 @@ if __name__ == '__main__':
             "NA": None
         })
 
+        inHeaders = indf.getHeader()
+
+        assert("ROB_log2FC" in inHeaders)
+        assert("ROB_ADJ.PVAL" in inHeaders)
+
         for row in indf:
 
             geneSym = row.get("gene_symbol", row.get("id", None))
@@ -317,18 +322,20 @@ if __name__ == '__main__':
                 downPref2geneFCP[args.prefixes[fidx]].append((geneSym, geneFC, genePVal))
 
 
-    intersectGenesUp = set()
-    intersectGenesDown = set()
-
     print("Sorting")
+    print([x for x in upPref2geneFCP], [len(upPref2geneFCP[x]) for x in upPref2geneFCP])
 
     for pref in upPref2geneFCP:
         upPref2geneFCP[pref] = sorted(upPref2geneFCP[pref], key=lambda x: x[2])
 
+    print([x for x in downPref2geneFCP], [len(downPref2geneFCP[x]) for x in downPref2geneFCP])
     for pref in downPref2geneFCP:
         downPref2geneFCP[pref] = sorted(downPref2geneFCP[pref], key=lambda x: x[2])
 
     print("Intersecting")
+
+    intersectGenesUp = None
+    intersectGenesDown = None
 
     for pref in upPref2geneFCP:
         if intersectGenesUp == None:
@@ -345,7 +352,7 @@ if __name__ == '__main__':
     labels = [args.prefixes[0] + " log2FC", args.prefixes[0] + " rank",
               args.prefixes[1] + " rank", args.prefixes[1] + " log2FC"]
 
-    print(labels)
+    print(labels, len(intersectGenesUp), len(intersectGenesDown))
 
     def makeDataDF(indata, ininter):
 
