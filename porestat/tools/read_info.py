@@ -74,6 +74,8 @@ class ReadInfo(ParallelPSTInterface):
         dReadSummary['USER_RUN_NAME'] = lambda file: file.user_filename_input()
         dReadSummary['RUN_ID'] = lambda file: file.runID()
 
+        # READ_ID,READ_NAME,CHANNEL_ID,READ_NUMBER,TYPE,READ_LENGTH,AVG_QUALITY,TIME,USER_RUN_NAME,RUN_ID
+
         self.endl = os.linesep
         self.dReadSummary = dReadSummary
         self.dObservations = [x for x in self.dReadSummary]
