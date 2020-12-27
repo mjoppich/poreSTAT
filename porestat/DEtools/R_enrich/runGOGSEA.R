@@ -40,7 +40,7 @@ keyType = "ENTREZID"
 if (organism == "org.Mm.eg.db")
 {
     suppressMessages(suppressWarnings(require(org.Mm.eg.db)))
-    orgDB = org.Hs.eg.db
+    orgDB = org.Mm.eg.db
 
     annotTable = grcm38
     egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
