@@ -713,10 +713,7 @@ class miRGeneGraph:
         rejOva = []
 
         for x in node2ratio:
-
             data = node2ratio[x]
-
-            
             populationSize = numAllGenes
             numSuccInPopulation = numDeGenes
 
@@ -724,6 +721,7 @@ class miRGeneGraph:
             sampleSize = len(graph.node[data[0]]["attr_dict"]["all_targets"])
 
             pval = hypergeom.sf(drawnSuccesses - 1, populationSize, numSuccInPopulation, sampleSize)
+            #print(x, drawnSuccesses - 1, populationSize, numSuccInPopulation, sampleSize, pval)
             ovaPval.append(pval)
 
         if len(node2ratio) > 0:
@@ -732,10 +730,10 @@ class miRGeneGraph:
 
 
         header = [("miRNA", "Measured?", "Score", "Measured Ratio", "Measured {} elements".format(direction), "Measured {} elements".format(self.dirToOpposite[direction]),
-                     "zscore", "pval", "adj_pval", "genes", "strict_opp_dir", "ova_pval", "ova_adj_pval")]
+                     "zscore", "pval", "adj_pval", "genes", "strict_opp_dir", "ova_pval", "ova_adj_pval", "mir_target_count")]
         retRatio = []
         for x in node2ratio:
-
+            data = node2ratio[x]
             savedElem = list(node2ratio[x])
 
             nodeIdx = allNodeNames.index(savedElem[0])
@@ -756,14 +754,20 @@ class miRGeneGraph:
             savedElem.append( ovaPval[nodeIdx] )
             savedElem.append( ovaAdjPval[nodeIdx] )
 
+            sampleSize = len(graph.node[data[0]]["attr_dict"]["all_targets"])
+            savedElem.append(sampleSize)
+
             retRatio.append(tuple(savedElem))
+
+
+            assert(len(savedElem) == len(header[0]))
 
         bestNodes = sorted(retRatio, key=lambda x: x[12], reverse=False)
 
         if len(bestNodes) > maxNodes and maxNodes != -1:
             bestNodes = bestNodes[0:maxNodes]
 
-        return [header] + bestNodes
+        return header + bestNodes
 
     def writeTopRegulatedMIRNA(self, graph, outfilename, upregs, downregs):
         """
@@ -891,8 +895,8 @@ class miRGeneGraph:
         self.scoreMIRs(graph)
         graphStats["miRNA NS Scores"] = self.getNSScores(graph)
 
-        graphStats["UP regulated miRNAs"] = self.getTopRegulatedMIRNAS(graph, "up", -1)
-        graphStats["DOWN regulated miRNAs"] = self.getTopRegulatedMIRNAS(graph, "down", -1)
+        graphStats["UP regulated miRNAs"] = self.getTopRegulatedMIRNAS(graph, "up", -1, numDeGenes=numDeGenes, numAllGenes=numAllGenes)
+        graphStats["DOWN regulated miRNAs"] = self.getTopRegulatedMIRNAS(graph, "down", -1, numDeGenes=numDeGenes, numAllGenes=numAllGenes)
 
         """
         write out TSVs
@@ -1795,7 +1799,7 @@ if __name__ == '__main__':
     """
     FETCH/BUILD INTERACTIONS
     """
-    contextDict = DataBaseAccessor.checkContext(contextDict)
+    #contextDict = DataBaseAccessor.checkContext(contextDict)
 
     for didx, detable in enumerate(args.detable):
 
@@ -1887,7 +1891,7 @@ if __name__ == '__main__':
 
         print("DE GENES", len(deGenes))
 
-        REFETCHDATA = True
+        REFETCHDATA = False
 
         mirnaContextDict = {"mirna": [x for x in deMIRs]}
         for x in contextDict:

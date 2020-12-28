@@ -39,6 +39,7 @@ if __name__ == '__main__':
 
 
     foundRes = defaultdict(lambda: list())
+    input2allres = {}
 
     for pathwaysFile in args.pathways:
         print(pathwaysFile.name)
@@ -81,6 +82,7 @@ if __name__ == '__main__':
             topNIDs.append((row[idColumn], qvalue))
 
         topNIDs = sorted(topNIDs, key=lambda x: x[1])
+        input2allres[os.path.basename(pathwaysFile.name)] = [x[0] for x in topNIDs]
 
         for topN in args.top_n:
 
@@ -99,6 +101,32 @@ if __name__ == '__main__':
             foundRes[topN].append((os.path.basename(pathwaysFile.name), localTopNIDs, lqCount))
 
 
+    def generate_logics(n_sets):
+        """Generate intersection identifiers in binary (0010 etc)"""
+        for i in range(1, 2**n_sets):
+            yield bin(i)[2:].zfill(n_sets)
+
+    def generate_petal_sets(datasets, fmt="{size}"):
+        """Generate petal descriptions for venn diagram based on set sizes"""
+        datasets = list(datasets)
+        n_sets = len(datasets)
+        dataset_union = set.union(*datasets)
+
+        petal_sets = {}
+        for logic in generate_logics(n_sets):
+            included_sets = [
+                datasets[i] for i in range(n_sets) if logic[i] == "1"
+            ]
+            excluded_sets = [
+                datasets[i] for i in range(n_sets) if logic[i] == "0"
+            ]
+            petal_set = (
+                (dataset_union & set.intersection(*included_sets)) -
+                set.union(set(), *excluded_sets)
+            )
+            petal_sets[logic] = petal_set
+        return petal_sets
+
 
 
     for topN in args.top_n:
@@ -107,6 +135,19 @@ if __name__ == '__main__':
             foundRes[topN].append(("Dummy Element",  [(None, None)], 0))
 
         vennLabels = venn.generate_petal_labels([set([y[0] for y in x[1]]) for x in foundRes[topN]])
+        vennSets = generate_petal_sets([set([y[0] for y in x[1]]) for x in foundRes[topN]])
+
+        for field in vennSets:
+
+            specificField = (Counter(field)["1"] == 1)
+
+            if not specificField:
+                continue
+
+            for specID in vennSets[field]:               
+                foundIn = [ input2allres[x].index(specID) if specID in input2allres[x] else -1 for x in input2allres ]
+                print(field, specID, foundIn)
+
         fig, ax = pwcount2function[len(foundRes[topN])](vennLabels, names=["{fn} (lq={lqc})".format(fn=x[0], lqc=x[2]) for x in foundRes[topN]])
 
         plt.suptitle("Overlaps for topN={} pathways (by qvalue)".format(topN))

@@ -1829,7 +1829,7 @@ if __name__ == '__main__':
 
                         print(methods, direction, outputFile, resFiles)
 
-                        sysCall = "python3 {script} --pathways {pathways} --output {output} --top_n 10 50 100 150 --output {output}".format(
+                        sysCall = "python3 {script} --pathways {pathways} --output {output} --top_n 10 50 100 150".format(
                             script=os.path.realpath(os.path.join(scriptMain, "enrichment", "compareEnrichmentAnalysis.py")),
                             pathways=" ".join(resFiles),
                             output=outputFile,
@@ -1837,6 +1837,8 @@ if __name__ == '__main__':
                         #args.simulate = False
                         if not args.simulate and len(resFiles) > 0 and (totalEnrichCalls > 0 or len(glob(outputFile + "*.png")) == 0):
                             subprocess.run(sysCall, shell=True, check=True)
+                        elif args.simulate:
+                            print("Simulated", sysCall)
                         #args.simulate = True
 
 
@@ -2029,7 +2031,7 @@ if __name__ == '__main__':
                     oldLocation = os.path.abspath(addFile.name)
                     newLocation = os.path.join(args.save, args.name + "." + addPrefix + "." + methodStr + ".tsv")
 
-                    if not os.path.exists(newLocation):
+                    if not os.path.exists(newLocation) and not args.simulate:
                         statsLogger.info("Copying additional DE file from {} to {}".format(oldLocation, newLocation))
                         copyfile(oldLocation, newLocation)
 
