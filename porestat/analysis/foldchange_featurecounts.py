@@ -323,6 +323,7 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                         rowUpdates = []
                         sampleName = condDataSample.filepath
 
+                        print(sampleName, len(condDataSample))
                         for row in condDataSample:
 
                             rowData = {

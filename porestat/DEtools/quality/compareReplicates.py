@@ -68,7 +68,9 @@ if __name__ == '__main__':
 
         for cidx, conditions in enumerate(args.conditions):
 
-            fig, axes = plt.subplots(len(conditions), len(conditions), figsize=(24, 18), sharex=True, sharey=True)
+            numConditions = len(conditions)
+
+            fig, axes = plt.subplots(len(conditions), len(conditions), figsize=(max(24, numConditions*4), max(24, numConditions*4)), sharex=True, sharey=True)
             fig.suptitle("Comparison of read counts", fontsize=15)
 
             if conditions[0].startswith("X."):

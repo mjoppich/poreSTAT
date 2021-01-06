@@ -57,6 +57,10 @@ if (length(allGeneIDs) == 0)
     quit(status=0, save='no')
 }
 
+# just in case we got stupid ensembl stable IDs ... ENSG00012817271.x => ENSG00012817271
+allGeneIDs = gsub("\\..*","",allGeneIDs)
+bgGeneIDs = gsub("\\..*","",bgGeneIDs)
+
 annotTable = NULL;
 
 if (organism == "mouse")

@@ -50,6 +50,10 @@ if (mode == "all")
 allGeneIDs = allGeneIDs[!is.na(allGeneIDs)]
 bgGeneIDs = bgGeneIDs[!is.na(bgGeneIDs)]
 
+# just in case we got stupid ensembl stable IDs ... ENSG00012817271.x => ENSG00012817271
+allGeneIDs = gsub("\\..*","",allGeneIDs)
+bgGeneIDs = gsub("\\..*","",bgGeneIDs)
+
 if (length(allGeneIDs) == 0)
 {
     print("NO GENE ID SELECTED. TERMINATING")

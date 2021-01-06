@@ -25,6 +25,9 @@ allGenes = allGenes[allGenes$ROB_ADJ.PVAL != 1.0 & allGenes$ROB_log2FC != 0.0 & 
 allGenes = allGenes[!is.na(allGenes$id),]
 allGeneIDs = as.vector(allGenes$id)
 
+# just in case we got stupid ensembl stable IDs ... ENSG00012817271.x => ENSG00012817271
+allGeneIDs = gsub("\\..*","",allGeneIDs)
+allGenes$id = allGeneIDs
 
 if (nrow(allGenes) == 0)
 {
@@ -80,6 +83,7 @@ tdf = data.frame(etz=egid$entrez, ens=egid$ensgene, lfc=egid$ROB_log2FC, pval=eg
 #print(tdf)
 
 entrezGenes = egid[!is.na(egid$entrez) & !is.na(egid$ensgene) & !is.null(egid$ensgene) & !is.null(egid$ROB_log2FC)& !is.nan(egid$ROB_log2FC) &!is.na(egid$ROB_log2FC),]
+print(dim(entrezGenes))
 
 #entrezGenesC = entrezGenes$ROB_ADJ.PVAL
 entrezGenesC = as.vector(entrezGenes$ROB_log2FC)
