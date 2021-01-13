@@ -4,11 +4,11 @@ LABEL maintainer="markus@compbio.cc"
 LABEL version="1.0"
 LABEL description="Differential Expression pipeline (robust)"
 
-RUN apt update
-RUN apt install -y python3 python3-pip git
+
+RUN apt update && apt install -y python3-dev python3 python3-pip git
 RUN apt install -y libgit2-dev zlib1g-dev libcurl4-gnutls-dev libxml2-dev libssl-dev libpng-dev libjpeg-dev libbz2-dev liblzma-dev libncurses5-dev libncursesw5-dev libgl-dev libgsl-dev libcurl4-gnutls-dev libxml2-dev libssl-dev libpng-dev libjpeg-dev libbz2-dev liblzma-dev libncurses5-dev libncursesw5-dev libgl-dev libgsl-dev 
 
-RUN pip3 install openpyxl jinja2 matplotlib venn pandas numpy seaborn scikit-learn umap scipy statsmodels upsetplot
+RUN pip3 install openpyxl jinja2 biopython matplotlib venn pandas numpy seaborn scikit-learn umap scipy statsmodels upsetplot HTSeq pysam dill mpld3 pathos openpyxl h5py
 
 
 RUN R -e 'install.packages(c("BiocManager", "devtools", "argparse", "dbplyr"))'
@@ -33,3 +33,9 @@ RUN git clone https://github.com/mjoppich/porestat /git/poreSTAT
 
 ENTRYPOINT ["python3", "/git/poreSTAT/porestat/DEtools/DifferentialAnalysis.py"]
 CMD ["python3", "/git/poreSTAT/porestat/DEtools/DifferentialAnalysis.py", "--help"]
+
+#docker build .
+#docker tag 4b2ac335f2b2 mjoppich/porestat_de:latest
+#docker tag 4b2ac335f2b2 mjoppich/porestat_de:v1.2
+#docker login
+#docker push mjoppich/porestat_de:v1.2 --max-concurrent-uploads 3

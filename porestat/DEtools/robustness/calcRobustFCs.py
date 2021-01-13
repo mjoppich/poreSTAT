@@ -243,17 +243,28 @@ if __name__ == '__main__':
             if not method in method2genes:
                 method2genes[method] = set()
 
+        totalGenes = 0
         for x in method2genes:
             print(x, len(method2genes[x]))
+            totalGenes += len(method2genes[x])
 
-        plt.title("Overlap of called genes per method")
-        upIn = from_contents(method2genes)
-        print( upIn.index )
-        print( upIn.index.levels )
+        outfilename = args.output[fidx].name + ".rob.upset.png"
+        print(outfilename)
+        if totalGenes == 0:
+            fig = plt.figure()
+            plt.title("No Data to show")
+            plt.savefig(outfilename, bbox_inches="tight")
+            plt.close()
+        
+        else:
 
-        plot(upIn, subset_size="auto") 
+            plt.title("Overlap of called genes per method")
+            upIn = from_contents(method2genes)
+            print( upIn.index )
+            print( upIn.index.levels )
 
-        plt.savefig(args.output[fidx].name + ".rob.upset.png", bbox_inches="tight")
+            plot(upIn, subset_size="auto") 
+            plt.savefig(outfilename, bbox_inches="tight")
 
 
     

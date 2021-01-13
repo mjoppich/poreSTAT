@@ -643,15 +643,16 @@ if __name__ == '__main__':
                         os.path.join(args.diffreg[pidx], "fcsummary"), args, prefix, caPlots)
 
 
-            sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
-                counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
-                conds1=" ".join(cond1RPaths[pidx]),
-                conds2=" ".join(cond2RPaths[pidx])
-            )
+            if os.path.isfile(os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm")):
+                sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
+                    counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
+                    conds1=" ".join(cond1RPaths[pidx]),
+                    conds2=" ".join(cond2RPaths[pidx])
+                )
 
-            runSysCall(sysCall, "compareReplicates (normalized)", caLogger, "Compare Replicates (msEmpiRe-normalized counts)",
-                       os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm.replicates."), args, prefix, caPlots)
+                runSysCall(sysCall, "compareReplicates (normalized)", caLogger, "Compare Replicates (msEmpiRe-normalized counts)",
+                        os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm.replicates."), args, prefix, caPlots)
 
 
             sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
@@ -666,18 +667,19 @@ if __name__ == '__main__':
                        os.path.join(args.diffreg[pidx], "orig_counts.countreplicates"), args, prefix, caPlots)
 
 
-            outPrefix = os.path.join(args.diffreg[pidx], "empire_norm_counts.compLogFC")
-            sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
-                script=os.path.realpath(os.path.join(scriptMain,"quality", "compareLogFC.py")),
-                counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
-                conds1=" ".join(cond1RPaths[pidx]),
-                conds2=" ".join(cond2RPaths[pidx]),
-                output=outPrefix
-            )
+            if os.path.isfile(os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm")):
+                outPrefix = os.path.join(args.diffreg[pidx], "empire_norm_counts.compLogFC")
+                sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
+                    script=os.path.realpath(os.path.join(scriptMain,"quality", "compareLogFC.py")),
+                    counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
+                    conds1=" ".join(cond1RPaths[pidx]),
+                    conds2=" ".join(cond2RPaths[pidx]),
+                    output=outPrefix
+                )
 
 
-            runSysCall(sysCall, "Compare LogFC (normalized)", caLogger, "Compare Log Fold-Changes (MS-EmpiRe normalized counts)",
-                       outPrefix, args, prefix, caPlots)
+                runSysCall(sysCall, "Compare LogFC (normalized)", caLogger, "Compare Log Fold-Changes (MS-EmpiRe normalized counts)",
+                        outPrefix, args, prefix, caPlots)
 
 
             sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
@@ -696,21 +698,22 @@ if __name__ == '__main__':
 
 
 
+            if os.path.isfile(os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm")):
 
-            sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareInterLogFCs.py")),
-                counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
-                conds1=" ".join(cond1RPaths[pidx]),
-                conds2=" ".join(cond2RPaths[pidx]),
-                output=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm")
-            )
+                sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "quality", "compareInterLogFCs.py")),
+                    counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
+                    conds1=" ".join(cond1RPaths[pidx]),
+                    conds2=" ".join(cond2RPaths[pidx]),
+                    output=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm")
+                )
 
-            plotId2Descr["Compare Inter-Log Fold-Changes (msEmpiRe-normalized counts)"] = "<p>These plots compare all pairwise logFCs between the two conditions.</p>" \
-                                                                          "<p>The logFC distributions are expected to match closely together</p>"
+                plotId2Descr["Compare Inter-Log Fold-Changes (msEmpiRe-normalized counts)"] = "<p>These plots compare all pairwise logFCs between the two conditions.</p>" \
+                                                                            "<p>The logFC distributions are expected to match closely together</p>"
 
 
-            runSysCall(sysCall, "Compare Inter LogFC (normalized)", caLogger, "Compare Inter-Log Fold-Changes (msEmpiRe-normalized counts)",
-                       os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm.interlogfc."), args, prefix, caPlots)
+                runSysCall(sysCall, "Compare Inter LogFC (normalized)", caLogger, "Compare Inter-Log Fold-Changes (msEmpiRe-normalized counts)",
+                        os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm.interlogfc."), args, prefix, caPlots)
 
             sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "quality", "compareInterLogFCs.py")),
@@ -1057,21 +1060,23 @@ if __name__ == '__main__':
 
                     if len(methods) >= 2:
 
-                        outputFilename = os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".directcompare.tsv")
+                        if os.path.isfile(os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm")):
 
-                        sysCall = "python3 {script} --de {de} --counts {counts} --conditions {conds1} --conditions {conds2} --tools {methods} --output {output}".format(
-                            de=countDeFile,
-                            counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
-                            script=os.path.realpath(os.path.join(scriptMain, "de_comparison", "compareDECounts.py")),
-                            methods=" ".join(methods),
-                            output=outputFilename,
-                            conds1=" ".join(cond1RPaths[pidx]),
-                            conds2=" ".join(cond2RPaths[pidx])
-                        )
-                        #plotName = "Compare DE Counts ({})".format(" ".join(methods))
-                        #plotId2Descr[plotName] = "<p>Plots something cool</p>"
+                            outputFilename = os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".directcompare.tsv")
 
-                        runSysCall(sysCall, plotName, statsLogger, None, outputFilename, args, prefix, methods, deEnrichPlots)
+                            sysCall = "python3 {script} --de {de} --counts {counts} --conditions {conds1} --conditions {conds2} --tools {methods} --output {output}".format(
+                                de=countDeFile,
+                                counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
+                                script=os.path.realpath(os.path.join(scriptMain, "de_comparison", "compareDECounts.py")),
+                                methods=" ".join(methods),
+                                output=outputFilename,
+                                conds1=" ".join(cond1RPaths[pidx]),
+                                conds2=" ".join(cond2RPaths[pidx])
+                            )
+                            #plotName = "Compare DE Counts ({})".format(" ".join(methods))
+                            #plotId2Descr[plotName] = "<p>Plots something cool</p>"
+
+                            runSysCall(sysCall, plotName, statsLogger, None, outputFilename, args, prefix, methods, deEnrichPlots)
 
 
 

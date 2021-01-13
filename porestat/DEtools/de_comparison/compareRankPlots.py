@@ -334,8 +334,8 @@ if __name__ == '__main__':
 
     print("Intersecting")
 
-    intersectGenesUp = None
-    intersectGenesDown = None
+    intersectGenesUp = set()
+    intersectGenesDown = set()
 
     for pref in upPref2geneFCP:
         if intersectGenesUp == None:

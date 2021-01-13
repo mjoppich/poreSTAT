@@ -69,8 +69,13 @@ eset <- readSE(exprs.file, pdat.file, fdat.file)
 message("Removing genes with low read count ...")
 #eset <- eset[rowSums(exprs(eset), na.rm = TRUE) > ncol(eset),]
 
+#RNA-seq data is expected to be raw read counts. Note that normalization for downstream DEanalysis, e.g. withedgeRandDESeq2, is not ultimately necessary (and in some cases evendiscouraged) as many of these tools implement specific normalization approaches themselves.
+
+#message("Quantile normalization ...")
+#eset <- normalize(eset, norm.method = "quantile")
+
 message("DE analysis ...")
-eset <- de.ana(eset, de.method = de.method, padj.method = "BH")
+eset <- deAna(eset, de.method = de.method, padj.method = "BH")
 
 write.table(rowData(eset, use.names=T), file=out.file, row.names=F, quote=F, sep="\t")
 
