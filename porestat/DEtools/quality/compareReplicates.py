@@ -5,9 +5,11 @@ from collections import defaultdict
 import matplotlib as mpl
 import argparse
 import matplotlib.patches as patches
-import sys, os
 import math
-sys.path.insert(0, "/mnt/d/dev/git/poreSTAT/")
+
+import sys, os
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
+
 
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 from collections import Counter

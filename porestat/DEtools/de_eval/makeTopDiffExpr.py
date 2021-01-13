@@ -4,6 +4,10 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
+import sys, os
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
+
+
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE

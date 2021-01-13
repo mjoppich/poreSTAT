@@ -1,5 +1,8 @@
 import argparse
-import os,sys
+import sys, os
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
+
+
 import pickle
 import scipy
 
@@ -13,7 +16,7 @@ import datetime
 
 from statsmodels.stats.multitest import multipletests
 from scipy.stats import hypergeom
-sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
+
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 from porestat.DEtools.mirtools.miRNAUtils import miRNA, miRNAPART, isNumber
 from porestat.plots.GraphPlotter import GraphPlot

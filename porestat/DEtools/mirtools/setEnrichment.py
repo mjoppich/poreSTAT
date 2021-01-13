@@ -3,12 +3,12 @@ from collections import defaultdict
 import matplotlib as mpl
 import argparse
 import matplotlib.patches as patches
+
 import sys, os
-
-from statsmodels.stats.multitest import multipletests
-
 sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
 
+
+from statsmodels.stats.multitest import multipletests
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 
 if __name__ == '__main__':

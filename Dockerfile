@@ -5,10 +5,10 @@ LABEL version="1.0"
 LABEL description="Differential Expression pipeline (robust)"
 
 
-RUN apt update && apt install -y python3-dev python3 python3-pip git
-RUN apt install -y libgit2-dev zlib1g-dev libcurl4-gnutls-dev libxml2-dev libssl-dev libpng-dev libjpeg-dev libbz2-dev liblzma-dev libncurses5-dev libncursesw5-dev libgl-dev libgsl-dev libcurl4-gnutls-dev libxml2-dev libssl-dev libpng-dev libjpeg-dev libbz2-dev liblzma-dev libncurses5-dev libncursesw5-dev libgl-dev libgsl-dev 
-
-RUN pip3 install openpyxl jinja2 biopython matplotlib venn pandas numpy seaborn scikit-learn umap scipy statsmodels upsetplot HTSeq pysam dill mpld3 pathos openpyxl h5py
+RUN apt update && apt install -y python3-dev python3 python3-pip git cmake
+RUN apt install -y python3-llvmlite libgit2-dev zlib1g-dev libcurl4-gnutls-dev libxml2-dev libhts-dev libssl-dev libpng-dev libjpeg-dev libbz2-dev liblzma-dev libncurses5-dev libncursesw5-dev libgl-dev libgsl-dev libcurl4-gnutls-dev libxml2-dev libssl-dev libpng-dev libjpeg-dev libbz2-dev liblzma-dev libncurses5-dev libncursesw5-dev libgl-dev libgsl-dev 
+RUN apt install -y llvm-10-dev && LLVM_CONFIG=/usr/bin/llvm-config-10 pip3 install umap-learn
+RUN pip3 install matplotlib==3.3.2 matplotlib_venn openpyxl jinja2 biopython umap-learn umap venn pandas numpy seaborn scikit-learn scipy statsmodels upsetplot HTSeq pysam dill pathos openpyxl h5py
 
 
 RUN R -e 'install.packages(c("BiocManager", "devtools", "argparse", "dbplyr"))'
@@ -29,13 +29,21 @@ RUN R -e 'devtools::install_github("zimmerlab/MS-EmpiRe")'
 
 WORKDIR /git
 RUN /bin/bash -c "chmod -R 775 /git"
+
+RUN git clone https://github.com/mjoppich/mpld3 /git/mpld3
+RUN cd /git/mpld3 && python3 setup.py submodule && python3 setup.py build && python3 setup.py install && cp -r mplexporter/mplexporter/renderers/ /usr/local/lib/python3.9/dist-packages/mpld3-0.3.1.dev1-py3.9.egg/mpld3/mplexporter/ && cd /git
+
 RUN git clone https://github.com/mjoppich/porestat /git/poreSTAT
+
+
+
+RUN mkdir poreSTAT/clib/build && cd poreSTAT/clib/build && cmake .. && make && cd /git
 
 ENTRYPOINT ["python3", "/git/poreSTAT/porestat/DEtools/DifferentialAnalysis.py"]
 CMD ["python3", "/git/poreSTAT/porestat/DEtools/DifferentialAnalysis.py", "--help"]
 
 #docker build .
-#docker tag 4b2ac335f2b2 mjoppich/porestat_de:latest
-#docker tag 4b2ac335f2b2 mjoppich/porestat_de:v1.2
+#docker tag d426563eec45 mjoppich/porestat_de:latest
+#docker tag d426563eec45 mjoppich/porestat_de:v1.3
 #docker login
-#docker push mjoppich/porestat_de:v1.2 --max-concurrent-uploads 3
+#docker push mjoppich/porestat_de:v1.3 

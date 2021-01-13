@@ -7,7 +7,8 @@ import math
 import natsort
 
 import sys, os
-sys.path.insert(0, "/mnt/d/dev/git/poreSTAT/")
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
+
 
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 

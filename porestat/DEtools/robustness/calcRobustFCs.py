@@ -1,5 +1,9 @@
 import math
 
+import sys, os
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
+
+
 import matplotlib as mpl
 mpl.use('Agg')
 
@@ -10,8 +14,6 @@ from collections import defaultdict
 
 import argparse
 from upsetplot import from_contents,plot
-import sys
-sys.path.insert(0, "/mnt/d/dev/git/poreSTAT/")
 
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 
