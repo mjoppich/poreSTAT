@@ -168,7 +168,7 @@ class EnrichmentDF(DataFrame):
         return ['NOISeq', 'DESeq2', 'DirectDESeq2', 'DirectDESeq2Paired', 'msEmpiRe', 'nlEmpiRe', 'limma', 'edgeR']
 
 
-    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['msEmpiRe', 'nlEmpiRe', 'DESeq2', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None, norRNA=False, noMtRNA=False):
+    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['msEmpiRe', 'nlEmpiRe', 'DESeq2', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None):
 
 
         filePrefix = prefix
@@ -290,6 +290,9 @@ class EnrichmentDF(DataFrame):
 
                     for sampleName in replicates[cond1] + replicates[cond2]:
                         baseDict[sampleName] = row[sampleName]
+
+                        if sampleName + ".LS" in self.column2idx:
+                            baseDict[sampleName + ".LS"] = row[sampleName + ".LS"]
 
                         if sampleName + ".FPKM" in self.column2idx:
                             baseDict[sampleName + ".FPKM"] = row[sampleName + ".FPKM"]

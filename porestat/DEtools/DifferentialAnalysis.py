@@ -235,8 +235,9 @@ if __name__ == '__main__':
 
     parser.add_argument('-fpkm', '--no-fpkm', dest='nofpkm', action='store_true', default=False)
     parser.add_argument('-tpm', '--no-tpm', dest='notpm', action='store_true', default=False)
-    parser.add_argument('-rrna', '-keep-rrna', dest='keeprrna', action='store_true', default=False)
+    parser.add_argument('-rrna', '--keep-rrna', dest='keeprrna', action='store_true', default=False)
     parser.add_argument('-rmtrna', '--remove-mtrna', dest='removemtrna', action='store_true', default=False)
+    parser.add_argument('-opc', '--only-protein-coding', dest='only_protein_coding', action='store_true', default=False)
 
     parser.add_argument('-n', '--name', type=str, required=True)
     parser.add_argument('-o', '--organism', type=str, required=True)
@@ -544,6 +545,9 @@ if __name__ == '__main__':
             if args.removemtrna:
                 addFlags.append("--remove-mtrna")
 
+            if args.only_protein_coding:
+                addFlags.append("--only-protein-coding")
+
             requiredMethods = set()
 
             for x in args.de_methods:
@@ -555,7 +559,7 @@ if __name__ == '__main__':
             requiredMethods = sorted(requiredMethods)
 
 
-            sysCall = "python3 {script} foldchange_fc --methods {reqmethods} --output {outdir} --counts {countfile} --prefixes {prefix} --conditions {cond1} --conditions {cond2} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna {flags} --fpkm --tpm".format(
+            sysCall = "python3 {script} foldchange_fc --methods {reqmethods} --output {outdir} --counts {countfile} --prefixes {prefix} --conditions {cond1} --conditions {cond2} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna {flags} --libsize --fpkm --tpm".format(
                 script=os.path.realpath(os.path.join(scriptMain, "../..", "scripts/poreAnalysis.py")),
                 outdir=args.diffreg[pidx],
                 countfile=args.counts[pidx].name,
@@ -615,7 +619,7 @@ if __name__ == '__main__':
         for pidx, prefix in enumerate(args.prefixes):
             caLogger.info("Running SubSample {} ({})".format(pidx, prefix))
 
-            sysCall = "python3 {script} --fc {countfile} --output {outdir} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna --fpkm --tpm".format(
+            sysCall = "python3 {script} --fc {countfile} --output {outdir} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna --libsize --fpkm --tpm".format(
                 script=os.path.realpath(os.path.join(scriptMain, "prepare", "calculateExpressionValues.py")),
                 outdir=os.path.join(args.diffreg[pidx], "counts.tpm.fpkm.tsv"),
                 countfile=args.counts[pidx].name,
@@ -896,7 +900,7 @@ if __name__ == '__main__':
                     prefixIdx1 = args.prefixes.index(prefixPair[0])
                     prefixIdx2 = args.prefixes.index(prefixPair[1])
 
-                    for countType in ["", "TPM", "FPKM"]:
+                    for countType in ["", "LS", "TPM", "FPKM"]:
                         """
         
                         PLOT ENV START
@@ -1080,7 +1084,7 @@ if __name__ == '__main__':
 
 
 
-                    for countType in ["TPM", "FPKM"]:
+                    for countType in ["LS", "TPM", "FPKM"]:
 
                         spConds1 = [x + "." + countType for x in args.cond1[pidx]]
                         spConds2 = [x + "." + countType for x in args.cond2[pidx]]
@@ -1269,7 +1273,7 @@ if __name__ == '__main__':
                         """
 
 
-                        for countType in ["", "TPM", "FPKM"]:
+                        for countType in ["", "LS", "TPM", "FPKM"]:
 
                             """
     

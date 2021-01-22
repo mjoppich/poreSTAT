@@ -29,6 +29,7 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--output', type=str, required=True, help='output files')
     parser.add_argument('-fpkm', '--fpkm', dest='fpkm', action='store_true', default=False)
     parser.add_argument('-tpm', '--tpm', dest='tpm', action='store_true', default=False)
+    parser.add_argument('-ls', '--ls', dest='ls', action='store_true', default=False)
 
     parser.add_argument('-td', '--top_de', nargs="+", type=str, default=None,
                         help="instead of largest expression, top differential genes from method (must have --num)")
@@ -61,6 +62,8 @@ if __name__ == "__main__":
                 accKeys = [x+".TPM" for x in group]
             elif args.fpkm:
                 accKeys = [x + ".FPKM" for x in group]
+            elif args.ls:
+                accKeys = [x + ".LS" for x in group]
             else:
                 accKeys = [x for x in group]
 
@@ -81,6 +84,8 @@ if __name__ == "__main__":
             suffix = [x+".TPM" for x in args.suffix]
         elif args.fpkm:
             suffix = [x + ".FPKM" for x in args.suffix]
+        elif args.ls:
+            suffix = [x + ".LS" for x in args.suffix]
 
         accKeys = [x for x in df.keys() if any([x.endswith(nsuff) for nsuff in suffix])]
 

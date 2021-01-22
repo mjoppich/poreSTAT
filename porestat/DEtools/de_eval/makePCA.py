@@ -19,8 +19,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('-f', '--fc', type=argparse.FileType('r'), required=True, help='fc files')
     parser.add_argument('-o', '--output', type=str, required=True, help='output files')
+
     parser.add_argument('-fpkm', '--fpkm', dest='fpkm', action='store_true', default=False)
     parser.add_argument('-tpm', '--tpm', dest='tpm', action='store_true', default=False)
+    parser.add_argument('-ls', '--ls', dest='ls', action='store_true', default=False)
 
     parser.add_argument('-cos', '--cosine', action='store_true', default=False, help="activate cosine similarity")
     parser.add_argument('-man', '--manhattan', action='store_true', default=False, help="activate manhattan similarity")
@@ -47,6 +49,8 @@ if __name__ == "__main__":
             accKeys = [x+".TPM" for x in args.samples]
         elif args.fpkm:
             accKeys = [x + ".FPKM" for x in args.samples]
+        elif args.ls:
+            accKeys = [x + ".LS" for x in args.samples]
         else:
             accKeys = args.samples
 
@@ -60,6 +64,8 @@ if __name__ == "__main__":
             suffix = [x+".TPM" for x in args.suffix]
         elif args.fpkm:
             suffix = [x + ".FPKM" for x in args.suffix]
+        elif args.ls:
+            accKeys = [x + ".LS" for x in args.suffix]
 
     accKeys = [x for x in df.keys() if any([x.endswith(nsuff) for nsuff in suffix])]
 
