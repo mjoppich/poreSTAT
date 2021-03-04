@@ -226,7 +226,7 @@ def readable_dir(prospective_dir):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser = argparse.ArgumentParser(description='Robust Differential Expression Analysis (RoDE)')
     parser.add_argument('-c', '--counts', nargs='+', type=argparse.FileType('r'), required=True, help='count files')
     parser.add_argument('-d', '--diffreg', type=readable_dir, nargs='+', required=True)
 

@@ -260,10 +260,13 @@ if __name__ == '__main__':
         
         else:
 
+            if len(method2genes) == 1:
+                method2genes["N/A"] = {}
+
             plt.title("Overlap of called genes per method")
             upIn = from_contents(method2genes)
             print( upIn.index )
-            print( upIn.index.levels )
+            #print( upIn.index.levels )
 
             plot(upIn, subset_size="auto") 
             plt.savefig(outfilename, bbox_inches="tight")
