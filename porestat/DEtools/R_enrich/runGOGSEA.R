@@ -117,14 +117,26 @@ print(length(entrezGenesC[duplicated(names(entrezGenesC))]))
 print("By Method")
 print(bymethod)
 
+if (length(entrezGenesC) < 10)
+{
+    print("TOO FEW GENES FOR GSE! Expect min 10 genes.")
+    quit(status=0, save='no')
+}
+
 #like
 #https://www.r-bloggers.com/kegg-enrichment-analysis-with-latest-online-data-using-clusterprofiler/
 
 for (GODB in c("BP", "MF", "CC")) { #
 
+    if (bymethod=="DOSE")
+    {
+        kk <- gseGO(entrezGenesC, orgDB, keyType=keyType, ont=GODB, pvalueCutoff=0.5, pAdjustMethod="BH", by=bymethod, nPerm=500)
+    } else {
+        kk <- gseGO(entrezGenesC, orgDB, keyType=keyType, ont=GODB, pvalueCutoff=0.5, pAdjustMethod="BH", by=bymethod)
+    }
 
     #by DOSE as fgsea has problems with all genes being in one class...
-    kk <- gseGO(entrezGenesC, orgDB, keyType=keyType, ont=GODB, pvalueCutoff=0.5, pAdjustMethod="BH", by=bymethod)
+    
 
     if (is.null(kk))
     {

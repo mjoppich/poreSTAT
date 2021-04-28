@@ -57,6 +57,11 @@ pdat.file <- commandArgs()[7]
 fdat.file <- commandArgs()[8]
 out.file <- commandArgs()[9]
 
+#exprs.file = "diffregs/neutrophils_excl.umi.all.diffreg/count_expr"
+#pdat.file = "diffregs/neutrophils_excl.umi.all.diffreg/count_p_data"
+#fdat.file = "diffregs/neutrophils_excl.umi.all.diffreg/count_f_data"
+#out.file = "diffregs/neutrophils_excl.umi.all.diffreg/count_out_data_DirectDESeq2"
+
 message("Reading data ...")
 eset <- readSE(exprs.file, pdat.file, fdat.file)
 
@@ -67,9 +72,35 @@ dds <- DESeq(dds)
 ( res <- results(dds) )
 outres = res[! is.na(res$padj),]
 
+normExpr = counts(dds, normalized=T)
+cn = colnames(normExpr)
+normExpr2 = cbind(rownames(normExpr), normExpr)
+colnames(normExpr2) = c("Geneid", cn)
 
 finalres = data.frame(PROBEID=rownames(outres), FC=outres$log2FoldChange, PVAL=outres$pvalue, ADJ.PVAL=outres$padj)
 
 write.table(finalres, file=out.file, row.names=F, quote=F, sep="\t")
+write.table(normExpr2, file=paste(out.file, ".norm_expr.tsv", sep=""), row.names=F, quote=F, sep="\t")
 
 
+fresSorted = finalres[order(finalres$ADJ.PVAL), ]
+library(ggplot2)
+
+geneList = fresSorted$PROBEID[1:min(10, length(fresSorted$PROBEID))]
+
+if ("ENSG00000011422" %in% finalres$PROBEID)
+{
+    geneList = c("ENSG00000011422", geneList)
+}
+
+for (gene in geneList)
+{
+    d <- plotCounts(dds, gene=gene, intgroup="GROUP", returnData=T)
+    p = ggplot(d, aes(x=GROUP, y=count)) + geom_point(position=position_jitter(w=0.1,h=0))
+
+    statdf = fresSorted[fresSorted$PROBEID == gene,]
+    statView = toString(statdf)
+
+    p = p + labs(title=gene, subtitle=statView)
+    ggsave(paste(out.file, ".", gene, ".png", sep=""), plot=p)
+}
