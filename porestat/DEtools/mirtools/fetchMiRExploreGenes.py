@@ -296,7 +296,7 @@ class miRGeneGraph:
 
         # number of genes for each mirna
         for node in graph.nodes():
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             if nodeData["type"] != "mirna":
                 continue
@@ -305,12 +305,12 @@ class miRGeneGraph:
             nonMirNeighbours = set()
 
             for y in miRNeighbours:
-                neighData = graph.node[y]["attr_dict"]
+                neighData = graph.nodes[y]["attr_dict"]
 
                 if neighData["type"] != "mirna":
                     nonMirNeighbours.add(y)
 
-            graph.node[node]["attr_dict"]["all_targets"] = nonMirNeighbours
+            graph.nodes[node]["attr_dict"]["all_targets"] = nonMirNeighbours
 
 
 
@@ -318,7 +318,7 @@ class miRGeneGraph:
         delNode = set()
         for node in graph.nodes():
 
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             if nodeData["type"] != "gene":
                 continue
@@ -357,7 +357,7 @@ class miRGeneGraph:
         removeNodes = set()
 
         for node in graph.nodes():
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             nodeNN = [x for x in graph.neighbors(node)]
 
@@ -374,7 +374,7 @@ class miRGeneGraph:
 
         for node in graph.nodes():
 
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             nodeNN = [x for x in graph.neighbors(node)]
 
@@ -390,8 +390,8 @@ class miRGeneGraph:
                 src = node
                 tgt = nn
 
-                srcData = graph.node[src]["attr_dict"]
-                tgtData = graph.node[tgt]["attr_dict"]
+                srcData = graph.nodes[src]["attr_dict"]
+                tgtData = graph.nodes[tgt]["attr_dict"]
 
                 srcDir = srcData.get("node_expr_direction", "N/A")
                 tgtDir = tgtData.get("node_expr_direction", "N/A")
@@ -411,12 +411,12 @@ class miRGeneGraph:
                 else:
                     unknownDirection += 1
 
-            graph.node[node]['attr_dict']["edge_elements"] = {
+            graph.nodes[node]['attr_dict']["edge_elements"] = {
                 'correct': correctDirection,
                 'incorrect': incorrectDirection,
                 'unknown': unknownDirection
             }
-            graph.node[node]['attr_dict']["node_elements"] = dict(directionCounter)
+            graph.nodes[node]['attr_dict']["node_elements"] = dict(directionCounter)
 
             if nodeData["node_expr_direction"] in ["N/A"]:
                 print(node, nodeData["node_expr_direction"], nodeData["node_expr_detection"], directionCounter)
@@ -453,7 +453,7 @@ class miRGeneGraph:
         nodeConditionCount = 0
         for node in sorted([x for x in graph.nodes()]):
 
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             if nodeData["type"] == "mirna":
                 continue
@@ -465,7 +465,7 @@ class miRGeneGraph:
 
             inconsistCount = 0
             for nn in nodeNN:
-                nnData = graph.node[nn]["attr_dict"]
+                nnData = graph.nodes[nn]["attr_dict"]
 
                 nnDirection = nnData["node_expr_direction"]
                 edgeType = graph.edges[(node, nn)]["edge_type"]
@@ -508,8 +508,8 @@ class miRGeneGraph:
                 src = edge[0]
                 tgt = edge[1]
 
-                srcData = graph.node[src]["attr_dict"]
-                tgtData = graph.node[tgt]["attr_dict"]
+                srcData = graph.nodes[src]["attr_dict"]
+                tgtData = graph.nodes[tgt]["attr_dict"]
 
                 if srcData["type"] == "gene":
 
@@ -558,7 +558,7 @@ class miRGeneGraph:
 
             for nn in nodeNN:
                 tgt = nn
-                tgtData = graph.node[tgt]["attr_dict"]
+                tgtData = graph.nodes[tgt]["attr_dict"]
                 tgtDir = tgtData.get("node_expr_direction", "N/A")
 
                 if tgtDir == "N/A":
@@ -602,7 +602,7 @@ class miRGeneGraph:
 
             for nn in nodeNN:
                 tgt = nn
-                tgtData = graph.node[tgt]["attr_dict"]
+                tgtData = graph.nodes[tgt]["attr_dict"]
                 tgtDir = tgtData.get("node_expr_direction", "N/A")
 
                 if tgtDir == "N/A":
@@ -627,7 +627,7 @@ class miRGeneGraph:
 
         for node in sorted([x for x in graph.nodes()]):
 
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             if not nodeData["type"] == "mirna":
                 continue
@@ -671,7 +671,7 @@ class miRGeneGraph:
 
             for nn in nodeNN:
                 tgt = nn
-                tgtData = graph.node[tgt]["attr_dict"]
+                tgtData = graph.nodes[tgt]["attr_dict"]
                 tgtDir = tgtData.get("node_expr_direction", "N/A")
 
                 totalDirectionCounter[self.dirToOpposite[tgtDir]] += 1  # opposite, because this is evidence for opp dir
@@ -721,7 +721,7 @@ class miRGeneGraph:
             numSuccInPopulation = numDeGenes
 
             drawnSuccesses = data[4]
-            sampleSize = len(graph.node[data[0]]["attr_dict"]["all_targets"])
+            sampleSize = len(graph.nodes[data[0]]["attr_dict"]["all_targets"])
 
             pval = hypergeom.sf(drawnSuccesses - 1, populationSize, numSuccInPopulation, sampleSize)
             #print(x, drawnSuccesses - 1, populationSize, numSuccInPopulation, sampleSize, pval)
@@ -757,7 +757,7 @@ class miRGeneGraph:
             savedElem.append( ovaPval[nodeIdx] )
             savedElem.append( ovaAdjPval[nodeIdx] )
 
-            sampleSize = len(graph.node[data[0]]["attr_dict"]["all_targets"])
+            sampleSize = len(graph.nodes[data[0]]["attr_dict"]["all_targets"])
             savedElem.append(sampleSize)
 
             retRatio.append(tuple(savedElem))
@@ -812,10 +812,10 @@ class miRGeneGraph:
 
             pval = elem[7]#allpvals[idx]
             adj_pval = elem[8]#allAdjPvals[idx]
-            direction = graph.node[miRNA]["attr_dict"].get("node_expr_direction", "N/A").upper()
+            direction = graph.nodes[miRNA]["attr_dict"].get("node_expr_direction", "N/A").upper()
 
-            all_targets = ";".join([str(x) for x in graph.node[miRNA]["attr_dict"]["all_targets"]])
-            target_gene_count = len(graph.node[miRNA]["attr_dict"]["all_targets"])
+            all_targets = ";".join([str(x) for x in graph.nodes[miRNA]["attr_dict"]["all_targets"]])
+            target_gene_count = len(graph.nodes[miRNA]["attr_dict"]["all_targets"])
 
             genes = elem[9]
             strict_count = elem[10]
@@ -849,7 +849,7 @@ class miRGeneGraph:
 
         for nn in nodeNN:
             tgt = nn
-            tgtData = graph.node[tgt]["attr_dict"]
+            tgtData = graph.nodes[tgt]["attr_dict"]
             tgtDir = tgtData.get("node_expr_direction", "N/A")
 
             if measuredOnly:
@@ -867,7 +867,7 @@ class miRGeneGraph:
                 if nnn == mirna:
                     continue
 
-                nnnDir = graph.node[nnn]["attr_dict"].get("node_expr_direction", "N/A")
+                nnnDir = graph.nodes[nnn]["attr_dict"].get("node_expr_direction", "N/A")
                 if tgtDir != "N/A" and tgtDir == self.dirToOpposite[nnnDir]:
                     nnExplained = True
                     break
@@ -964,7 +964,7 @@ class miRGeneGraph:
         """
         # impute regulations
         for node in graph.nodes():
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             if nodeData["type"] != "mirna":
                 continue
@@ -978,7 +978,7 @@ class miRGeneGraph:
             nnRegs = {}
             for nn in nodeNN:
 
-                nndata = graph.node[nn]["attr_dict"]
+                nndata = graph.nodes[nn]["attr_dict"]
                 if nndata["log2FC"] < 0:
                     nnRegs[nn] = "down"
                 elif nndata["log2FC"] > 0:
@@ -1029,7 +1029,7 @@ class miRGeneGraph:
         # impute regulations
         for node in graph.nodes():
 
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             if nodeData["type"] == "mirna":
                 continue
@@ -1044,7 +1044,7 @@ class miRGeneGraph:
             acceptNode = True
             for nn in nodeNN:
 
-                nndata = graph.node[nn]["attr_dict"]
+                nndata = graph.nodes[nn]["attr_dict"]
                 if nndata["log2FC"] < 0:
                     nnDir = "down"
                 elif nndata["log2FC"] > 0:
@@ -1084,11 +1084,11 @@ class miRGeneGraph:
         # impute regulations
 
     def nnHasEvidence(self, graph, node):
-        nodeData = graph.node[node]["attr_dict"]
+        nodeData = graph.nodes[node]["attr_dict"]
         nodeNN = [x for x in graph.neighbors(node)]
         for nn in nodeNN:
 
-            nndata = graph.node[nn]["attr_dict"]
+            nndata = graph.nodes[nn]["attr_dict"]
             #edgeType = graph.edges[(node, nn)]["edge_type"]
             #if edgeType in ['imputed', 'expected']:
             #    return True
@@ -1116,7 +1116,7 @@ class miRGeneGraph:
 
         for node in graph.nodes():
 
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             if nodeData["type"] != "mirna":
                 continue
@@ -1142,7 +1142,7 @@ class miRGeneGraph:
 
             for nn in nodeNN:
 
-                nndata = graph.node[nn]["attr_dict"]
+                nndata = graph.nodes[nn]["attr_dict"]
                 if nndata["log2FC"] < 0:
                     nnRegs[nn] = "down"
                 elif nndata["log2FC"] > 0:
@@ -1247,13 +1247,13 @@ class miRGeneGraph:
                     print("impute2 not samedir", node, regCounter, nnEdgeTypes, nnWithEvidence, sameDir, undetEdges)
 
     def nnGetEvidences(self, graph, node):
-        nodeData = graph.node[node]["attr_dict"]
+        nodeData = graph.nodes[node]["attr_dict"]
         nodeNN = [x for x in graph.neighbors(node)]
 
         evidenceNodes = set()
         for nn in nodeNN:
 
-            nndata = graph.node[nn]["attr_dict"]
+            nndata = graph.nodes[nn]["attr_dict"]
             edgeType = graph.edges[(node, nn)]["edge_type"]
 
             if graph.edges[(node, nn)].get("linestyle", None) == "dotted":
@@ -1274,7 +1274,7 @@ class miRGeneGraph:
 
         for node in graph.nodes():
 
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             if nodeData["type"] != "mirna":
                 continue
@@ -1298,7 +1298,7 @@ class miRGeneGraph:
 
             for nn in nodeNN:
 
-                nndata = graph.node[nn]["attr_dict"]
+                nndata = graph.nodes[nn]["attr_dict"]
                 if nndata["log2FC"] < 0:
                     childDir = "down"
                 elif nndata["log2FC"] > 0:
@@ -1327,7 +1327,7 @@ class miRGeneGraph:
                 for nn in nodeNN:
 
                     allEvs = self.nnGetEvidences(graph, nn)
-                    nndata = graph.node[nn]["attr_dict"]
+                    nndata = graph.nodes[nn]["attr_dict"]
 
                     if nndata["log2FC"] < 0:
                         childDir = "down"
@@ -1367,7 +1367,7 @@ class miRGeneGraph:
                 for nn in nodeNN:
 
                     allEvs = self.nnGetEvidences(graph, nn)
-                    nndata = graph.node[nn]["attr_dict"]
+                    nndata = graph.nodes[nn]["attr_dict"]
 
                     childDir = graph.nodes[nn]["attr_dict"].get("node_expr_direction", "N/A")
 
@@ -1401,13 +1401,13 @@ class miRGeneGraph:
         else:
             return
 
-        nodeData = graph.node[gnode]["attr_dict"]
+        nodeData = graph.nodes[gnode]["attr_dict"]
         nodeNN = [x for x in graph.neighbors(gnode)]
 
         for nn in nodeNN:
 
             mirEdge = (gnode, nn)
-            ndata = graph.node[nn]["attr_dict"]
+            ndata = graph.nodes[nn]["attr_dict"]
 
             childDir = graph.nodes[nn]["attr_dict"].get("node_expr_direction", "N/A")
 
@@ -1448,8 +1448,8 @@ class miRGeneGraph:
             src = edge[0]
             tgt = edge[1]
 
-            srcData = graph.node[src]["attr_dict"]
-            tgtData = graph.node[tgt]["attr_dict"]
+            srcData = graph.nodes[src]["attr_dict"]
+            tgtData = graph.nodes[tgt]["attr_dict"]
 
             srcDir = srcData.get("node_expr_direction", "N/A")
             tgtDir = tgtData.get("node_expr_direction", "N/A")
@@ -1531,7 +1531,7 @@ class miRGeneGraph:
 
         for node in graph.nodes():
 
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             if node in ["miR-181"]:
                 print(node)
@@ -1560,7 +1560,7 @@ class miRGeneGraph:
 
             for nn in nodeNN:
 
-                nndata = graph.node[nn]["attr_dict"]
+                nndata = graph.nodes[nn]["attr_dict"]
                 childDir = graph.nodes[nn]["attr_dict"].get("node_expr_direction", "N/A")
 
                 nnRegs[nn] = childDir
@@ -1654,7 +1654,7 @@ class miRGeneGraph:
     def checkConsistency(self, graph):
         for node in sorted([x for x in graph.nodes()]):
 
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             if nodeData["type"] != "mirna":
                 continue
@@ -1665,7 +1665,7 @@ class miRGeneGraph:
 
             inconsistCount = 0
             for nn in nodeNN:
-                nnData = graph.node[nn]["attr_dict"]
+                nnData = graph.nodes[nn]["attr_dict"]
 
                 nnDirection = nnData["node_expr_direction"]
                 edgeType = graph.edges[(node, nn)]["edge_type"]
@@ -1682,7 +1682,7 @@ class miRGeneGraph:
 
         for node in sorted([x for x in graph.nodes()]):
 
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             if nodeData["type"] == "mirna":
                 continue
@@ -1694,7 +1694,7 @@ class miRGeneGraph:
 
             inconsistCount = 0
             for nn in nodeNN:
-                nnData = graph.node[nn]["attr_dict"]
+                nnData = graph.nodes[nn]["attr_dict"]
 
                 nnDirection = nnData["node_expr_direction"]
                 edgeType = graph.edges[(node, nn)]["edge_type"]
@@ -1733,7 +1733,7 @@ class miRGeneGraph:
 
         tCounter = Counter()
         for node in graph.nodes():
-            nodeData = graph.node[node]["attr_dict"]
+            nodeData = graph.nodes[node]["attr_dict"]
 
             tCounter[tuple([nodeData.get(x, "") for x in attrNames])] += 1
 

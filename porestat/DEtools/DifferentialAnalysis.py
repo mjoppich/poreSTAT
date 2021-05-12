@@ -235,6 +235,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-fpkm', '--no-fpkm', dest='nofpkm', action='store_true', default=False)
     parser.add_argument('-tpm', '--no-tpm', dest='notpm', action='store_true', default=False)
+    parser.add_argument('-ls', '--no-ls', dest='nols', action='store_true', default=False)
     parser.add_argument('-rrna', '--keep-rrna', dest='keeprrna', action='store_true', default=False)
     parser.add_argument('-rmtrna', '--remove-mtrna', dest='removemtrna', action='store_true', default=False)
     parser.add_argument('-opc', '--only-protein-coding', dest='only_protein_coding', action='store_true', default=False)
@@ -318,6 +319,7 @@ if __name__ == '__main__':
 
     args.fpkm = True
     args.tpm = True
+    args.ls = True
     args.rm_rrna = True
     if args.nofpkm:
         args.fpkm = False
@@ -325,13 +327,25 @@ if __name__ == '__main__':
     if args.notpm:
         args.tpm = False
 
+    if args.nols:
+        args.ls = False
+
     if args.keeprrna:
         args.rm_rrna = False
 
 
+    allCountTypes = []
+
+    if args.ls:
+        allCountTypes.append("LS")
+    if args.tpm:
+        allCountTypes.append("TPM")
+    if args.fpkm:
+        allCountTypes.append("FPKM")
 
     tpmFlag = "--tpm"
     fpkmFlag = "--fpkm"
+    lsFlag = "--ls"
     rrnaFlag = "--no-rrna"
     mtrnaFlag = "--remove-mtrna"
 
@@ -340,6 +354,9 @@ if __name__ == '__main__':
 
     if not args.tpm:
         tpmFlag = ""
+
+    if not args.ls:
+        lsFlag = ""
 
     if not rrnaFlag:
         rrnaFlag = ""
@@ -900,7 +917,7 @@ if __name__ == '__main__':
                     prefixIdx1 = args.prefixes.index(prefixPair[0])
                     prefixIdx2 = args.prefixes.index(prefixPair[1])
 
-                    for countType in ["", "LS", "TPM", "FPKM"]:
+                    for countType in [""] + allCountTypes:
                         """
         
                         PLOT ENV START
@@ -1084,7 +1101,7 @@ if __name__ == '__main__':
 
 
 
-                    for countType in ["LS", "TPM", "FPKM"]:
+                    for countType in allCountTypes:
 
                         spConds1 = [x + "." + countType for x in args.cond1[pidx]]
                         spConds2 = [x + "." + countType for x in args.cond2[pidx]]
@@ -1273,7 +1290,7 @@ if __name__ == '__main__':
                         """
 
 
-                        for countType in ["", "LS", "TPM", "FPKM"]:
+                        for countType in [""] + allCountTypes:
 
                             """
     
