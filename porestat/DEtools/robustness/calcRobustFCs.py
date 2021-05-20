@@ -93,12 +93,10 @@ if __name__ == '__main__':
                 availMethods.add(hsplit[0])
                 methodCol2Idx[(hsplit[0], hsplit[-1])].append(hidx)
 
-        print(availMethods)
-        print(args.methods)
-
         for method in args.methods:
             if not method in availMethods:
                 print("Invalid Method:", method)
+                print("Available Methods:", availMethods)
                 exit(-1)
 
         rowFCidx = indf.addColumn("ROB_log2FC")

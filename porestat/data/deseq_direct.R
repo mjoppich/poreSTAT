@@ -80,7 +80,10 @@ colnames(normExpr2) = c("Geneid", cn)
 finalres = data.frame(PROBEID=rownames(outres), FC=outres$log2FoldChange, PVAL=outres$pvalue, ADJ.PVAL=outres$padj)
 
 write.table(finalres, file=out.file, row.names=F, quote=F, sep="\t")
-write.table(normExpr2, file=paste(out.file, ".norm_expr.tsv", sep=""), row.names=F, quote=F, sep="\t")
+
+out_dir_name = dirname(out.file)
+out_base_name = basename(out.file)
+write.table(normExpr2, file=paste(out_dir_name, "/", "norm_expr.", out_base_name, sep=""), row.names=F, quote=F, sep="\t")
 
 
 fresSorted = finalres[order(finalres$ADJ.PVAL), ]
