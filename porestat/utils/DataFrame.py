@@ -522,7 +522,6 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         for i in range(0, len(self.data)):
             vElemLine = list(self.data[i])
             vReturnLine = oFunc(vElemLine)
-
             self[i] = vReturnLine
 
     def getColumn(self, oColumn):
@@ -773,19 +772,19 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
 
         return sStr
 
-    def _makeStr(self, sep='\t'):
+    def _makeStr(self, sep='\t', include_header=True):
 
         sortedHeader = sorted(self.column2idx.items(), key=operator.itemgetter(1))
-
         vHeader = [str(x[0]) for x in sortedHeader]
-
-        sStr = sep.join(vHeader)
+        
+        allData = []
+        if include_header:
+            allData.append(sep.join(vHeader))
 
         for oLine in self.data:
-            sStr += "\n"
-            sStr += sep.join([str(x) for x in oLine])
+            allData.append(sep.join([str(x) for x in oLine]))
 
-        return sStr
+        return "\n".join(allData)
 
     def _writeToFile(self, content, filename):
 
@@ -1256,7 +1255,7 @@ document.addEventListener('readystatechange', event => {
 
 
 
-    def export(self, outFile, exType=ExportTYPE.TSV, html_element_id=None):
+    def export(self, outFile, exType=ExportTYPE.TSV, html_element_id=None, include_header=True):
 
         outputText = None
 
@@ -1272,9 +1271,9 @@ document.addEventListener('readystatechange', event => {
             return self._makeHTMLString(html_element_id)
 
         if exType == ExportTYPE.TSV:
-            outputText = self._makeStr('\t')
+            outputText = self._makeStr('\t', include_header=include_header)
         elif exType == ExportTYPE.CSV:
-            outputText = self._makeStr(';')
+            outputText = self._makeStr(';', include_header=include_header)
 
         elif exType == ExportTYPE.LATEX:
             outputText = self._makeLatex()
@@ -1332,10 +1331,18 @@ document.addEventListener('readystatechange', event => {
 
         vLine = list(aLine)
 
+        origVH = vNumberHeader
+
         if vNumberHeader is None:
             vNumberHeader = [False] * len(oHeader)
 
         for e in range(0, len(vNumberHeader)):
+            if e >= len(vLine):
+                print("incorrect e")
+                print(origVH)
+                print(len(vLine), vLine)
+                print(len(vNumberHeader), vNumberHeader)
+
             if vNumberHeader[e]:
                 oRes = toNumber(vLine[e], vLine[e])
                 vLine[e] = oRes
@@ -1355,7 +1362,7 @@ document.addEventListener('readystatechange', event => {
         return tuple(vLine)
 
     @classmethod
-    def parseFromFile(cls, sFileName, oHeader=None, skipLines=0, cDelim='\t', bConvertTextToNumber=True, encoding="utf-8", skipChar=None, replacements=None):
+    def parseFromFile(cls, sFileName, oHeader=None, skipLines=0, cDelim='\t', bConvertTextToNumber=True, encoding="utf-8", skipChar=None, replacements=None,header=True):
 
 
         if type(sFileName) == str:
@@ -1379,11 +1386,16 @@ document.addEventListener('readystatechange', event => {
 
         if oHeader is None:
 
-            # retrieve header from first line
-            iStartLine += 1
-
-            oHeaderRes = cls.createHeader(vLines[0], cDelim)
-            oHeader = oHeaderRes[0]
+            if header==True:
+                # retrieve header from first line
+                iStartLine += 1
+                oHeaderRes = cls.createHeader(vLines[0], cDelim)
+                oHeader = oHeaderRes[0]
+            else:
+                numCols = len(vLines[0].split(cDelim))
+                oHeader = {}
+                for i in range(0,numCols):
+                    oHeader["var{}".format(i)] = i
 
         else:
 
@@ -1412,6 +1424,9 @@ document.addEventListener('readystatechange', event => {
 
                     if isNumber(vLine[e]):
                         vNumberHeader[e] = True
+
+            assert(len(vNumberHeader) == len(oHeader))
+            assert(len(vLine) == len(oHeader))
 
             lineTuple = cls.createLineTuple(sLine=sLine, oHeader=oHeader, cDelim=cDelim, vNumberHeader=vNumberHeader, oEmptyValue=None, replacements=replacements)
 

@@ -12,7 +12,11 @@ from multiprocessing import Pool
 
 sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../")
 
+#import os,sys
+#sys.path.insert(0, "/mnt/f/dev/git/poreSTAT")
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
+#DataFrame.parseFromFile("diffregs/myh11_1_smc/smc_wt_ko.reads_exon.diffreg/count_smc_ko_1_smc_wt_1.tsv")
+
 from porestat.utils.OrderedDefaultDictClass import OrderedDefaultDict
 
 
@@ -854,24 +858,25 @@ if __name__ == '__main__':
         log.debug(sysCall)
 
         simulate = args.simulate
+        searchPref = plotsPrefix
 
         if plotsPrefix != None:
-            searchPref = plotsPrefix
-            if not searchPref.upper().endswith(".PNG") and len(glob(searchPref)) == 0:
+            
+            if not searchPref.upper().endswith((".PNG",)) and len(glob(searchPref)) == 0:
                 searchPref += "*.png"
 
             if args.update and len(glob(searchPref + "*")) > 0:
                 simulate = True
 
-        if not simulate:
+        if not simulate and not sysCall is None:
             subprocess.run(sysCall, shell=True, check=True)
 
         if plotid != None and plotsPrefix != None:
 
-            if not plotsPrefix.upper().endswith(".PNG"):
-                plotsPrefix += "*.png"
+            #if not plotsPrefix.upper().endswith(".PNG"):
+            #    plotsPrefix += "*.png"
 
-            plotDict[method][plotid][prefix] = glob(plotsPrefix)
+            plotDict[method][plotid][prefix] = glob(searchPref)
             log.debug("Found Images\n" + "\n".join(plotDict[method][plotid][prefix]))
 
     def splitDEMethods(inMethods):
@@ -981,6 +986,16 @@ if __name__ == '__main__':
                                                                                          "<p>The upset plot shows how many genes have been discovered using each method.</p>"\
                                                                                          "<p>The volcano plot shows logFC and -log10(pVal) for the robustly detected genes (that are genes that are DE with all above methods).</p>".format(" ".join(methods))
                     runSysCall(sysCall, "Calculate Robust FCs", statsLogger, "DE Methods Overview ({})".format(" ".join(methods)), robustDeFile + ".rob.", args, prefix, methods, deEnrichPlots)
+
+                    
+                    if len(methods) == 1:
+                        methodsStr = methods[0]
+                        plotName = "DE Method Plots ({})".format(methodsStr)
+                        plotId2Descr[plotName] = "<p>For specific methods several plots are created as part of the general DE analysis.</p>" \
+                                                                              "<p>These plots are collected here.</p>"
+                        
+                        methodPlots = "{diffreg}/{mstr}.*.svg".format(diffreg=args.diffreg[pidx], mstr=methodsStr)
+                        runSysCall(None, "Collect DE Method Plots", statsLogger, plotName, methodPlots, args, prefix, methods, deEnrichPlots)
 
 
                     """

@@ -26,13 +26,14 @@ RUN cd /git/mpld3 && python3 setup.py submodule && python3 setup.py build && pyt
 RUN git clone https://github.com/mjoppich/porestat /git/poreSTAT
 RUN mkdir poreSTAT/clib/build && cd poreSTAT/clib/build && cmake .. && make && cd /git
 
-RUN R -e 'install.packages(c("BiocManager", "devtools", "argparse", "dbplyr"))'
+RUN R -e 'install.packages(c("BiocManager", "devtools", "argparse", "dbplyr", "ashr", "svglite"))'
 RUN R -e 'devtools::install_github("stephenturner/annotables")'
 RUN R -e 'options(download.file.method = "curl"); devtools::install_github("YuLab-SMU/ReactomePA")'
 RUN R -e 'BiocManager::install("clusterProfiler")'
 #RUN R -e 'BiocManager::install("ReactomePA")'
 RUN R -e 'BiocManager::install("RDAVIDWebService")'
 RUN R -e 'BiocManager::install("qvalue")'
+RUN R -e 'BiocManager::install("apeglm")'
 RUN R -e 'BiocManager::install("org.Mm.eg.db")'
 RUN R -e 'BiocManager::install("org.Hs.eg.db")'
 RUN R -e 'BiocManager::install("org.Sc.sgd.db")'
