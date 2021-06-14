@@ -5,11 +5,10 @@ import argparse
 import math
 
 import sys, os
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
+
 
 from upsetplot import from_contents, plot
-
-sys.path.insert(0, "/mnt/d/dev/git/poreSTAT/")
-
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 import venn
 

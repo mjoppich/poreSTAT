@@ -7,7 +7,8 @@ import argparse
 import math
 
 import sys, os
-sys.path.insert(0, "/mnt/d/dev/git/poreSTAT/")
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
+
 
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 import venn
@@ -131,11 +132,30 @@ if __name__ == '__main__':
 
     for topN in args.top_n:
 
+        outname = args.output + "." + str(topN)
+        if not outname.endswith(".png"):
+            outname += ".png"
+
+        print(outname)
+
         if len(foundRes[topN]) == 1:
             foundRes[topN].append(("Dummy Element",  [(None, None)], 0))
 
-        vennLabels = venn.generate_petal_labels([set([y[0] for y in x[1]]) for x in foundRes[topN]])
-        vennSets = generate_petal_sets([set([y[0] for y in x[1]]) for x in foundRes[topN]])
+        inputSets = [set([y[0] for y in x[1]]) for x in foundRes[topN]]
+
+        totalElements = sum([len(x) for x in inputSets])
+
+        if totalElements == 0:
+            print(outname, "no data")
+            fig = plt.figure()
+            plt.title("No Data to show")
+            plt.savefig(outname, bbox_inches="tight")
+            plt.close()
+
+            continue
+
+        vennLabels = venn.generate_petal_labels(inputSets)
+        vennSets = generate_petal_sets(inputSets)
 
         for field in vennSets:
 
@@ -151,12 +171,5 @@ if __name__ == '__main__':
         fig, ax = pwcount2function[len(foundRes[topN])](vennLabels, names=["{fn} (lq={lqc})".format(fn=x[0], lqc=x[2]) for x in foundRes[topN]])
 
         plt.suptitle("Overlaps for topN={} pathways (by qvalue)".format(topN))
-
-        outname = args.output + "." + str(topN)
-
-        if not outname.endswith(".png"):
-            outname += ".png"
-
-        print(outname)
         plt.savefig(outname, bbox_inches ="tight")
 

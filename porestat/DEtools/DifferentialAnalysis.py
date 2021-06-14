@@ -12,7 +12,11 @@ from multiprocessing import Pool
 
 sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../")
 
+#import os,sys
+#sys.path.insert(0, "/mnt/f/dev/git/poreSTAT")
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
+#DataFrame.parseFromFile("diffregs/myh11_1_smc/smc_wt_ko.reads_exon.diffreg/count_smc_ko_1_smc_wt_1.tsv")
+
 from porestat.utils.OrderedDefaultDictClass import OrderedDefaultDict
 
 
@@ -226,7 +230,7 @@ def readable_dir(prospective_dir):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser = argparse.ArgumentParser(description='Robust Differential Expression Analysis (RoDE)')
     parser.add_argument('-c', '--counts', nargs='+', type=argparse.FileType('r'), required=True, help='count files')
     parser.add_argument('-d', '--diffreg', type=readable_dir, nargs='+', required=True)
 
@@ -235,8 +239,10 @@ if __name__ == '__main__':
 
     parser.add_argument('-fpkm', '--no-fpkm', dest='nofpkm', action='store_true', default=False)
     parser.add_argument('-tpm', '--no-tpm', dest='notpm', action='store_true', default=False)
-    parser.add_argument('-rrna', '-keep-rrna', dest='keeprrna', action='store_true', default=False)
+    parser.add_argument('-ls', '--no-ls', dest='nols', action='store_true', default=False)
+    parser.add_argument('-rrna', '--keep-rrna', dest='keeprrna', action='store_true', default=False)
     parser.add_argument('-rmtrna', '--remove-mtrna', dest='removemtrna', action='store_true', default=False)
+    parser.add_argument('-opc', '--only-protein-coding', dest='only_protein_coding', action='store_true', default=False)
 
     parser.add_argument('-n', '--name', type=str, required=True)
     parser.add_argument('-o', '--organism', type=str, required=True)
@@ -317,6 +323,7 @@ if __name__ == '__main__':
 
     args.fpkm = True
     args.tpm = True
+    args.ls = True
     args.rm_rrna = True
     if args.nofpkm:
         args.fpkm = False
@@ -324,13 +331,25 @@ if __name__ == '__main__':
     if args.notpm:
         args.tpm = False
 
+    if args.nols:
+        args.ls = False
+
     if args.keeprrna:
         args.rm_rrna = False
 
 
+    allCountTypes = []
+
+    if args.ls:
+        allCountTypes.append("LS")
+    if args.tpm:
+        allCountTypes.append("TPM")
+    if args.fpkm:
+        allCountTypes.append("FPKM")
 
     tpmFlag = "--tpm"
     fpkmFlag = "--fpkm"
+    lsFlag = "--ls"
     rrnaFlag = "--no-rrna"
     mtrnaFlag = "--remove-mtrna"
 
@@ -339,6 +358,9 @@ if __name__ == '__main__':
 
     if not args.tpm:
         tpmFlag = ""
+
+    if not args.ls:
+        lsFlag = ""
 
     if not rrnaFlag:
         rrnaFlag = ""
@@ -378,6 +400,9 @@ if __name__ == '__main__':
 
     if not len(args.prefixes) == len(args.counts) or len(args.diffreg) > 2:
         raise argparse.ArgumentError("prefixes must be same length than counts and should not be more than 2")
+
+    if any(["_" in x for x in args.prefixes]):
+        raise argparse.ArgumentError("Prefixes must not contain the _ character !")
 
     if not len(args.diffreg) == len(args.cond1) or not len(args.diffreg) == len(args.cond2):
         raise argparse.ArgumentError("cond1/2 must be same length as diffreg.")
@@ -544,6 +569,9 @@ if __name__ == '__main__':
             if args.removemtrna:
                 addFlags.append("--remove-mtrna")
 
+            if args.only_protein_coding:
+                addFlags.append("--only-protein-coding")
+
             requiredMethods = set()
 
             for x in args.de_methods:
@@ -555,7 +583,7 @@ if __name__ == '__main__':
             requiredMethods = sorted(requiredMethods)
 
 
-            sysCall = "python3 {script} foldchange_fc --methods {reqmethods} --output {outdir} --counts {countfile} --prefixes {prefix} --conditions {cond1} --conditions {cond2} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna {flags} --fpkm --tpm".format(
+            sysCall = "python3 {script} foldchange_fc --methods {reqmethods} --output {outdir} --counts {countfile} --prefixes {prefix} --conditions {cond1} --conditions {cond2} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna {flags} --libsize --fpkm --tpm".format(
                 script=os.path.realpath(os.path.join(scriptMain, "../..", "scripts/poreAnalysis.py")),
                 outdir=args.diffreg[pidx],
                 countfile=args.counts[pidx].name,
@@ -615,7 +643,7 @@ if __name__ == '__main__':
         for pidx, prefix in enumerate(args.prefixes):
             caLogger.info("Running SubSample {} ({})".format(pidx, prefix))
 
-            sysCall = "python3 {script} --fc {countfile} --output {outdir} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna --fpkm --tpm".format(
+            sysCall = "python3 {script} --fc {countfile} --output {outdir} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna --libsize --fpkm --tpm".format(
                 script=os.path.realpath(os.path.join(scriptMain, "prepare", "calculateExpressionValues.py")),
                 outdir=os.path.join(args.diffreg[pidx], "counts.tpm.fpkm.tsv"),
                 countfile=args.counts[pidx].name,
@@ -643,17 +671,6 @@ if __name__ == '__main__':
                         os.path.join(args.diffreg[pidx], "fcsummary"), args, prefix, caPlots)
 
 
-            sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
-                counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
-                conds1=" ".join(cond1RPaths[pidx]),
-                conds2=" ".join(cond2RPaths[pidx])
-            )
-
-            runSysCall(sysCall, "compareReplicates (normalized)", caLogger, "Compare Replicates (msEmpiRe-normalized counts)",
-                       os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm.replicates."), args, prefix, caPlots)
-
-
             sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
                 counts=args.counts[pidx].name,
@@ -665,19 +682,28 @@ if __name__ == '__main__':
             runSysCall(sysCall, "Compare Replicates (countreplicates)", caLogger, "Compare Replicates (raw counts)",
                        os.path.join(args.diffreg[pidx], "orig_counts.countreplicates"), args, prefix, caPlots)
 
-
-            outPrefix = os.path.join(args.diffreg[pidx], "empire_norm_counts.compLogFC")
-            sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
-                script=os.path.realpath(os.path.join(scriptMain,"quality", "compareLogFC.py")),
-                counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
-                conds1=" ".join(cond1RPaths[pidx]),
-                conds2=" ".join(cond2RPaths[pidx]),
-                output=outPrefix
+            sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds} --output {output}".format(
+                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
+                counts=args.counts[pidx].name,
+                conds=" ".join(args.cond1[pidx]+args.cond2[pidx]),
+                output=os.path.join(args.diffreg[pidx], "orig_counts.combinedcountreplicates")
             )
 
+            runSysCall(sysCall, "Compare All Replicates (countreplicates)", caLogger, "Compare All Replicates (raw counts)",
+                       os.path.join(args.diffreg[pidx], "orig_counts.combinedcountreplicates"), args, prefix, caPlots)
 
-            runSysCall(sysCall, "Compare LogFC (normalized)", caLogger, "Compare Log Fold-Changes (MS-EmpiRe normalized counts)",
-                       outPrefix, args, prefix, caPlots)
+
+
+            sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds} --ls --output {output}".format(
+                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
+                counts=args.counts[pidx].name,
+                conds=" ".join(args.cond1[pidx]+args.cond2[pidx]),
+                output=os.path.join(args.diffreg[pidx], "orig_counts.combinedcountreplicates")
+            )
+
+            runSysCall(sysCall, "Compare All Replicates (library-size normalized)", caLogger, "Compare All Replicates (library-size normalized)",
+                       os.path.join(args.diffreg[pidx], "orig_counts.combined_ls_countreplicates"), args, prefix, caPlots)
+
 
 
             sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
@@ -694,23 +720,6 @@ if __name__ == '__main__':
 
 
 
-
-
-
-            sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
-                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareInterLogFCs.py")),
-                counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
-                conds1=" ".join(cond1RPaths[pidx]),
-                conds2=" ".join(cond2RPaths[pidx]),
-                output=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm")
-            )
-
-            plotId2Descr["Compare Inter-Log Fold-Changes (msEmpiRe-normalized counts)"] = "<p>These plots compare all pairwise logFCs between the two conditions.</p>" \
-                                                                          "<p>The logFC distributions are expected to match closely together</p>"
-
-
-            runSysCall(sysCall, "Compare Inter LogFC (normalized)", caLogger, "Compare Inter-Log Fold-Changes (msEmpiRe-normalized counts)",
-                       os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm.interlogfc."), args, prefix, caPlots)
 
             sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "quality", "compareInterLogFCs.py")),
@@ -763,6 +772,50 @@ if __name__ == '__main__':
 
             runSysCall(sysCall, "Compare Counts Per Gene", caLogger, "Raw Counts Per Gene",
                        os.path.join(args.diffreg[pidx], "countspergene.cpergenes"), args, prefix, caPlots)
+
+
+            normedCountsFile = os.path.join(args.diffreg[pidx], "norm_expr.count_out_data_DirectDESeq2")
+            if os.path.isfile(normedCountsFile):
+
+                sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
+                    counts=normedCountsFile,
+                    conds1=" ".join(cond1RPaths[pidx]),
+                    conds2=" ".join(cond2RPaths[pidx])
+                )
+
+                runSysCall(sysCall, "compareReplicates (normalized counts)", caLogger, "Compare Replicates (normalized counts)",
+                        normedCountsFile + ".norm.replicates.", args, prefix, caPlots)
+
+
+                outPrefix = os.path.join(args.diffreg[pidx], "normed_counts.compLogFC")
+                sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
+                    script=os.path.realpath(os.path.join(scriptMain,"quality", "compareLogFC.py")),
+                    counts=normedCountsFile,
+                    conds1=" ".join(cond1RPaths[pidx]),
+                    conds2=" ".join(cond2RPaths[pidx]),
+                    output=outPrefix
+                )
+                runSysCall(sysCall, "Compare LogFC (normalized counts)", caLogger, "Compare LogFC (normalized counts)",
+                        outPrefix, args, prefix, caPlots)
+
+                outPrefix = os.path.join(args.diffreg[pidx], "normed_counts.compInterLogFC")
+                sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "quality", "compareInterLogFCs.py")),
+                    counts=normedCountsFile,
+                    conds1=" ".join(cond1RPaths[pidx]),
+                    conds2=" ".join(cond2RPaths[pidx]),
+                    output=outPrefix
+                )
+
+                plotId2Descr["Compare Inter-Log Fold-Changes (normalized counts)"] = "<p>These plots compare all pairwise logFCs between the two conditions.</p>" \
+                                                                            "<p>The logFC distributions are expected to match closely together</p>"
+
+
+                runSysCall(sysCall, "Compare Inter LogFC (normalized counts)", caLogger, "Compare Inter-Log Fold-Changes (normalized counts)",
+                       outPrefix + ".interlogfc.", args, prefix, caPlots)
+
+
 
 
             if args.enhance != None and args.enhance.name != None:
@@ -830,24 +883,25 @@ if __name__ == '__main__':
         log.debug(sysCall)
 
         simulate = args.simulate
+        searchPref = plotsPrefix
 
         if plotsPrefix != None:
-            searchPref = plotsPrefix
-            if not searchPref.upper().endswith(".PNG") and len(glob(searchPref)) == 0:
+            
+            if not searchPref.upper().endswith((".PNG",)) and len(glob(searchPref)) == 0:
                 searchPref += "*.png"
 
             if args.update and len(glob(searchPref + "*")) > 0:
                 simulate = True
 
-        if not simulate:
+        if not simulate and not sysCall is None:
             subprocess.run(sysCall, shell=True, check=True)
 
         if plotid != None and plotsPrefix != None:
 
-            if not plotsPrefix.upper().endswith(".PNG"):
-                plotsPrefix += "*.png"
+            #if not plotsPrefix.upper().endswith(".PNG"):
+            #    plotsPrefix += "*.png"
 
-            plotDict[method][plotid][prefix] = glob(plotsPrefix)
+            plotDict[method][plotid][prefix] = glob(searchPref)
             log.debug("Found Images\n" + "\n".join(plotDict[method][plotid][prefix]))
 
     def splitDEMethods(inMethods):
@@ -893,7 +947,7 @@ if __name__ == '__main__':
                     prefixIdx1 = args.prefixes.index(prefixPair[0])
                     prefixIdx2 = args.prefixes.index(prefixPair[1])
 
-                    for countType in ["", "TPM", "FPKM"]:
+                    for countType in [""] + allCountTypes:
                         """
         
                         PLOT ENV START
@@ -957,6 +1011,16 @@ if __name__ == '__main__':
                                                                                          "<p>The upset plot shows how many genes have been discovered using each method.</p>"\
                                                                                          "<p>The volcano plot shows logFC and -log10(pVal) for the robustly detected genes (that are genes that are DE with all above methods).</p>".format(" ".join(methods))
                     runSysCall(sysCall, "Calculate Robust FCs", statsLogger, "DE Methods Overview ({})".format(" ".join(methods)), robustDeFile + ".rob.", args, prefix, methods, deEnrichPlots)
+
+                    
+                    if len(methods) == 1:
+                        methodsStr = methods[0]
+                        plotName = "DE Method Plots ({})".format(methodsStr)
+                        plotId2Descr[plotName] = "<p>For specific methods several plots are created as part of the general DE analysis.</p>" \
+                                                                              "<p>These plots are collected here.</p>"
+                        
+                        methodPlots = "{diffreg}/{mstr}.*.svg".format(diffreg=args.diffreg[pidx], mstr=methodsStr)
+                        runSysCall(None, "Collect DE Method Plots", statsLogger, plotName, methodPlots, args, prefix, methods, deEnrichPlots)
 
 
                     """
@@ -1057,25 +1121,27 @@ if __name__ == '__main__':
 
                     if len(methods) >= 2:
 
-                        outputFilename = os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".directcompare.tsv")
+                        if os.path.isfile(os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm")):
 
-                        sysCall = "python3 {script} --de {de} --counts {counts} --conditions {conds1} --conditions {conds2} --tools {methods} --output {output}".format(
-                            de=countDeFile,
-                            counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
-                            script=os.path.realpath(os.path.join(scriptMain, "de_comparison", "compareDECounts.py")),
-                            methods=" ".join(methods),
-                            output=outputFilename,
-                            conds1=" ".join(cond1RPaths[pidx]),
-                            conds2=" ".join(cond2RPaths[pidx])
-                        )
-                        #plotName = "Compare DE Counts ({})".format(" ".join(methods))
-                        #plotId2Descr[plotName] = "<p>Plots something cool</p>"
+                            outputFilename = os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".directcompare.tsv")
 
-                        runSysCall(sysCall, plotName, statsLogger, None, outputFilename, args, prefix, methods, deEnrichPlots)
+                            sysCall = "python3 {script} --de {de} --counts {counts} --conditions {conds1} --conditions {conds2} --tools {methods} --output {output}".format(
+                                de=countDeFile,
+                                counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
+                                script=os.path.realpath(os.path.join(scriptMain, "de_comparison", "compareDECounts.py")),
+                                methods=" ".join(methods),
+                                output=outputFilename,
+                                conds1=" ".join(cond1RPaths[pidx]),
+                                conds2=" ".join(cond2RPaths[pidx])
+                            )
+                            #plotName = "Compare DE Counts ({})".format(" ".join(methods))
+                            #plotId2Descr[plotName] = "<p>Plots something cool</p>"
+
+                            runSysCall(sysCall, plotName, statsLogger, None, outputFilename, args, prefix, methods, deEnrichPlots)
 
 
 
-                    for countType in ["TPM", "FPKM"]:
+                    for countType in allCountTypes:
 
                         spConds1 = [x + "." + countType for x in args.cond1[pidx]]
                         spConds2 = [x + "." + countType for x in args.cond2[pidx]]
@@ -1264,7 +1330,7 @@ if __name__ == '__main__':
                         """
 
 
-                        for countType in ["", "TPM", "FPKM"]:
+                        for countType in [""] + allCountTypes:
 
                             """
     

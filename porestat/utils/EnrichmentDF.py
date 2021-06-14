@@ -6,7 +6,7 @@ from porestat.utils.Numbers import toNumber, toFloat
 
 from ..analysis.similarity_analysis import SimilarityAnalysis
 from .DataFrame import DataFrame, DataRow, ExportTYPE
-import os
+import os, sys
 import mpld3
 from ..plots.plotconfig import PlotConfig, PlotSaveTYPE
 from ..plots.poreplot import PorePlot
@@ -165,10 +165,10 @@ class EnrichmentDF(DataFrame):
 
     @property
     def supported_de_methods(self):
-        return ['NOISeq', 'DESeq2', 'DirectDESeq2', 'DirectDESeq2Paired', 'msEmpiRe', 'nlEmpiRe', 'limma', 'edgeR']
+        return ['DESeq2', 'DirectDESeq2', 'DirectDESeq2Paired', 'msEmpiRe', 'nlEmpiRe', 'limma', 'edgeR', 'limmavoom', 'DirectEdgeR', "DESingle", "scde", "MAST"]
 
 
-    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['msEmpiRe', 'nlEmpiRe', 'DESeq2', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None, norRNA=False, noMtRNA=False):
+    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['msEmpiRe', 'nlEmpiRe', 'limmavoom', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None):
 
 
         filePrefix = prefix
@@ -189,7 +189,7 @@ class EnrichmentDF(DataFrame):
         fdataFile = base + "f_data"
         outFileBase = base + "out_data"
 
-        noiseqFile = base + "noiseq"
+        countsFile = base + "df"
 
         for x in methods:
             if not x in self.supported_de_methods:
@@ -209,7 +209,7 @@ class EnrichmentDF(DataFrame):
 
                 prepData = self.prepareEBData(replicates[cond1], replicates[cond2])
 
-                with open(noiseqFile, 'w') as fout:
+                with open(countsFile, 'w') as fout:
 
                     for elem in prepData:
                         fout.write("\t".join([elem[0]] + [str(x) for x in reversed(elem[1:])])  +"\n")
@@ -220,10 +220,14 @@ class EnrichmentDF(DataFrame):
                 if "nlEmpiRe" in methods:
 
                     nlempireDir = basePath + "nlempire"
-
                     os.makedirs(nlempireDir, exist_ok=True)
+
+                    indf = DataFrame.parseFromFile(fdataFile, header=False)
+                    indf.applyToRow( lambda x: [y.replace(".", "#") for y in x])
+                    indf.export(nlempireDir + "/f_data.txt", include_header=False)
+
                     shutil.copyfile(exprFile, nlempireDir + "/exprs.txt")
-                    shutil.copyfile(fdataFile, nlempireDir + "/f_data.txt")
+                    #shutil.copyfile(fdataFile, nlempireDir + "/f_data.txt")
                     shutil.copyfile(pdataFile, nlempireDir + "/p_data.txt")
 
                 condResult = {}
@@ -231,47 +235,108 @@ class EnrichmentDF(DataFrame):
                 for method in methods: # 'limma' 'edgeR'
                     outFile = outFileBase + "_" + method
 
+                    deCallStr = "{rscript} {script} {counts} {pdata} {fdata} {outfile}"
+
                     execStr = None
                     if method in ['DESeq2', 'limma', 'edgeR']:
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/de_rseq.R"
                         execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile
                             #raise PSToolException("Unable to run enrichment analsyis. " + str(execStr))
+                    elif method in ['limmavoom']:
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/limma_voom_direct.R"
+                        execStr = deCallStr.format(
+                            rscript=rscriptPath,
+                            script=scriptPath,
+                            counts=countsFile,
+                            pdata=pdataFile,
+                            fdata=fdataFile,
+                            outfile=outFile)
+
+                    elif method in ['DirectEdgeR']:
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/edgeR_direct.R"
+                        execStr = deCallStr.format(
+                            rscript=rscriptPath,
+                            script=scriptPath,
+                            counts=countsFile,
+                            pdata=pdataFile,
+                            fdata=fdataFile,
+                            outfile=outFile)
 
                     elif method in ['DirectDESeq2']:
-                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/deseq_direct.R"
-                        execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" " + outFile
-
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/deseq2_direct.R"
+                        execStr = deCallStr.format(
+                            rscript=rscriptPath,
+                            script=scriptPath,
+                            counts=countsFile,
+                            pdata=pdataFile,
+                            fdata=fdataFile,
+                            outfile=outFile)
+                    elif method in ['DESingle']:
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/DESingle_direct.R"
+                        execStr = deCallStr.format(
+                            rscript=rscriptPath,
+                            script=scriptPath,
+                            counts=countsFile,
+                            pdata=pdataFile,
+                            fdata=fdataFile,
+                            outfile=outFile)
+                    elif method in ['MAST']:
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/MAST_direct.R"
+                        execStr = deCallStr.format(
+                            rscript=rscriptPath,
+                            script=scriptPath,
+                            counts=countsFile,
+                            pdata=pdataFile,
+                            fdata=fdataFile,
+                            outfile=outFile)
+                    elif method in ['scde']:
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/scde_direct.R"
+                        execStr = deCallStr.format(
+                            rscript=rscriptPath,
+                            script=scriptPath,
+                            counts=countsFile,
+                            pdata=pdataFile,
+                            fdata=fdataFile,
+                            outfile=outFile)
                     elif method in ['DirectDESeq2Paired']:
-                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/deseq_direct_paired.R"
-                        execStr = rscriptPath+" "+scriptPath+" "+noiseqFile+" "+pdataFile+".paired" +" " + outFile
+                        scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/deseq2_direct_paired.R"
+                        execStr = rscriptPath+" "+scriptPath+" "+countsFile+" "+pdataFile+".paired" +" " + outFile
 
                     elif method in ['msEmpiRe']:
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/empire_diffreg.R"
-                        execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+noiseqFile+" "+method+" " + outFile
+                        execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+countsFile+" "+method+" " + outFile
 
                     elif method in ['nlEmpiRe']:
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/nlEmpiRe_eset.jar"
                         execStr = javaPath+" -jar "+scriptPath+" -inputdir {} -cond1 1 -cond2 0 -o {}".format(nlempireDir, outFile)
 
                     elif method in ['NOISeq']:
-
+                        assert(False)
                         sample4condition = [conditions[i]] * len(replicates[cond2]) + [conditions[j]] * len(replicates[cond1])
                         print(sample4condition)
 
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/noiseq_diffreg.R"
-
-                        execStr = rscriptPath+" "+scriptPath+" "+noiseqFile + " "+ outFile + " " + " ".join(sample4condition)
+                        execStr = rscriptPath+" "+scriptPath+" "+countsFile + " "+ outFile + " " + " ".join(sample4condition)
 
                     print(execStr)
 
                     if not noDErun:
                         sysret = os.system(execStr)
-                    sysret = 1
+                    else:
+                        sysret = 1
 
                     if sysret != 0:
-                        pass
+                        print(execStr)
+                        print("Error in calling last Rscript")
+                        sys.exit(-1)
+
 
                     methDF = DataFrame.parseFromFile(outFile)
+
+                    if method in ["nlEmpiRe"]:
+                        idColIdx = methDF.getColumnIndex("id")
+                        methDF.applyByRow("id", lambda x: x[idColIdx].replace("#", "."))
+
                     condResult[method] = methDF
 
 
@@ -290,6 +355,9 @@ class EnrichmentDF(DataFrame):
 
                     for sampleName in replicates[cond1] + replicates[cond2]:
                         baseDict[sampleName] = row[sampleName]
+
+                        if sampleName + ".LS" in self.column2idx:
+                            baseDict[sampleName + ".LS"] = row[sampleName + ".LS"]
 
                         if sampleName + ".FPKM" in self.column2idx:
                             baseDict[sampleName + ".FPKM"] = row[sampleName + ".FPKM"]
@@ -361,12 +429,12 @@ class EnrichmentDF(DataFrame):
                     rawPdata = methDF.toDataRow( geneIDidx, rawPValidx)
                     adjPdata = methDF.toDataRow( geneIDidx, adjPValidx)
 
-                    noiSeqProbIdx = None
-                    noiSeqProbTitle = None
-                    if method in ['NOISeq']:
-                        noiSeqProbTitle = method + "_prob"
-                        if methDF.columnExists("prob"):
-                            noiSeqProbIdx = methDF.getColumnIndex('prob')
+                    #noiSeqProbIdx = None
+                    #noiSeqProbTitle = None
+                    #if method in ['NOISeq']:
+                    #    noiSeqProbTitle = method + "_prob"
+                    #    if methDF.columnExists("prob"):
+                    #        noiSeqProbIdx = methDF.getColumnIndex('prob')
 
 
                     methRows = []
@@ -379,8 +447,8 @@ class EnrichmentDF(DataFrame):
                             adjpTitle: row.getIndex(adjPValidx),
                         }
 
-                        if noiSeqProbIdx != None:
-                            rowDict[noiSeqProbTitle] = row[noiSeqProbIdx]
+                        #if noiSeqProbIdx != None:
+                        #    rowDict[noiSeqProbTitle] = row[noiSeqProbIdx]
 
 
                         methRows.append(rowDict)
@@ -511,7 +579,8 @@ class EnrichmentDF(DataFrame):
         for cond1, cond2 in conditionPair2File:
 
             file = conditionPair2File[(cond1, cond2)]
-
+            
+            print("Reading Comparison", file)
             compDF = DataFrame.parseFromFile(file)
             # 0 evidence, 1 gene, 2 cond1, 3 cond2, 4+ methods
 
@@ -528,8 +597,8 @@ class EnrichmentDF(DataFrame):
 
             (headHTML, bodyHTML) = compDF.export(outFile=None, exType=ExportTYPE.HTML_STRING)
 
-            if 'NOISeq' in methods:
-                bodyHTML = bodyHTML + "<h3>Warning: the NOISeq calculated p-values are transformed z-scores from probabilities of differential expression</h3>"
+            #if 'NOISeq' in methods:
+            #    bodyHTML = bodyHTML + "<h3>Warning: the NOISeq calculated p-values are transformed z-scores from probabilities of differential expression</h3>"
 
             pltcfg = PlotConfig()
             pltcfg.setOutputType(PlotSaveTYPE.HTML_STRING)
@@ -563,13 +632,13 @@ class EnrichmentDF(DataFrame):
 
                 PorePlot.volcanoPlot(geneNames, l2FCdata, rawPdata, "Volcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "raw pValue", pltcfg)
 
-                if method in ['NOISeq']:
-                    pltcfg.addHTMLPlot("<h3>Warning: the calculated p-values are transformed z-scores from probabilities of differential expression</h3>")
+                #if method in ['NOISeq']:
+                #    pltcfg.addHTMLPlot("<h3>Warning: the calculated p-values are transformed z-scores from probabilities of differential expression</h3>")
 
                 PorePlot.volcanoPlot(geneNames, l2FCdata, adjPdata, "Volcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "adj pValue", pltcfg)
 
-                if method in ['NOISeq']:
-                    pltcfg.addHTMLPlot("<h3>Warning: the calculated p-values are transformed z-scores from probabilities of differential expression</h3>")
+                #if method in ['NOISeq']:
+                #    pltcfg.addHTMLPlot("<h3>Warning: the calculated p-values are transformed z-scores from probabilities of differential expression</h3>")
 
 
 

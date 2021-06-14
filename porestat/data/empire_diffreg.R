@@ -212,6 +212,9 @@ myres <- data.frame(
     ADJ.PVAL = result$p.adj
 )
 
+myres <- myres[order(myres$RAW.PVAL),]
+
+
 print(head(myres))
 
 write.table(myres, file=out.file, row.names=F, quote=F, sep="\t")

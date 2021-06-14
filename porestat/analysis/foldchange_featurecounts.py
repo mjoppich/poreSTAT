@@ -1,5 +1,6 @@
 import argparse
 from collections import defaultdict
+from typing import OrderedDict
 
 import HTSeq
 import matplotlib
@@ -54,9 +55,12 @@ class FoldChangeFeatureCountsDistributionFactory(PSToolInterfaceFactory):
 
         parser.add_argument('-rrna', '--no-rrna', dest='norrna', action='store_true', default=False)
         parser.add_argument('-rmtrna', '--remove-mtrna', dest='removemtrna', action='store_true', default=False)
+        parser.add_argument('-opc', '--only-protein-coding', dest='only_protein_coding', action='store_true', default=False)
 
         parser.add_argument('-fpkm', '--fpkm', dest='fpkm', action='store_true', default=False)
         parser.add_argument('-tpm', '--tpm', dest='tpm', action='store_true', default=False)
+        parser.add_argument('-libsize', '--libsize', dest='libsize', action='store_true', default=False)
+
 
         parser.add_argument('-anc', '--allow-nonexistant-cond', dest='allow_nonexistant_cond', action='store_true', default=False)
 
@@ -96,13 +100,13 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
 
         if args.norrna and biotypes == None:
             raise argparse.ArgumentParser().error("removal of rRNA requires --enhanced!")
-
         if args.removemtrna and biotypes == None:
             raise argparse.ArgumentParser().error("removal of mtRNA requires --enhanced!")
+        if args.only_protein_coding and biotypes == None:
+            raise argparse.ArgumentParser().error("--only-protein-coding requires --enhanced!")
 
         if args.fpkm and gene2length == None:
             raise argparse.ArgumentParser().error("calculation of FPKM requires --lengths!")
-
         if args.tpm and gene2length == None:
             raise argparse.ArgumentParser().error("calculation of TPM requires --lengths!")
 
@@ -142,10 +146,29 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                         geneColIdx = subDf.getColumnIndex("gene")
                         subDf.filterRows(lambda x: x[geneColIdx] in biotypes and not "Mt_" in biotypes[x[geneColIdx]][1] )
 
+                    if biotypes != None and args.only_protein_coding:
+                        subDf.filterRows(lambda x: x[geneColIdx] in biotypes and "protein_coding" in biotypes[x[geneColIdx]][1] )
+
                     if os.path.isdir(condElement) or os.path.isfile(condElement):
                         subDf.setFilepath(os.path.abspath(condElement))
                     else:
                         subDf.setFilepath(condElement)
+
+                    if args.libsize:
+                        countCol = subDf.getColumnIndex("count")
+                        geneCol = subDf.getColumnIndex("gene")
+
+                        totalCounts = sum([x[countCol] for x in subDf.data])
+
+                        libSizeIdx = subDf.addColumn("LS", 0)
+
+                        def addLibSize(x):
+                            x[libSizeIdx] = (x[countCol]/totalCounts) * 10000
+
+                            return tuple(x)
+
+                        subDf.applyToRow(addLibSize)     
+
 
                     if args.fpkm:
 
@@ -309,7 +332,7 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
 
             for valueSource in ['count']:
                 self.condData = EnrichmentDF()
-                replicates = {}
+                replicates = OrderedDict()
 
                 for condition in vConds:
 
@@ -323,12 +346,16 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                         rowUpdates = []
                         sampleName = condDataSample.filepath
 
+                        print(sampleName, len(condDataSample))
                         for row in condDataSample:
 
                             rowData = {
                                     "id": row["gene"],
                                     sampleName: row[valueSource]
                                 }
+
+                            if args.libsize:
+                                rowData[sampleName+".LS"] = row["LS"]
 
                             if args.fpkm:
                                 rowData[sampleName+".FPKM"] = row["FPKM"]
@@ -357,9 +384,7 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                                                                                replicates=replicates,
                                                                                noDErun=args.noanalysis,
                                                                                enhanceSymbol=geneEnhancement,
-                                                                               geneLengths=geneLengths,
-                                                                               norRNA=args.norrna,
-                                                                               noMtRNA=args.removemtrna
+                                                                               geneLengths=geneLengths
                                                                                )
 
             self.prepareHTMLOut(createdComparisons, replicates, args)

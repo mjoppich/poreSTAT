@@ -4,6 +4,10 @@
 import argparse
 from collections import defaultdict
 
+import sys, os
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
+
+
 import numpy as np
 from typing import List
 import matplotlib
@@ -13,7 +17,7 @@ from matplotlib import colors as mpl_colors, cm as mpl_cm, colorbar as mpl_color
 import random, sys, matplotlib.colors
 # Make sure that we are using QT5
 import pandas as pd
-sys.path.insert(0, "/mnt/d/dev/git/poreSTAT/")
+
 
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 
@@ -334,8 +338,8 @@ if __name__ == '__main__':
 
     print("Intersecting")
 
-    intersectGenesUp = None
-    intersectGenesDown = None
+    intersectGenesUp = set()
+    intersectGenesDown = set()
 
     for pref in upPref2geneFCP:
         if intersectGenesUp == None:

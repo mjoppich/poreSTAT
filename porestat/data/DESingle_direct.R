@@ -1,10 +1,9 @@
-#!/home/proj/biosoft/software/R/R-3.2.2/bin/Rscript
 ############################################################
 #
-# author: Ludwig Geistlinger
-# date: 2015-07-02 13:10:08
+# author: Markus Joppich
+# date: 2021
 #
-# descr: differential expression analysis of RNA-seq data
+# descr: differential expression analysis of RNA-seq data using DESingle
 #
 ############################################################
 
@@ -15,7 +14,7 @@
 if (length(commandArgs()) != 9) message("usage: Rscript de_rseq.R <exprs.file> <pdat.file> <fdat.file> <out.file>")
 stopifnot(length(commandArgs()) == 9)
 
-message("Loading EnrichmentBrowser")
+message("Loading Libraries")
 message("R paths")
 message(.libPaths())
 
@@ -34,7 +33,7 @@ message(.libPaths())
 
 
 
-requiredPackages = c('DESeq2', "EnrichmentBrowser")
+requiredPackages = c('DEsingle', "svglite")
 for (rPackage in requiredPackages) {
     if (! require(rPackage, character.only = TRUE))
     {
@@ -57,19 +56,33 @@ pdat.file <- commandArgs()[7]
 fdat.file <- commandArgs()[8]
 out.file <- commandArgs()[9]
 
-message("Reading data ...")
-eset <- readSE(exprs.file, pdat.file, fdat.file)
+#exprs.file = "diffregs/myh11_1_cx3cr1/cx3cr1_wt_ko.umi_exon.diffreg/count_noiseq"
+#pdat.file = "diffregs/myh11_1_cx3cr1/cx3cr1_wt_ko.umi_exon.diffreg/count_p_data"
+#fdat.file = "diffregs/myh11_1_cx3cr1/cx3cr1_wt_ko.umi_exon.diffreg/count_f_data"
+#out.file = "diffregs/myh11_1_cx3cr1/cx3cr1_wt_ko.umi_exon.diffreg/count_out_data_DirectLimmaVoom"
+
+out_dir_name = dirname(out.file)
+out_base_name = basename(out.file)
+fig.width = 7
+fig.height = 5
+
+pdat <- read.delim(pdat.file, header=F)
+colnames(pdat) = c("samples", "group")
+pdat$group = paste("Grp", pdat$group, sep="")
+
+counts <- read.delim(exprs.file, row.names = 1)
+counts = counts[, pdat$samples]
 
 
-message("DE analysis ...")
-dds <- DESeqDataSet(eset, design = ~GROUP)
-dds <- DESeq(dds)
-( res <- results(dds) )
-outres = res[! is.na(res$padj),]
+results <- DEsingle(counts = counts, group = factor(pdat$group), parallel=TRUE)
 
+finalres = data.frame(
+    PROBEID=rownames(results),
+    FC=results[["norm_foldChange"]],
+    PVAL=results[["pvalue"]],
+    ADJ.PVAL=results[["pvalue.adj.FDR"]])
 
-finalres = data.frame(PROBEID=rownames(outres), FC=outres$log2FoldChange, PVAL=outres$pvalue, ADJ.PVAL=outres$padj)
+finalres <- finalres[order(finalres$PVAL),]
+
 
 write.table(finalres, file=out.file, row.names=F, quote=F, sep="\t")
-
-

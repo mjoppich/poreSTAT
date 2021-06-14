@@ -1,9 +1,9 @@
 
 
 import argparse
-import sys
-sys.path.insert(0, "/mnt/d/dev/git/poreSTAT/")
-
+import sys, os
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
+import numpy as np
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 from collections import Counter
 
@@ -83,6 +83,9 @@ if __name__ == '__main__':
 
     parser.add_argument('-fpkm', '--fpkm', dest='fpkm', action='store_true', default=False)
     parser.add_argument('-tpm', '--tpm', dest='tpm', action='store_true', default=False)
+    parser.add_argument('-libsize', '--libsize', dest='libsize', action='store_true', default=False)
+
+    
     args = parser.parse_args()
 
 
@@ -145,9 +148,14 @@ if __name__ == '__main__':
 
         geneLength = geneLengths.get(curGeneID, 0)
 
+
         for sample in sampleHeaders:
 
             rowDict[sample] = row[sample]
+
+            if args.libsize:
+                libSizeValue = (row[sample]/sample2total[sample]) * 10000
+                rowDict[sample + ".LS"] = libSizeValue
 
             if args.fpkm:
 

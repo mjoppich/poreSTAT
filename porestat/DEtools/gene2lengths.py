@@ -203,6 +203,11 @@ def main(args):
 
     exonData = ['seqname','start','end','gene_id', 'gene_name']
 
+    if not "gene_biotype" in gc:
+        if "gene_type" in gc:
+            gc["gene_biotype"] = gc["gene_type"]
+            log("Renamed gene_type to gene_biotype")
+
     if "gene_biotype" in gc:
         exonData.append("gene_biotype")
 
@@ -239,7 +244,10 @@ def main(args):
     with log("Creating result df ..."):
 
         # Create a new DataFrame with gene lengths and EnsemblID.
-        ensembl_no_version = lengths.index.map(lambda x: x.split(".")[0])
+        if args.keep_version:
+            ensembl_no_version = lengths.index
+        else:
+            ensembl_no_version = lengths.index.map(lambda x: x.split(".")[0])
         ldf = pd.DataFrame({'length': lengths,
                             'gene_identifier': ensembl_no_version,
                             'biotype': bioType,
@@ -253,9 +261,23 @@ def main(args):
         #m1 = m1[['Ensembl_gene_identifier', 'GeneID', 'length']].drop_duplicates()
         m1 = ldf.drop_duplicates()
 
+    
+
     with log("Writing output file: {}".format(GENE_LENGTHS)):
         with open(GENE_LENGTHS, "w") as out:
             m1.to_csv(out, sep="\t", index=False)
+
+    with log("Writing output file: {}".format(GENE_LENGTHS + ".list")):
+        with open(GENE_LENGTHS + ".list", "w") as out:
+            #Gene stable ID	Gene name	Gene type
+            mlist = pd.DataFrame({"Gene stable ID": ensembl_no_version, "Gene name": gene_name, "Gene type": bioType},index=lengths.index)
+            mlist.to_csv(out, sep="\t", index=False)
+
+    with log("Writing output file: {}".format(GENE_LENGTHS)+ ".length.list"):
+        with open(GENE_LENGTHS+ ".length.list", "w") as out:
+            #gene_identifier	length	biotype	Gene name
+            mlenlist = pd.DataFrame({"gene_identifier": ensembl_no_version, "length": lengths, "biotype": bioType, "Gene name": gene_name},index=lengths.index)
+            mlenlist.to_csv(out, sep="\t", index=False)
 
 def get_genename(df):
 
@@ -266,10 +288,17 @@ def get_genename(df):
 
 def get_biotype(df):
 
-    if not "gene_biotype" in df:
+    fieldname = "gene_biotype"
+    
+    if not fieldname in df:
+        fieldname = "gene_type"
+
+    if not fieldname in df:
+        print(df.columns)
+        exit(-1)
         return ""
 
-    return "|".join(set(df["gene_biotype"]))
+    return "|".join(set(df[fieldname]))
 
 
 def count_bp(df):
@@ -320,6 +349,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process some gtf.')
     parser.add_argument("-g", "--gtf", type=argparse.FileType("r"), required=True)
     parser.add_argument("-o", "--output", type=argparse.FileType("w"), required=True)
+    parser.add_argument("-v", "--keep-version", action="store_true", default=False)
     args = parser.parse_args()
 
 

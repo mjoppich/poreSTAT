@@ -3,6 +3,10 @@ from enum import Enum
 
 import re
 
+import sys, os
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
+
+
 def containsDigitAndChars( someStr ):
 
     hasDigit = False

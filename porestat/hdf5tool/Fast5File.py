@@ -2,18 +2,13 @@ import argparse
 import sys
 import os
 import glob
-import tarfile
-import shutil
 
-import datetime
 import h5py
 from enum import Enum
 from collections import OrderedDict, Counter
 
-import time
 
 from .SequenceFormats import FASTQ
-from ..utils.Files import makePath
 import dateutil.parser
 
 class classproperty(object):

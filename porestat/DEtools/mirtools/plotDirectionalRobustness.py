@@ -3,7 +3,9 @@ from collections import defaultdict
 
 import matplotlib.pyplot as plt
 
-import sys
+import sys, os
+sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../../")
+
 import numpy as np
 from upsetplot import from_contents, plot
 
