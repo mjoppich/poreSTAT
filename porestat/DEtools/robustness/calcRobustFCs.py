@@ -14,9 +14,9 @@ from collections import defaultdict
 
 import argparse
 from upsetplot import from_contents,plot
-
+import numpy as np
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
-
+from adjustText import adjust_text
 
 mpl.style.use("seaborn")
 
@@ -43,6 +43,153 @@ def getColorVector(cnt, colormap="Viridis"):
         
     return colors
 
+
+
+def plot_volcano(FcPvalGene, title, outfile, showGeneCount=30):
+
+
+
+    color1 = "#883656"  #"#BA507A"
+    color1_nosig = "#BA507A"
+    color1_nosig_less = "#d087a4"
+
+    color2 = "#4d6841"
+    color2_nosig = "#70975E"
+    color2_nosig_less = "#99b78b"
+
+
+
+    colors = {"down": (color1, color1_nosig, color1_nosig_less), "up": (color2, color2_nosig,color2_nosig_less)}
+    
+    with plt.style.context("default"):
+        plt.figure(figsize=(16,10))
+
+        FcPvalGene = sorted(FcPvalGene, key=lambda x: x[1])
+
+        xydots = [(x[0], -np.log10(x[1])) for x in FcPvalGene]
+        maxally = max([x[1] for x in xydots if not np.isinf(x[1])])
+        xydots = [(x, y if y <= maxally else maxally) for x,y in xydots]
+        dotgene = [x[2] for x in FcPvalGene]
+
+        pvalThresh = -np.log10(0.05)
+
+        showGeneCount_pos = showGeneCount
+        showGeneCount_neg = showGeneCount
+
+        showGenes = []
+        for x in FcPvalGene:
+
+            gene = x[2]
+            geneFC = x[0]
+
+            if geneFC < 0 and showGeneCount_neg > 0:
+                showGenes.append(gene)
+                showGeneCount_neg -= 1
+
+            if geneFC > 0 and showGeneCount_pos > 0:
+                showGenes.append(gene)
+                showGeneCount_pos -= 1
+
+
+        texts = []
+        sel_down_xy = []
+        nosig_down_xy = []
+        nosigless_down_xy = []
+
+        sel_up_xy = []
+        nosig_up_xy = []
+        nosigless_up_xy = []
+
+        upregCount = 0
+        downregCount = 0
+        upregSigCount = 0
+        downregSigCount = 0
+        unregCount = 0
+
+        for gi, (x,y) in enumerate(xydots):
+
+            if x < 0:
+                if y < pvalThresh or abs(x) < 1:
+                    downregCount += 1
+                else:
+                    downregSigCount += 1
+            elif x > 0:
+                if y < pvalThresh or abs(x) < 1:
+                    upregCount += 1
+                else:
+                    upregSigCount += 1
+            elif x == 0:
+                unregCount += 1
+
+            if dotgene[gi] in showGenes:
+
+                if x < 0:
+                    sel_down_xy.append((x,y))
+                else:
+                    sel_up_xy.append((x,y))
+
+
+                texts.append(plt.text(x * (1 + 0.01), y * (1 + 0.01) , dotgene[gi], fontsize=12, bbox=dict(boxstyle='round', facecolor='white', alpha=0.7)))
+
+            else:
+
+                if x < 0:
+
+                    if y < pvalThresh or abs(x) < 1:
+                        nosigless_down_xy.append((x,y))
+                    else:
+                        nosig_down_xy.append((x,y))
+                else:
+                    if y < pvalThresh or abs(x) < 1:
+                        nosigless_up_xy.append((x,y))
+                    else:
+                        nosig_up_xy.append((x,y))
+
+
+        #print(len(sel_xy), "of", len(genes))
+
+        ymax = max([y for x,y in xydots])
+        xmin = min([x for x,y in xydots])
+        xmax = max([x for x,y in xydots])
+
+
+
+        plt.plot([x[0] for x in nosigless_up_xy], [x[1] for x in nosigless_up_xy], '.', color=colors["up"][2])
+        plt.plot([x[0] for x in nosigless_down_xy], [x[1] for x in nosigless_down_xy], '.', color=colors["down"][2])
+
+        plt.plot([x[0] for x in nosig_up_xy], [x[1] for x in nosig_up_xy], 'o', color=colors["up"][1])
+        plt.plot([x[0] for x in nosig_down_xy], [x[1] for x in nosig_down_xy], 'o', color=colors["down"][1])
+
+        plt.plot([x[0] for x in sel_up_xy], [x[1] for x in sel_up_xy], 'o', color=colors["up"][0])
+        plt.plot([x[0] for x in sel_down_xy], [x[1] for x in sel_down_xy], 'o', color=colors["down"][0])
+
+
+        plt.hlines(y=pvalThresh, xmin=plt.xlim()[0], xmax=-1, linestyle="dotted")
+        plt.hlines(y=pvalThresh, xmin=1, xmax=plt.xlim()[1], linestyle="dotted")
+
+        yMaxLim = plt.ylim()[1]
+
+        plt.vlines(x=-1, ymin=pvalThresh, ymax=yMaxLim, linestyle="dotted")
+        plt.vlines(x=1, ymin=pvalThresh, ymax=yMaxLim, linestyle="dotted")
+
+        adjust_text(texts, force_points=0.2, force_text=0.2, expand_points=(2, 2), expand_text=(1, 1), arrowprops=dict(arrowstyle="-", color='black', lw=0.5))
+        #        texts.append(plt.text(x * (1 + 0.01), y * (1 + 0.01) , dotgene[gi], fontsize=12))
+
+        plt.title(title, fontsize = 40)
+        plt.xlabel("logFC", fontsize = 32)
+        plt.ylabel("Neg. Log. Adj. P-Value", fontsize = 32)
+        plt.xticks(fontsize=14)
+
+        infoText = "Total Genes: {}; Up-Reg. (sig.): {} ({}); Down-Reg. (sig.): {} ({}); Un-Reg.: {}".format(
+            upregCount+downregCount+upregSigCount+downregSigCount+unregCount,
+            upregCount, upregSigCount,
+            downregCount, downregSigCount,
+            unregCount
+        )
+        plt.figtext(0.5, 0.01, infoText, wrap=True, horizontalalignment='center', fontsize=14)
+
+        print(outfile)
+        plt.savefig(outfile, bbox_inches="tight")
 
 
 
@@ -207,10 +354,13 @@ if __name__ == '__main__':
         fcPvals = []
         fcPvalsSig = []
 
+        fcPvalGene = []
+
         for row in indf:
 
             rowFC = row["ROB_log2FC"]
             rowPV = row["ROB_ADJ.PVAL"]
+            rowGene = row[genesymname]
 
             if rowFC == None or rowPV == None:
                 continue
@@ -225,15 +375,21 @@ if __name__ == '__main__':
                     print("logfc", row["ROB_log2FC"], "adj.pval", row["ROB_ADJ.PVAL"])
                     exit(-1)
 
+            fcPvalGene.append((rowFC, rowPV, rowGene))
+
             if rowPV < 0.05 and abs(rowFC) >= 1.0:
                 fcPvalsSig.append((rowFC, logRowPV))
             else:
                 fcPvals.append((rowFC, logRowPV))
 
-        plt.scatter([x[0] for x in fcPvals], [x[1] for x in fcPvals], color="blue", label="Gene (n={})".format(len(fcPvals)))
-        plt.scatter([x[0] for x in fcPvalsSig], [x[1] for x in fcPvalsSig], color="red", label="Gene pVal < 0.05 &\n logFC >= 1 (n={})".format(len(fcPvalsSig)))
-        plt.legend(loc='lower left')
-        plt.savefig(args.output[fidx].name + ".rob.volcano.png", bbox_inches="tight")
+        #plt.scatter([x[0] for x in fcPvals], [x[1] for x in fcPvals], color="blue", label="Gene (n={})".format(len(fcPvals)))
+        #plt.scatter([x[0] for x in fcPvalsSig], [x[1] for x in fcPvalsSig], color="red", label="Gene pVal < 0.05 &\n logFC >= 1 (n={})".format(len(fcPvalsSig)))
+        #plt.legend(loc='lower left')
+        #plt.savefig(args.output[fidx].name + ".rob.volcano.png", bbox_inches="tight")
+
+        volcanoOutfile = args.output[fidx].name + ".rob.volcano.png"
+        print(volcanoOutfile)
+        plot_volcano(fcPvalGene, ";".join([str(x) for x in args.methods]), volcanoOutfile)
 
         print("Writing out DF", args.output[fidx].name)
         indf.export(args.output[fidx].name)
@@ -263,7 +419,7 @@ if __name__ == '__main__':
 
             plt.title("Overlap of called genes per method")
             upIn = from_contents(method2genes)
-            print( upIn.index )
+            #print( upIn.index )
             #print( upIn.index.levels )
 
             plot(upIn, subset_size="auto") 

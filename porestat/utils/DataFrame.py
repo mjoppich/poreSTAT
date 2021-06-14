@@ -501,8 +501,6 @@ class DataFrame(DataSeries, DefaultDataColumnAccess):
         return DataRow.fromDict(dataDict)
 
 
-
-
     def applyByRow(self, oColumn, oFunc):
 
         iColumnIndex = self.getColumnIndex(oColumn)

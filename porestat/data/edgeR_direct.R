@@ -135,7 +135,7 @@ deRes = as.data.frame(topTags(lrt12, n=Inf, adjust.method = "BH"))
 
 finalres = data.frame(
     PROBEID=rownames(deRes),
-    FC=deRes$logFC,
+    FC=-deRes$logFC,
     PVAL=deRes$PValue,
     ADJ.PVAL=deRes$FDR)
     

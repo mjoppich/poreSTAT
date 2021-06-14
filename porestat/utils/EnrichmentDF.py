@@ -165,10 +165,10 @@ class EnrichmentDF(DataFrame):
 
     @property
     def supported_de_methods(self):
-        return ['DESeq2', 'DirectDESeq2', 'DirectDESeq2Paired', 'msEmpiRe', 'nlEmpiRe', 'limma', 'edgeR', 'limma_voom', 'DirectEdgeR', "DESingle", "scde", "MAST"]
+        return ['DESeq2', 'DirectDESeq2', 'DirectDESeq2Paired', 'msEmpiRe', 'nlEmpiRe', 'limma', 'edgeR', 'limmavoom', 'DirectEdgeR', "DESingle", "scde", "MAST"]
 
 
-    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['msEmpiRe', 'nlEmpiRe', 'limma_voom', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None):
+    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['msEmpiRe', 'nlEmpiRe', 'limmavoom', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None):
 
 
         filePrefix = prefix
@@ -242,7 +242,7 @@ class EnrichmentDF(DataFrame):
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/de_rseq.R"
                         execStr = rscriptPath+" "+scriptPath+" "+exprFile+" "+pdataFile+" "+fdataFile+" "+method+" " + outFile
                             #raise PSToolException("Unable to run enrichment analsyis. " + str(execStr))
-                    elif method in ['limma_voom']:
+                    elif method in ['limmavoom']:
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/limma_voom_direct.R"
                         execStr = deCallStr.format(
                             rscript=rscriptPath,

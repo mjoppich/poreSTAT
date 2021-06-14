@@ -56,6 +56,15 @@ pdat.file <- commandArgs()[7]
 fdat.file <- commandArgs()[8]
 out.file <- commandArgs()[9]
 
+#exprs.file = "diffregs/myh11_2_cx3cr1/cx3cr1_wt_ko.umi_exon.diffreg/count_df"
+#exprs.file = "diffregs/kupffer_cells/kupffer_cells.umiexon.diffreg/count_df"
+#pdat.file = "diffregs/myh11_2_cx3cr1/cx3cr1_wt_ko.umi_exon.diffreg/count_p_data"
+#pdat.file = "diffregs/kupffer_cells/kupffer_cells.umiexon.diffreg/count_p_data"
+#fdat.file = "diffregs/myh11_1_cx3cr1/cx3cr1_wt_ko.umi_exon.diffreg/count_f_data"
+#out.file = "diffregs/myh11_2_cx3cr1/cx3cr1_wt_ko.umi_exon.diffreg/count_out_data_delboy"
+#out.file = "diffregs/kupffer_cells/kupffer_cells.umiexon.diffreg/count_out_data_delboy"
+
+
 out_dir_name = dirname(out.file)
 out_base_name = basename(out.file)
 fig.width = 7
@@ -84,7 +93,7 @@ res <- res[order(res$pvalue),]
 
 
 
-plotname = paste(out_dir_name, "/", "direct_deseq2.topgenes.", out_base_name, ".svg", sep="")
+plotname = paste(out_dir_name, "/", "DirectDESeq2.topgenes.", out_base_name, ".svg", sep="")
 svglite::svglite(file = plotname, width = fig.width, height = fig.height)
 par(mfrow=c(2,3))
 
@@ -103,7 +112,7 @@ resLFC <- lfcShrink(dds, coef="group_Grp1_vs_Grp0", type="apeglm")
 resNorm <- lfcShrink(dds, coef="group_Grp1_vs_Grp0", type="normal")
 resAsh <- lfcShrink(dds, coef="group_Grp1_vs_Grp0", type="ashr")
 
-plotname = paste(out_dir_name, "/", "direct_deseq2.ma_by_methods.", out_base_name, ".svg", sep="")
+plotname = paste(out_dir_name, "/", "DirectDESeq2.ma_by_methods.", out_base_name, ".svg", sep="")
 svglite::svglite(file = plotname, height = 6, width = 15)
 pltXLim = 10 ** ceiling(log10(max(counts(dds, normalized=T))))
 par(mfrow=c(1,3), mar=c(4,4,2,1))
@@ -114,7 +123,7 @@ plotMA(resAsh, xlim=xlim, ylim=ylim, main="ashr")
 dev.off()
 
 
-plotname = paste(out_dir_name, "/", "direct_deseq2.disp_estimates.", out_base_name, ".svg", sep="")
+plotname = paste(out_dir_name, "/", "DirectDESeq2.disp_estimates.", out_base_name, ".svg", sep="")
 svglite::svglite(file = plotname, width = fig.width, height = fig.height)
 plotDispEsts(dds)
 dev.off()

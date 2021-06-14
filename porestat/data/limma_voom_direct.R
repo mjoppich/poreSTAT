@@ -93,7 +93,7 @@ group <- interaction(expgrps)
 
 
 
-plotname = paste(out_dir_name, "/", "limma_voom.mds.", out_base_name, ".svg", sep="")
+plotname = paste(out_dir_name, "/", "limmavoom.mds.", out_base_name, ".svg", sep="")
 
 svglite::svglite(file = plotname, width = fig.width, height = fig.height)
 plotMDS(d, col = as.numeric(group))
@@ -101,7 +101,7 @@ dev.off()
 
 mm <- model.matrix(~0 + group)
 
-plotname = paste(out_dir_name, "/", "limma_voom.mean_var.", out_base_name, ".svg", sep="")
+plotname = paste(out_dir_name, "/", "limmavoom.mean_var.", out_base_name, ".svg", sep="")
 svglite::svglite(file = plotname, width = fig.width, height = fig.height)
 y <- voom(d, mm, plot = T)
 dev.off()
@@ -120,7 +120,7 @@ deRes = as.data.frame(top.table)
 
 finalres = data.frame(
     PROBEID=rownames(deRes),
-    FC=deRes$logFC,
+    FC=-deRes$logFC,
     PVAL=deRes$P.Value,
     ADJ.PVAL=deRes$adj.P.Val)
     

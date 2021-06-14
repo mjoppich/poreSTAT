@@ -401,6 +401,9 @@ if __name__ == '__main__':
     if not len(args.prefixes) == len(args.counts) or len(args.diffreg) > 2:
         raise argparse.ArgumentError("prefixes must be same length than counts and should not be more than 2")
 
+    if any(["_" in x for x in args.prefixes]):
+        raise argparse.ArgumentError("Prefixes must not contain the _ character !")
+
     if not len(args.diffreg) == len(args.cond1) or not len(args.diffreg) == len(args.cond2):
         raise argparse.ArgumentError("cond1/2 must be same length as diffreg.")
 
@@ -668,18 +671,6 @@ if __name__ == '__main__':
                         os.path.join(args.diffreg[pidx], "fcsummary"), args, prefix, caPlots)
 
 
-            if os.path.isfile(os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm")):
-                sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2}".format(
-                    script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
-                    counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
-                    conds1=" ".join(cond1RPaths[pidx]),
-                    conds2=" ".join(cond2RPaths[pidx])
-                )
-
-                runSysCall(sysCall, "compareReplicates (normalized)", caLogger, "Compare Replicates (msEmpiRe-normalized counts)",
-                        os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm.replicates."), args, prefix, caPlots)
-
-
             sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
                 counts=args.counts[pidx].name,
@@ -691,20 +682,28 @@ if __name__ == '__main__':
             runSysCall(sysCall, "Compare Replicates (countreplicates)", caLogger, "Compare Replicates (raw counts)",
                        os.path.join(args.diffreg[pidx], "orig_counts.countreplicates"), args, prefix, caPlots)
 
+            sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds} --output {output}".format(
+                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
+                counts=args.counts[pidx].name,
+                conds=" ".join(args.cond1[pidx]+args.cond2[pidx]),
+                output=os.path.join(args.diffreg[pidx], "orig_counts.combinedcountreplicates")
+            )
 
-            if os.path.isfile(os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm")):
-                outPrefix = os.path.join(args.diffreg[pidx], "empire_norm_counts.compLogFC")
-                sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
-                    script=os.path.realpath(os.path.join(scriptMain,"quality", "compareLogFC.py")),
-                    counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
-                    conds1=" ".join(cond1RPaths[pidx]),
-                    conds2=" ".join(cond2RPaths[pidx]),
-                    output=outPrefix
-                )
+            runSysCall(sysCall, "Compare All Replicates (countreplicates)", caLogger, "Compare All Replicates (raw counts)",
+                       os.path.join(args.diffreg[pidx], "orig_counts.combinedcountreplicates"), args, prefix, caPlots)
 
 
-                runSysCall(sysCall, "Compare LogFC (normalized)", caLogger, "Compare Log Fold-Changes (MS-EmpiRe normalized counts)",
-                        outPrefix, args, prefix, caPlots)
+
+            sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds} --ls --output {output}".format(
+                script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
+                counts=args.counts[pidx].name,
+                conds=" ".join(args.cond1[pidx]+args.cond2[pidx]),
+                output=os.path.join(args.diffreg[pidx], "orig_counts.combinedcountreplicates")
+            )
+
+            runSysCall(sysCall, "Compare All Replicates (library-size normalized)", caLogger, "Compare All Replicates (library-size normalized)",
+                       os.path.join(args.diffreg[pidx], "orig_counts.combined_ls_countreplicates"), args, prefix, caPlots)
+
 
 
             sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
@@ -721,24 +720,6 @@ if __name__ == '__main__':
 
 
 
-
-
-            if os.path.isfile(os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm")):
-
-                sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
-                    script=os.path.realpath(os.path.join(scriptMain, "quality", "compareInterLogFCs.py")),
-                    counts=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm"),
-                    conds1=" ".join(cond1RPaths[pidx]),
-                    conds2=" ".join(cond2RPaths[pidx]),
-                    output=os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm")
-                )
-
-                plotId2Descr["Compare Inter-Log Fold-Changes (msEmpiRe-normalized counts)"] = "<p>These plots compare all pairwise logFCs between the two conditions.</p>" \
-                                                                            "<p>The logFC distributions are expected to match closely together</p>"
-
-
-                runSysCall(sysCall, "Compare Inter LogFC (normalized)", caLogger, "Compare Inter-Log Fold-Changes (msEmpiRe-normalized counts)",
-                        os.path.join(args.diffreg[pidx], "count_out_data_msEmpiRe.norm.interlogfc."), args, prefix, caPlots)
 
             sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "quality", "compareInterLogFCs.py")),
@@ -791,6 +772,50 @@ if __name__ == '__main__':
 
             runSysCall(sysCall, "Compare Counts Per Gene", caLogger, "Raw Counts Per Gene",
                        os.path.join(args.diffreg[pidx], "countspergene.cpergenes"), args, prefix, caPlots)
+
+
+            normedCountsFile = os.path.join(args.diffreg[pidx], "norm_expr.count_out_data_DirectDESeq2")
+            if os.path.isfile(normedCountsFile):
+
+                sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
+                    counts=normedCountsFile,
+                    conds1=" ".join(cond1RPaths[pidx]),
+                    conds2=" ".join(cond2RPaths[pidx])
+                )
+
+                runSysCall(sysCall, "compareReplicates (normalized counts)", caLogger, "Compare Replicates (normalized counts)",
+                        normedCountsFile + ".norm.replicates.", args, prefix, caPlots)
+
+
+                outPrefix = os.path.join(args.diffreg[pidx], "normed_counts.compLogFC")
+                sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
+                    script=os.path.realpath(os.path.join(scriptMain,"quality", "compareLogFC.py")),
+                    counts=normedCountsFile,
+                    conds1=" ".join(cond1RPaths[pidx]),
+                    conds2=" ".join(cond2RPaths[pidx]),
+                    output=outPrefix
+                )
+                runSysCall(sysCall, "Compare LogFC (normalized counts)", caLogger, "Compare LogFC (normalized counts)",
+                        outPrefix, args, prefix, caPlots)
+
+                outPrefix = os.path.join(args.diffreg[pidx], "normed_counts.compInterLogFC")
+                sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
+                    script=os.path.realpath(os.path.join(scriptMain, "quality", "compareInterLogFCs.py")),
+                    counts=normedCountsFile,
+                    conds1=" ".join(cond1RPaths[pidx]),
+                    conds2=" ".join(cond2RPaths[pidx]),
+                    output=outPrefix
+                )
+
+                plotId2Descr["Compare Inter-Log Fold-Changes (normalized counts)"] = "<p>These plots compare all pairwise logFCs between the two conditions.</p>" \
+                                                                            "<p>The logFC distributions are expected to match closely together</p>"
+
+
+                runSysCall(sysCall, "Compare Inter LogFC (normalized counts)", caLogger, "Compare Inter-Log Fold-Changes (normalized counts)",
+                       outPrefix + ".interlogfc.", args, prefix, caPlots)
+
+
 
 
             if args.enhance != None and args.enhance.name != None:

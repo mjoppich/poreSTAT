@@ -14,6 +14,7 @@ sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../..
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 from collections import Counter
 import natsort
+from scipy.stats.stats import pearsonr
 
 mpl.style.use("seaborn")
 
@@ -28,7 +29,8 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--pathname', action="store_true", default=False)
     parser.add_argument('-o', '--output', nargs='+', type=str, required=False, help="output base")
 
-    parser.add_argument('-r', '--relative', action="store_true", default=False)
+    parser.add_argument('-ls', '--ls', action="store_true", default=False )
+
     args = parser.parse_args()
 
     if args.output == None:
@@ -72,8 +74,36 @@ if __name__ == '__main__':
 
             numConditions = len(conditions)
 
+            maxCount = 1
+            minCount = 1
+               
+            for condition in conditions:
+                condCount = sum(indf.getColumn(condition))
+                for row in indf:
+                    if not args.ls:
+                        maxCount = max(row[condition]+1, maxCount)
+                        minCount = min(row[condition]+1, minCount)
+                    else:
+                        curCount = row[condition]/condCount
+                        maxCount = max(curCount, maxCount)
+
+                        if curCount > 0:
+                            minCount = min(curCount, minCount)
+
+            print("Min Count", minCount)
+            print("Max Count", maxCount)
+
+            print("Min Count", minCount, math.floor(math.log10(minCount)))
+            print("Max Count", maxCount, math.ceil(math.log10(maxCount)))
+
+            plotRange = (10** math.floor(math.log10(minCount)), 10**math.ceil(math.log10(maxCount)))
+            print("Log Range", plotRange )
+
             fig, axes = plt.subplots(len(conditions), len(conditions), figsize=(max(24, numConditions*4), max(24, numConditions*4)), sharex=True, sharey=True)
-            fig.suptitle("Comparison of read counts", fontsize=15)
+            figTitle = "Comparison of Read Counts"
+            if args.ls:
+                figTitle += " (library-size normalized)"
+            fig.suptitle(figTitle, fontsize=24)
 
             if conditions[0].startswith("X."):
                 sconditions = [".".join(x.split(".")[-4:-2]) for x in conditions]
@@ -91,10 +121,7 @@ if __name__ == '__main__':
 
             sconditions = ["\n".join(x.split(".")) for x in sconditions]
                 
-            axes[0,0].set_title(sconditions[0])
-
-            if args.relative:
-                print("condition1", "condition2", "condition1_total", "condition2_total", "scaling_factor_cond1", "scaling_factor_cond2", "scaling_factor", "union_gene_count", "intersect_gene_count", "intersect_gene_count_fraction1", "intersect_gene_count_fraction2", "least_frequent_cond1", "least_frequent_cond2")
+            
 
             cond2genecount = {}
 
@@ -107,18 +134,30 @@ if __name__ == '__main__':
                 top = bottom + height
 
                 # axes coordinates are 0,0 is bottom left and 1,1 is upper right
-                p = patches.Rectangle(
-                    (left, bottom), width, height,
-                    fill=False, transform=axes[i,i].transAxes, clip_on=False
-                    )
+                #p = patches.Rectangle(
+                #    (left, bottom), width, height,
+                #    fill=False, transform=axes[i,i].transAxes, clip_on=False
+                #    )
+                #axes[i,i].add_patch(p)
+                #axes[i,i].text(0.5*(left+right), 0.5*(bottom+top), sconditions[i],
+                #horizontalalignment='center',
+                #verticalalignment='center',
+                #fontsize=7, color='red',
+                #transform=axes[i,i].transAxes)
 
-                axes[i,i].add_patch(p)
+                axes[i,i].remove()
+                axes[i,i] = fig.add_subplot(len(conditions), len(conditions), (i*len(conditions)+i)+1)
 
-                axes[i,i].text(0.5*(left+right), 0.5*(bottom+top), sconditions[i],
-                horizontalalignment='center',
-                verticalalignment='center',
-                fontsize=7, color='red',
-                transform=axes[i,i].transAxes)
+                if not args.ls:
+                    cond1Counts = [x+1 for x in indf.getColumn(conditions[i])]
+                else:
+                    condCount = sum(indf.getColumn(condition))
+                    cond1Counts = [x/condCount for x in indf.getColumn(conditions[i])]
+
+                axes[i,i].hist(cond1Counts, bins=len(cond1Counts), histtype='step', density=True, cumulative=True,linewidth=2)
+                axes[i,i].set_xlim(plotRange)
+                axes[i,i].set_xscale("log")
+
 
                 for j in range(i+1, len(conditions)):
 
@@ -141,18 +180,8 @@ if __name__ == '__main__':
                         cond1countsRaw[gene] = cond1count
                         cond2countsRaw[gene] = cond2count
 
-                        # required for log!
-                        if cond1count == 0:
-                            cond1count = 0.01
-
-                        # required for log!
-                        if cond2count == 0:
-                            cond2count = 0.01
-
                         cond1totals += cond1count
                         cond2totals += cond2count
-
-                        
 
                         cond1counts[gene] = cond1count
                         cond2counts[gene] = cond2count
@@ -162,42 +191,52 @@ if __name__ == '__main__':
 
                     plotGenes = set([x for x in cond1counts]).intersection([x for x in cond2counts])
 
-                    if args.relative:
-                        sf1 = math.pow(10, math.ceil(math.log10(cond1totals)))
-                        sf2 = math.pow(10, math.ceil(math.log10(cond2totals)))
-                        plotGenes = set([x[0] for x in cond1counts.most_common(2000)] + [x[0] for x in cond2counts.most_common(2000)])
-                        plotGenesInt = set([x[0] for x in cond1counts.most_common(2000)]).intersection([x[0] for x in cond2counts.most_common(2000)])
+                    cond1countsIntersected = [cond1counts[x] for x in plotGenes]
+                    cond2countsIntersected = [cond2counts[x] for x in plotGenes]
 
-                        cond1Top = sum([cond1counts[x] for x in plotGenesInt]) / cond1totals
-                        cond2Top = sum([cond2counts[x] for x in plotGenesInt]) / cond2totals
-
-                        cond1Least = "__".join([str(x) for x in cond1counts.most_common(2000)[-1]])
-                        cond2Least = "__".join([str(x) for x in cond2counts.most_common(2000)[-1]])
-                        
-                        sf = max([sf1, sf2])
-                        sf = 10000
-
-                        print(conditions[i], conditions[j], cond1totals, cond2totals, sf1, sf2, sf, len(plotGenes), len(plotGenesInt), cond1Top, cond2Top, cond1Least, cond2Least)
-
-                    else:
-                        sf = 1.0
-                        cond1totals = 1.0
-                        cond2totals = 1.0
+                    if args.ls:
+                        cond1countsIntersected = [cond1counts[x]/cond1totals for x in plotGenes]
+                        cond2countsIntersected = [cond2counts[x]/cond2totals for x in plotGenes]
 
 
+                    axes[i,j].scatter(cond1countsIntersected, cond2countsIntersected, label="{} vs. {} (n={})".format(sconditions[i], sconditions[j], len(plotGenes)) ,s=5)
 
-                    cond1countsNormed = [sf * cond1counts[x] / cond1totals for x in plotGenes]
-                    cond2countsNormed = [sf * cond2counts[x] / cond2totals for x in plotGenes]
+                    axes[i,j].plot([plotRange[0], plotRange[1]], [plotRange[0], plotRange[1]], color="red", linestyle="dotted")
 
-                    axes[i,j].scatter(cond1countsNormed, cond2countsNormed, label="{} vs. {} (n={})".format(sconditions[i], sconditions[j], len(plotGenes)) ,s=5)
+                    axes[i,j].set_xlim(plotRange)
+                    axes[i,j].set_ylim(plotRange)
+
                     axes[i,j].set_yscale('log')
                     axes[i,j].set_xscale('log')
+
+
+                    # calculate correlation!
+
+                    corrEff, corrSig = pearsonr(cond1countsIntersected, cond2countsIntersected)
+
+                    corrText = "Corr: {:.3f}\nSig: {:.3f}".format(corrEff, corrSig)
+
+                    p = patches.Rectangle(
+                        (left, bottom), width, height,
+                        fill=False, transform=axes[i,i].transAxes, clip_on=False
+                        )
+                    axes[j,i].add_patch(p)
+                    axes[j,i].text(0.5*(left+right), 0.5*(bottom+top), corrText,
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    fontsize=24, color='red',
+                    transform=axes[j,i].transAxes)
 
                 
                     if i == 0:
                         axes[i,j].set_title(sconditions[j])
                 
-            plt.savefig(args.output[fidx] + ".replicates."+str(fidx) + "." + str(cidx) +".png", bbox_inches ="tight")
+
+            axes[0,0].set_title(sconditions[0])
+
+            plotFileName = args.output[fidx] + ".replicates."+str(fidx) + "." + str(cidx) +".png"
+            print("Saving Plot", plotFileName)
+            plt.savefig(plotFileName, bbox_inches ="tight")
             plt.close()
 
             topGeneCounts = [2000, 3000, 4000, 5000]
