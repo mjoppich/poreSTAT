@@ -19,6 +19,8 @@ from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 
 from porestat.utils.OrderedDefaultDictClass import OrderedDefaultDict
 
+def joined(listelems, sep):
+    return sep.join(listelems)
 
 def reportStart(reportFile):
 
@@ -631,7 +633,7 @@ if __name__ == '__main__':
     caLogger = logging.getLogger("COUNTSANALYSIS")
     caLogger.addHandler(consoleHandler)
 
-    if args.counts_analysis:
+    if True:
         caLogger.info("Starting")
 
         args.report.write("<h1>poreSTAT: COUNTS ANALYSIS</h1>\n")
@@ -658,6 +660,9 @@ if __name__ == '__main__':
                 subprocess.run(sysCall, shell=True, check=True)
 
             
+            if not args.counts_analysis:
+                continue
+
             visFCInput = args.counts[pidx].name + ".summary"
 
             if os.path.isfile(visFCInput):
@@ -1030,10 +1035,12 @@ if __name__ == '__main__':
                     """
 
 
+
+
                     sysCall = "python3 {script} --fc {counts} --output {output} --num -1 --samples {samples}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
+                        script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA2.py")),
                         counts=robustDeFile,
-                        samples=" ".join(args.cond1[pidx] + args.cond2[pidx] ),
+                        samples=" --samples".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
                         output=robustDeFile + ".expr_all.mpca"
                     )
 
@@ -1053,9 +1060,9 @@ if __name__ == '__main__':
 
                     #makePCA.py --fc report_save/aortas.star.msEmpiRe_DESeq.tsv --output report_save/aortas.star.msEmpiRe_DESeq.tsv.mpca
                     sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 --samples {samples}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
+                        script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA2.py")),
                         counts=robustDeFile,
-                        samples=" ".join(args.cond1[pidx] + args.cond2[pidx] ),
+                        samples=" --samples".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
                         output=robustDeFile + ".mpca"
                     )
 
@@ -1068,9 +1075,9 @@ if __name__ == '__main__':
                     runSysCall(sysCall, plotName, statsLogger, plotName, robustDeFile + ".mpca.*.png", args, prefix, methods, deEnrichPlots)
 
                     sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --samples {samples}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
+                        script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA2.py")),
                         counts=robustDeFile,
-                        samples=" ".join(args.cond1[pidx] + args.cond2[pidx]),
+                        samples=" --samples".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
                         output=robustDeFile + ".all.mpca"
                     )
 
@@ -1183,7 +1190,7 @@ if __name__ == '__main__':
                         sysCall = "python3 {script} --fc {counts} --output {output} --num -1 --{ct} --samples {samples}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
                             counts=robustDeFile,
-                            samples=" ".join(args.cond1[pidx] + args.cond2[pidx] ),
+                            samples=" --samples".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
                             output=robustDeFile + "." + countType + ".expr_all.mpca",
                             ct=countType.lower()
                         )
@@ -1203,7 +1210,7 @@ if __name__ == '__main__':
                         sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 --{ct} --samples {samples}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
                             counts=robustDeFile,
-                            samples=" ".join(args.cond1[pidx] + args.cond2[pidx] ),
+                            samples=" --samples".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
                             output=robustDeFile + "." + countType + ".mpca",
                             ct=countType.lower()
                         )
@@ -1261,8 +1268,16 @@ if __name__ == '__main__':
                         combinedRaw = os.path.join(args.save, args.name + "." + "combined_raw" + "." + methodStr + ".tsv")
                         combinedDE = os.path.join(args.save, args.name + "." + "combined" + "." + methodStr + ".tsv")
 
-                        combinedSamples_1 = [allPrefixes[0] + "_" + x for x in args.cond1[0]] + [allPrefixes[1] + "_" + x for x in args.cond1[1]]
-                        combinedSamples_2 = [allPrefixes[0] + "_" + x for x in args.cond2[0]] + [allPrefixes[1] + "_" + x for x in args.cond2[1]]
+
+                        cond1Group1 = [allPrefixes[0] + "_" + x for x in args.cond1[0]]
+                        cond1Group2 = [allPrefixes[1] + "_" + x for x in args.cond1[1]]
+
+                        cond2Group1 = [allPrefixes[0] + "_" + x for x in args.cond2[0]]
+                        cond2Group2 = [allPrefixes[1] + "_" + x for x in args.cond2[1]]
+                        listOfSamples = [cond1Group1, cond1Group2, cond2Group1, cond2Group2]
+
+                        combinedSamples_1 = cond1Group1 + cond1Group2
+                        combinedSamples_2 = cond2Group1 + cond2Group2
 
                         combinedSamples = combinedSamples_1 + combinedSamples_2
 
@@ -1364,13 +1379,16 @@ if __name__ == '__main__':
                             PLOT ENV START
                             
                             """
+
+
+
                             outPrefix = combinedDE + "." + countType + ".mpca"
                             sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 {ct} --samples {samples}".format(
-                                script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
+                                script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA2.py")),
                                 counts=combinedDE,
                                 methods=" ".join(methods),
                                 output=outPrefix,
-                                samples=" ".join(combinedSamples),
+                                samples=" --samples".join( [joined(sampleList, " ") for sampleList in listOfSamples] ),
                                 ct="--"+countType.lower() if len(countType) > 0 else ""
                             )
 
@@ -1396,11 +1414,11 @@ if __name__ == '__main__':
                             """
                             outPrefix = combinedDE + "." + countType + ".all_expr.mpca"
                             sysCall = "python3 {script} --fc {counts} --output {output} --num -1 {ct} --samples {samples}".format(
-                                script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
+                                script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA2.py")),
                                 counts=combinedDE,
                                 methods=" ".join(methods),
                                 output=outPrefix,
-                                samples=" ".join(combinedSamples),
+                                samples=" --samples".join( [joined(sampleList, " ") for sampleList in listOfSamples] ),
                                 ct="--"+countType.lower() if len(countType) > 0 else ""
                             )
 
@@ -1428,11 +1446,11 @@ if __name__ == '__main__':
                             """
                             outPrefix = combinedDE + "." + countType + ".all.mpca"
                             sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB {ct} --samples {samples}".format(
-                                script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
+                                script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA2.py")),
                                 counts=combinedDE,
                                 methods=" ".join(methods),
                                 output=outPrefix,
-                                samples=" ".join(combinedSamples),
+                                samples=" --samples".join( [joined(sampleList, " ") for sampleList in listOfSamples] ),
                                 ct="--"+countType.lower() if len(countType) > 0 else ""
                             )
 

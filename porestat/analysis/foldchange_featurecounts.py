@@ -325,7 +325,8 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
 
             counts, cond2samples = self.readCounts(args, biotypes=geneEnhancement, gene2length=geneLengths)
 
-            vConds = sorted([x for x in counts])
+            #vConds = sorted([x for x in counts])
+            vConds = [x for x in counts]
 
             createdComparisons = defaultdict(list)
             conditions = []
