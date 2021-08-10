@@ -2133,7 +2133,7 @@ if __name__ == '__main__':
                     outputname = os.path.splitext(methodResult)[0] + "." + enrichName + ".setenrich.tsv"
 
                     sysCall = "python3 {script} --de {de} --sets {sets} --output {output}".format(
-                        script=os.path.realpath(os.path.join(scriptMain,"mirtools", "setEnrichment.py")),
+                        script=os.path.realpath(os.path.join(scriptMain,"enrichment", "setEnrichment.py")),
                         de=methodResult,
                         sets=enrichSetFName,
                         output=outputname
