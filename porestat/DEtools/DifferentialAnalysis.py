@@ -623,6 +623,8 @@ if __name__ == '__main__':
             if args.update and len(glob(searchPref + "*")) > 0:
                 simulate = True
 
+
+
         if not simulate:
             subprocess.run(sysCall, shell=True, check=True)
 
@@ -703,7 +705,7 @@ if __name__ == '__main__':
                 script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
                 counts=args.counts[pidx].name,
                 conds=" ".join(args.cond1[pidx]+args.cond2[pidx]),
-                output=os.path.join(args.diffreg[pidx], "orig_counts.combinedcountreplicates")
+                output=os.path.join(args.diffreg[pidx], "orig_counts.combined_ls_countreplicates")
             )
 
             runSysCall(sysCall, "Compare All Replicates (library-size normalized)", caLogger, "Compare All Replicates (library-size normalized)",
@@ -1040,7 +1042,7 @@ if __name__ == '__main__':
                     sysCall = "python3 {script} --fc {counts} --output {output} --num -1 --samples {samples}".format(
                         script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA2.py")),
                         counts=robustDeFile,
-                        samples=" --samples".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
+                        samples=" --samples ".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
                         output=robustDeFile + ".expr_all.mpca"
                     )
 
@@ -1062,7 +1064,7 @@ if __name__ == '__main__':
                     sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 --samples {samples}".format(
                         script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA2.py")),
                         counts=robustDeFile,
-                        samples=" --samples".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
+                        samples=" --samples ".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
                         output=robustDeFile + ".mpca"
                     )
 
@@ -1077,7 +1079,7 @@ if __name__ == '__main__':
                     sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --samples {samples}".format(
                         script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA2.py")),
                         counts=robustDeFile,
-                        samples=" --samples".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
+                        samples=" --samples ".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
                         output=robustDeFile + ".all.mpca"
                     )
 
@@ -1188,9 +1190,9 @@ if __name__ == '__main__':
                         """
 
                         sysCall = "python3 {script} --fc {counts} --output {output} --num -1 --{ct} --samples {samples}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
+                            script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA2.py")),
                             counts=robustDeFile,
-                            samples=" --samples".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
+                            samples=" --samples ".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
                             output=robustDeFile + "." + countType + ".expr_all.mpca",
                             ct=countType.lower()
                         )
@@ -1208,9 +1210,9 @@ if __name__ == '__main__':
                                    robustDeFile + "." + countType + ".expr_all.mpca.*.png", args, prefix, methods, deEnrichPlots)
 
                         sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 1000 --{ct} --samples {samples}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA.py")),
+                            script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makePCA2.py")),
                             counts=robustDeFile,
-                            samples=" --samples".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
+                            samples=" --samples ".join( [joined(args.cond1[pidx], " "),  joined(args.cond2[pidx], " ")] ),
                             output=robustDeFile + "." + countType + ".mpca",
                             ct=countType.lower()
                         )
@@ -1388,7 +1390,7 @@ if __name__ == '__main__':
                                 counts=combinedDE,
                                 methods=" ".join(methods),
                                 output=outPrefix,
-                                samples=" --samples".join( [joined(sampleList, " ") for sampleList in listOfSamples] ),
+                                samples=" --samples ".join( [joined(sampleList, " ") for sampleList in listOfSamples] ),
                                 ct="--"+countType.lower() if len(countType) > 0 else ""
                             )
 
@@ -1418,7 +1420,7 @@ if __name__ == '__main__':
                                 counts=combinedDE,
                                 methods=" ".join(methods),
                                 output=outPrefix,
-                                samples=" --samples".join( [joined(sampleList, " ") for sampleList in listOfSamples] ),
+                                samples=" --samples ".join( [joined(sampleList, " ") for sampleList in listOfSamples] ),
                                 ct="--"+countType.lower() if len(countType) > 0 else ""
                             )
 
@@ -1450,7 +1452,7 @@ if __name__ == '__main__':
                                 counts=combinedDE,
                                 methods=" ".join(methods),
                                 output=outPrefix,
-                                samples=" --samples".join( [joined(sampleList, " ") for sampleList in listOfSamples] ),
+                                samples=" --samples ".join( [joined(sampleList, " ") for sampleList in listOfSamples] ),
                                 ct="--"+countType.lower() if len(countType) > 0 else ""
                             )
 
