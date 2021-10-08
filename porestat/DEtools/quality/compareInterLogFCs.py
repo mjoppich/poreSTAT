@@ -95,6 +95,11 @@ if __name__ == '__main__':
             else:
                 sconditions2 = [os.path.basename(x) for x in conditions2]
             
+        totalComps = len(conditions) * (len(conditions)-1)
+        print("Expecting total Comps", totalComps)
+
+        plotThreshold = 40
+
         fig = plt.figure(figsize=(16, 12))
 
         for i in range(0, len(conditions1)):
@@ -102,6 +107,10 @@ if __name__ == '__main__':
             for j in range(0, len(conditions2)):
 
                 cond1counts = []
+
+                if totalComps > plotThreshold:
+                    if abs(i-j) > 3:
+                        continue
 
                 
                 for ridx, row in enumerate(indf):
@@ -125,7 +134,12 @@ if __name__ == '__main__':
 
                     cond1counts.append(rowfc)
 
-                plt.hist(cond1counts, bins=len(cond1counts), label=sconditions1[i] + " vs " + sconditions2[j], density=True, cumulative=True, histtype="step")
+                labelDesc = sconditions1[i] + " vs " + sconditions2[j]
+
+                if totalComps > plotThreshold:
+                    labelDesc = None
+
+                plt.hist(cond1counts, bins=len(cond1counts), label=labelDesc, density=True, cumulative=True, histtype="step")
 
         plt.legend(loc='upper left')
 

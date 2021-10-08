@@ -118,6 +118,8 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
 
         for idx, countFile in enumerate(args.counts):
 
+            print("Loading File", idx,":", countFile.name)
+
             countFilePrefix = args.prefixes[idx]
             df = DataFrame.parseFromFile(countFile.name, skipChar='#')
 

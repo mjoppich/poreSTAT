@@ -316,8 +316,6 @@ if __name__ == '__main__':
     else:
         args.prefix_counts = ""
 
-    print(args.prefix_counts)
-
     origArgsSimulate = args.simulate
 
     args.save = os.path.realpath(args.save)
@@ -784,11 +782,12 @@ if __name__ == '__main__':
             normedCountsFile = os.path.join(args.diffreg[pidx], "norm_expr.count_out_data_DirectDESeq2")
             if os.path.isfile(normedCountsFile):
 
-                sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2}".format(
+                sysCall = "python3 {script} --pathname --counts {counts} --conditions {conds1} --conditions {conds2} --output {output}".format(
                     script=os.path.realpath(os.path.join(scriptMain, "quality", "compareReplicates.py")),
                     counts=normedCountsFile,
                     conds1=" ".join(cond1RPaths[pidx]),
-                    conds2=" ".join(cond2RPaths[pidx])
+                    conds2=" ".join(cond2RPaths[pidx]),
+                    output=".".join([normedCountsFile, "norm.replicates"])
                 )
 
                 runSysCall(sysCall, "compareReplicates (normalized counts)", caLogger, "Compare Replicates (normalized counts)",

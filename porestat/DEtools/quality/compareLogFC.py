@@ -71,11 +71,21 @@ if __name__ == '__main__':
 
             fig = plt.figure()
 
+            totalComps = len(conditions) * (len(conditions)-1)
+            print("Expecting total Comps", totalComps)
+
+            plotThreshold = 40
+
+
             for i in range(0, len(conditions)):
 
                 for j in range(i+1, len(conditions)):
 
                     cond1counts = []
+
+                    if totalComps > plotThreshold:
+                        if abs(i-j) > 3:
+                            continue
 
                     
                     for row in indf:
@@ -92,11 +102,17 @@ if __name__ == '__main__':
                         rowfc = math.log2(cond11count/cond12count)
                         cond1counts.append(rowfc)
 
-                    plt.hist(cond1counts, bins=len(cond1counts), label=sconditions[i] + " vs " + sconditions[j]  + " (n="+str(len(cond1counts))+")", density=True, cumulative=True, histtype="step")
+                    labelDesc = sconditions[i] + " vs " + sconditions[j]  + " (n="+str(len(cond1counts))+")"
+
+                    if totalComps > plotThreshold:
+                        labelDesc = None
+                    plt.hist(cond1counts, bins=len(cond1counts), label=labelDesc, density=True, cumulative=True, histtype="step")
+
 
             plt.legend(loc='upper left')
-
-            plt.savefig(args.output[fidx] + ".logfc."+str(fidx) + "." + str(cidx) +".png", bbox_inches="tight")
+            outFilename = args.output[fidx] + ".logfc."+str(fidx) + "." + str(cidx) +".png"
+            print(outFilename)
+            plt.savefig(outFilename, bbox_inches="tight")
             plt.close()
 
                         

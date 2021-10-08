@@ -680,8 +680,6 @@ class PorePlot:
             if fc == None or pv == None:
                 continue
 
-
-
             if pv < 0.05:
                 signfcData.append(fc)
                 signpvData.append(-logpv(pv))

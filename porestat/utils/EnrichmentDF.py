@@ -630,6 +630,8 @@ class EnrichmentDF(DataFrame):
                 rawPdata = parseList(compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(rawpTitle)).to_list())
                 adjPdata = parseList(compDF.toDataRow(compDF.getColumnIndex('id'), compDF.getColumnIndex(adjpTitle)).to_list())
 
+                print("Volcano Plot For method", method)
+
                 PorePlot.volcanoPlot(geneNames, l2FCdata, rawPdata, "Volcano Plot " + cond1 + " vs " + cond2 + "\n ("+method+")", "log2 FC", "raw pValue", pltcfg)
 
                 #if method in ['NOISeq']:

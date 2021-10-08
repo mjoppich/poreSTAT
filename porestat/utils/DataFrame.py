@@ -1402,6 +1402,9 @@ document.addEventListener('readystatechange', event => {
 
         oNewDataFrame.column2idx = oHeader
 
+        #for x in oNewDataFrame.column2idx:
+        #    print(x, oNewDataFrame.column2idx[x])
+
         vNumberHeader = [False] * len(oHeader)
 
         for i in range(iStartLine, len(vLines)):
@@ -1413,6 +1416,8 @@ document.addEventListener('readystatechange', event => {
                 sLine = vLines[i].strip()
                 aLine = sLine.split(cDelim)
                 vLine = list(aLine)
+
+                print("NumberHeader", "Line", i, "Values", len(vLine), "for", len(oHeader), "columns")
 
                 for e in range(0, len(vLine)):
 
