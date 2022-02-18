@@ -80,7 +80,7 @@ if __name__ == '__main__':
 
         
 
-        sns.clustermap(dfPlot, figsize=(15, 15), method="ward", col_colors = colColor, row_cluster=True)
+        sns.clustermap(dfPlot, figsize=(15, 15), method="ward", col_colors = colColor, row_cluster=True,xticklabels=True)
 
         plt.suptitle("Heatmap of read counts (raw, library-size normalized * 10000, log2(+1), > t={} )".format(t))
         plt.savefig(args.output + ".expr_plot"+str(t)+".png")

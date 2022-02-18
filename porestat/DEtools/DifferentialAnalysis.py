@@ -276,6 +276,9 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--enhance', type=argparse.FileType('r'), help='enhancement file', default=None)
     parser.add_argument('-l', '--lengths', type=argparse.FileType('r'), help='lengths file', default=None)
 
+    parser.add_argument('-remove-gene-stable', '--remove-gene-stable-identifier', dest='removestable', action='store_true', default=False)
+
+
     parser.add_argument('-m', '--de_methods', nargs='+', type=str, help="differential methods for analysis. If combination, write DESeq;msEmpiRe")
     parser.add_argument('-em', '--enrich-methods', nargs='+', type=str, default=None, required=False,
                         help="differential methods for enrichment analysis. If combination, write DESeq;msEmpiRe")
@@ -572,6 +575,9 @@ if __name__ == '__main__':
             if args.only_protein_coding:
                 addFlags.append("--only-protein-coding")
 
+            if args.removestable:
+                addFlags.append("--remove-gene-stable-identifier")
+
             requiredMethods = set()
 
             for x in args.de_methods:
@@ -582,8 +588,15 @@ if __name__ == '__main__':
 
             requiredMethods = sorted(requiredMethods)
 
+            if not args.nofpkm:
+                addFlags.append("--fpkm")
+            if not args.notpm:
+                addFlags.append("--tpm")
+            if not args.nols:
+                addFlags.append("--libsize")
 
-            sysCall = "python3 {script} foldchange_fc --methods {reqmethods} --output {outdir} --counts {countfile} --prefixes {prefix} --conditions {cond1} --conditions {cond2} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna {flags} --libsize --fpkm --tpm".format(
+                
+            sysCall = "python3 {script} foldchange_fc --methods {reqmethods} --output {outdir} --counts {countfile} --prefixes {prefix} --conditions {cond1} --conditions {cond2} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna {flags}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "../..", "scripts/poreAnalysis.py")),
                 outdir=args.diffreg[pidx],
                 countfile=args.counts[pidx].name,
@@ -645,6 +658,7 @@ if __name__ == '__main__':
         for pidx, prefix in enumerate(args.prefixes):
             caLogger.info("Running SubSample {} ({})".format(pidx, prefix))
 
+            """
             sysCall = "python3 {script} --fc {countfile} --output {outdir} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna --libsize --fpkm --tpm".format(
                 script=os.path.realpath(os.path.join(scriptMain, "prepare", "calculateExpressionValues.py")),
                 outdir=os.path.join(args.diffreg[pidx], "counts.tpm.fpkm.tsv"),
@@ -658,7 +672,7 @@ if __name__ == '__main__':
 
             if not args.simulate and not (args.update and len(glob(os.path.join(args.diffreg[pidx], "counts.tpm.fpkm.tsv"))) > 0):
                 subprocess.run(sysCall, shell=True, check=True)
-
+            """
             
             if not args.counts_analysis:
                 continue
@@ -755,7 +769,7 @@ if __name__ == '__main__':
             runSysCall(sysCall, "Make Count Plots", caLogger, "Compare Raw Counts Distribution",
                        os.path.join(args.diffreg[pidx], "counts.countplot"), args, prefix, caPlots)
 
-            sysCall = "python3 {script} --counts {counts} --groups {conds1} --groups {conds2} --thresholds -1 1 2 10 --output {output}".format(
+            sysCall = "python3 {script} --counts {counts} --groups {conds1} --groups {conds2} --thresholds -1 1 2 10 20 --output {output}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "quality", "visCounts.py")),
                 counts=args.counts[pidx].name,
                 conds1=" ".join(args.cond1[pidx]),
@@ -968,10 +982,13 @@ if __name__ == '__main__':
                             countType = "raw"
                             countAdd = ""
 
+                        counts1File = os.path.join(args.diffreg[prefixIdx1], "count_{}_{}.tsv".format(args.cond1[prefixIdx1][0], args.cond2[prefixIdx1][0]))
+                        counts2File = os.path.join(args.diffreg[prefixIdx2], "count_{}_{}.tsv".format(args.cond1[prefixIdx2][0], args.cond2[prefixIdx2][0]))
+
                         outPrefix = os.path.join(args.save, args.name +  ".compare_mappers" + countSuffix)
                         sysCall = "python3 {script} --counts {counts} --conditions {conds1} --conditions {conds2} --prefixes {prefixes} --output {output}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "quality", "compareMappingReplicates.py")),
-                            counts=" ".join([os.path.join(args.diffreg[prefixIdx1], "counts.tpm.fpkm.tsv"), os.path.join(args.diffreg[prefixIdx2], "counts.tpm.fpkm.tsv")]),
+                            counts=" ".join([counts1File, counts2File]),
                             conds1=" ".join([x +countAdd for x in args.cond1[prefixIdx1]] + [x + countAdd for x in args.cond2[prefixIdx1]]),
                             conds2=" ".join([x +countAdd for x in args.cond1[prefixIdx2]] + [x + countAdd for x in args.cond2[prefixIdx2]]),
                             prefixes=" ".join([args.prefixes[prefixIdx1], args.prefixes[prefixIdx2]]),

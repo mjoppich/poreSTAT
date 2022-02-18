@@ -60,6 +60,7 @@ class FoldChangeFeatureCountsDistributionFactory(PSToolInterfaceFactory):
         parser.add_argument('-fpkm', '--fpkm', dest='fpkm', action='store_true', default=False)
         parser.add_argument('-tpm', '--tpm', dest='tpm', action='store_true', default=False)
         parser.add_argument('-libsize', '--libsize', dest='libsize', action='store_true', default=False)
+        parser.add_argument('-remove-gene-stable', '--remove-gene-stable-identifier', dest='removestable', action='store_true', default=False)
 
 
         parser.add_argument('-anc', '--allow-nonexistant-cond', dest='allow_nonexistant_cond', action='store_true', default=False)
@@ -139,6 +140,10 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                         continue
 
                     subDf = df.selectColumns({"Geneid": "gene", condElement: "count"})
+
+                    if args.removestable:
+                        geneColIdx = subDf.getColumnIndex("gene")
+                        subDf.applyByRow("gene", lambda x: x[geneColIdx].split(".")[0])
 
                     if biotypes != None and args.norrna:
                         geneColIdx = subDf.getColumnIndex("gene")

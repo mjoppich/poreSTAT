@@ -344,7 +344,7 @@ class PorePlot:
                     color.append((1, 1, 1, 1))
 
                 else:
-                    frac = p2l[channelID] / (maxAvgLength - minAvgLength)
+                    frac = (p2l[channelID]-minAvgLength) / (maxAvgLength - minAvgLength)
                     color.append(cls.getColor(colormap=scolormap, value=frac))
 
         pltcfg.startPlot()
@@ -393,10 +393,12 @@ class PorePlot:
             sizeSteps = 5
 
             frac = count / (maxCount - minCount)
-            area = minPoreRad + frac * (maxPoreRad-minPoreRad)
+            minArea = minPoreRad + 0 * (maxPoreRad-minPoreRad)
+            maxArea = minPoreRad + 1 * (maxPoreRad-minPoreRad)
 
-            readCounts = [ x for x in range(int(minCount), int(maxCount), (int(maxCount)-int(minCount))/ sizeSteps)]
-            sizes = [x for x in range(int(min(area)), int(max(area)), int((max(area) - min(area)) / sizeSteps))]
+            readCounts = [ x for x in range(int(minCount), int(maxCount), round((int(maxCount)-int(minCount))/ sizeSteps))]
+            sizes = [x for x in range(int(minArea), int(maxArea),  round((int(maxArea)-int(minArea))/ sizeSteps))]
+            #sizes = [x for x in range(int(min(area)), int(max(area)), round( int((max(area) - min(area)) / sizeSteps )))]
 
             legendPlts = []
             for size in sizes:
@@ -898,6 +900,7 @@ class PorePlot:
 
         pandasDF = pandas.DataFrame.from_dict(pdData,orient='index').T
         sns.violinplot(data=pandasDF, orient=orientation, ax=ax, scale='area', inner='box', order=labels, dropna=True)
+        sns.pointplot(ax=ax, data=pandasDF, estimator=np.mean, dropna=True, color="red", markers="d")
 
         if xTitle != None:
             ax.set_xlabel(xTitle)

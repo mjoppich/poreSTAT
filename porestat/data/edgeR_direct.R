@@ -138,6 +138,9 @@ finalres = data.frame(
     FC=-deRes$logFC,
     PVAL=deRes$PValue,
     ADJ.PVAL=deRes$FDR)
+
+finalres <- finalres[order(finalres$PVAL),]
+
     
 write.table(finalres, file=out.file, row.names=F, quote=F, sep="\t")
 

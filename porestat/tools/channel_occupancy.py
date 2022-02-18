@@ -5,7 +5,7 @@ import sys
 from collections import Counter
 from collections import defaultdict
 
-from numpy import genfromtxt
+import numpy as np
 from ..plots.plotconfig import PlotConfig
 
 from ..utils.Utils import mergeDicts
@@ -59,7 +59,7 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
         super(ChannelOccupancy, self).__init__(args)
 
         this_dir, this_filename = os.path.split(__file__)
-        chipLayout = genfromtxt(this_dir + '/../data/chip_layout.csv', delimiter=',', dtype=int)
+        chipLayout = np.genfromtxt(this_dir + '/../data/chip_layout.csv', delimiter=',', dtype=int)
 
         self.channelCount = chipLayout.shape[0] * chipLayout.shape[1]
         self.allChannels = [i for i in range(1, self.channelCount+1)]
@@ -107,6 +107,8 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
             channelDict[channelID].append((timeOfCreation, readLength))
         else:
             channelDict[channelID] = [(timeOfCreation, readLength)]
+
+        return localEnv
 
     def joinParallel(self, existResult, newResult, oEnvironment):
 
@@ -223,6 +225,18 @@ class ChannelOccupancy(ParallelPSTReportableInterface):
         args.pltcfg.centeredStyle = newstyle
 
         print(args.pltcfg.centeredStyle)
+
+        quantiles = [0.25,0.5,0.75]
+        print("channelID", "min", "mean", "median", "max", "quantiles ({})".format(quantiles))
+        allchannels = []
+        for channelID in channel2rl:
+            thisChannel = channel2rl[channelID]
+            if len(thisChannel) == 0:
+                thisChannel = [-1]
+            print(channelID, np.min(thisChannel), np.mean(thisChannel), np.median(thisChannel), np.max(thisChannel), np.quantile(thisChannel, quantiles))
+            allchannels += channel2rl[channelID]
+        print("all", np.min(allchannels), np.mean(allchannels), np.median(allchannels), np.max(allchannels), np.quantile(allchannels, quantiles))
+
 
         PorePlot.plotLoadOut(channel2rl, runKey, pltcfg=args.pltcfg)
 

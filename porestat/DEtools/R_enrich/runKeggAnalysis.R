@@ -5,6 +5,11 @@ suppressMessages(suppressWarnings(require(dplyr)))
 suppressMessages(suppressWarnings(require(RDAVIDWebService)))
 suppressMessages(suppressWarnings(require(qvalue)))
 
+suppressMessages(suppressWarnings(require(org.Hs.eg.db)))
+suppressMessages(suppressWarnings(require(org.Mm.eg.db)))
+
+
+
 args = commandArgs(trailingOnly=TRUE)
 
 filename = args[1]
@@ -64,18 +69,22 @@ annotTable = NULL;
 if (organism == "mouse")
 {
     annotTable = grcm38
+    conversionTable = org.Mm.eg.db
     egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
 
 } else if (organism == "human")
 {
     annotTable = grch38
+    conversionTable = org.Hs.eg.db
+
     egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
 } else if (organism == "yeast")
 {
 
     suppressMessages(suppressWarnings(require(org.Sc.sgd.db)))
+    conversionTable = org.Sc.sgd.db
 
     readableState =F
     allEntrez = allGeneIDs#sapply(allGeneIDs, function(x) {get(x, org.Sc.sgdENTREZID)} )
@@ -124,13 +133,17 @@ head(entrezBGC)
 #like
 #https://www.r-bloggers.com/kegg-enrichment-analysis-with-latest-online-data-using-clusterprofiler/
  
-kk <- enrichKEGG(entrezGenesC, organism=organism, keyType="kegg", pAdjustMethod="BH", universe=c(entrezGenesC, entrezBGC), pvalueCutoff=0.5, qvalueCutoff=0.5)
+kk <- enrichKEGG(entrezGenesC, organism=organism,
+keyType="kegg", pAdjustMethod="BH",
+universe=c(entrezGenesC, entrezBGC), pvalueCutoff=0.5, qvalueCutoff=0.5)
 
 if (is.null(kk))
 {
     print("NO DATA RETURNED. TERMINATING")
     quit(status=0, save='no')
 }
+
+kk <- setReadable(kk, OrgDb = conversionTable, keyType="ENTREZID")
 
 rs = as.data.frame(kk)
 

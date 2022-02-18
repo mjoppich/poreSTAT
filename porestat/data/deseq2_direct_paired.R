@@ -88,6 +88,8 @@ dds <- DESeqDataSetFromMatrix(countData =cts, colData = sampleTable, design = ~s
 dds <- DESeq(dds)
 ( res <- results(dds) )
 outres = res[! is.na(res$padj),]
+outres <- outres[order(outres$padj),]
+
 
 finalres = data.frame(PROBEID=rownames(outres), FC=outres$log2FoldChange, PVAL=outres$pvalue, ADJ.PVAL=outres$padj)
 
