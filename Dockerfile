@@ -17,11 +17,19 @@ RUN pip3 install matplotlib==3.3.2 numpy
 RUN pip3 install umap-learn 
 RUN pip3 install matplotlib_venn adjustText natsort openpyxl jinja2 biopython venn pandas numpy seaborn scikit-learn scipy statsmodels upsetplot HTSeq pysam dill pathos openpyxl h5py
 
+RUN curl -fsSL https://deb.nodesource.com/setup_17.x | bash -
+RUN apt-get install -y nodejs
+
 WORKDIR /git
 RUN /bin/bash -c "chmod -R 775 /git"
 
 RUN git clone https://github.com/mjoppich/mpld3 /git/mpld3
-RUN cd /git/mpld3 && python3 setup.py submodule && python3 setup.py build && python3 setup.py install && cp -r mplexporter/mplexporter/renderers/ /usr/local/lib/python3.8/dist-packages/mpld3-0.3.1.dev1-py3.8.egg/mpld3/mplexporter/ && cd /git
+RUN cd /git/mpld3 && npm update
+RUN cd /git/mpld3 && python3 setup.py submodule
+RUN cd /git/mpld3 && python3 setup.py buildjs
+RUN cd /git/mpld3 && python3 setup.py build
+RUN cd /git/mpld3 && python3 setup.py install
+RUN cp -r /git/mpld3/mplexporter/mplexporter/renderers/ /usr/local/lib/python3.8/dist-packages/mpld3-0.3.1.dev1-py3.8.egg/mpld3/mplexporter/ && cd /git
 
 RUN git clone https://github.com/mjoppich/porestat /git/poreSTAT
 RUN mkdir poreSTAT/clib/build && cd poreSTAT/clib/build && cmake .. && make && cd /git
@@ -47,8 +55,12 @@ RUN R -e 'devtools::install_github("zimmerlab/MS-EmpiRe")'
 ENTRYPOINT ["python3", "/git/poreSTAT/porestat/DEtools/DifferentialAnalysis.py"]
 CMD ["python3", "/git/poreSTAT/porestat/DEtools/DifferentialAnalysis.py", "--help"]
 
+#docker build .
 #docker build --no-cache .
-#docker tag 5414366bcd4e mjoppich/porestat_de:latest
-#docker tag 5414366bcd4e mjoppich/porestat_de:v1.3
+
+# => => writing image sha256:09064d1399ebfdf78b45fe3f20d75fe213343eceeeb2e2bf445c5306ad6f2c53
+# docker image ls
+#docker tag 09064d1399ebfdf78b45fe3f20d75fe213343eceeeb2e2bf445c5306ad6f2c53 mjoppich/porestat_de:latest
+#docker tag 09064d1399ebfdf78b45fe3f20d75fe213343eceeeb2e2bf445c5306ad6f2c53 mjoppich/porestat_de:v1.4
 #docker login
-#docker push mjoppich/porestat_de:v1.3 
+#docker push mjoppich/porestat_de:v1.4
