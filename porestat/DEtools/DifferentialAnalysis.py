@@ -239,6 +239,10 @@ if __name__ == '__main__':
     parser.add_argument('-c1', '--cond1', nargs='+', type=str, action='append', required=True, help="columns in count files for cond1")
     parser.add_argument('-c2', '--cond2', nargs='+', type=str, action='append', required=True, help="columns in count files for cond2")
 
+    parser.add_argument('-minfc', '--min-foldchange', type=float, default=1.0, required=False)
+    parser.add_argument('-minpval', '--min-pvalue', type=float, default=0.05, required=False)
+
+
     parser.add_argument('-fpkm', '--no-fpkm', dest='nofpkm', action='store_true', default=False)
     parser.add_argument('-tpm', '--no-tpm', dest='notpm', action='store_true', default=False)
     parser.add_argument('-ls', '--no-ls', dest='nols', action='store_true', default=False)
@@ -769,7 +773,7 @@ if __name__ == '__main__':
             runSysCall(sysCall, "Make Count Plots", caLogger, "Compare Raw Counts Distribution",
                        os.path.join(args.diffreg[pidx], "counts.countplot"), args, prefix, caPlots)
 
-            sysCall = "python3 {script} --counts {counts} --groups {conds1} --groups {conds2} --thresholds -1 1 2 10 20 --output {output}".format(
+            sysCall = "python3 {script} --counts {counts} --groups {conds1} --groups {conds2} --thresholds -1 1 2 10 20 50 --output {output}".format(
                 script=os.path.realpath(os.path.join(scriptMain, "quality", "visCounts.py")),
                 counts=args.counts[pidx].name,
                 conds1=" ".join(args.cond1[pidx]),
@@ -1023,18 +1027,33 @@ if __name__ == '__main__':
                     robustDeFile = os.path.join(args.save, args.name + "." + prefix + "." + methodStr + ".tsv")
 
                     prefix2countFile[prefix] = countDeFile
-                    sysCall = "python3 {script} --de {counts} --methods {methods} --output {output}".format(
+                    sysCall = "python3 {script} --min-foldchange {minfc} --min-pvalue {minp} --de {counts} --methods {methods} --output {output}".format(
                         script=os.path.realpath(os.path.join(scriptMain, "robustness", "calcRobustFCs.py")),
                         counts=countDeFile,
                         methods=" ".join(methods),
-                        output=robustDeFile
+                        output=robustDeFile,
+                        minfc=args.min_foldchange,
+                        minp = args.min_pvalue
                     )
 
-                    plotId2Descr["DE Methods Overview ({})".format(" ".join(methods))] = "<p>The following plots rely on the robust values (logFC, PVAL) for the methods {}</p>" \
+                    plotId2Descr["DE Methods Overview ({})".format(" ".join(methods))] = "<p>The following plots rely on the robust values (|logFC| >= {}, PVAL < {}) for the methods {}</p>" \
                                                                                          "<p>The upset plot shows how many genes have been discovered using each method.</p>"\
-                                                                                         "<p>The volcano plot shows logFC and -log10(pVal) for the robustly detected genes (that are genes that are DE with all above methods).</p>".format(" ".join(methods))
+                                                                                         "<p>The volcano plot shows logFC and -log10(pVal) for the robustly detected genes (that are genes that are DE with all above methods).</p>".format(args.min_foldchange, args.min_pvalue, " ".join(methods))
                     runSysCall(sysCall, "Calculate Robust FCs", statsLogger, "DE Methods Overview ({})".format(" ".join(methods)), robustDeFile + ".rob.", args, prefix, methods, deEnrichPlots)
 
+
+                    robustDeFileXlsx = robustDeFile.split(".")
+                    robustDeFileXlsx[-1] = "xlsx"
+                    robustDeFileXlsx = ".".join(robustDeFileXlsx)
+
+                    plotId2Descr["DE Methods Files ({})".format(" ".join(methods))] = [robustDeFile]
+                    runSysCall("python3 {script} {input}".format(
+                        script=os.path.realpath(os.path.join(scriptMain, "prepare", "tsv2excel.py")),
+                        input=robustDeFile
+                    ), "DE Methods Files", statsLogger, "DE Methods Files ({})".format(" ".join(methods)), robustDeFileXlsx, args, prefix, methods, deEnrichPlots)
+
+                    #deEnrichPlots[methods]["DE Methods Files ({})".format(" ".join(methods))][prefix] = [robustDeFile, robustDeFileXlsx]
+                    
                     
                     if len(methods) == 1:
                         methodsStr = methods[0]
@@ -1315,11 +1334,13 @@ if __name__ == '__main__':
                                    deEnrichPlots)
 
                         prefix2countFile[prefix] = countDeFile
-                        sysCall = "python3 {script} --de {counts} --methods {methods} --output {output}".format(
+                        sysCall = "python3 {script} --min-foldchange {minfc} --min-pvalue {minp} --de {counts} --methods {methods} --output {output}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "robustness", "calcRobustFCs.py")),
                             counts=combinedRaw,
                             methods=" ".join(methods),
-                            output=combinedDE
+                            output=combinedDE,
+                            minfc=args.min_foldchange,
+                            minp = args.min_pvalue
                         )
 
                         runSysCall(sysCall, "Calculate Robust FCs", statsLogger, "DE Methods Overview",
@@ -1598,11 +1619,13 @@ if __name__ == '__main__':
                            deEnrichPlots)
 
                 #prefix2countFile[prefix] = countDeFile
-                sysCall = "python3 {script} --de {counts} --methods {methods} --output {output}".format(
+                sysCall = "python3 {script} --min-foldchange {minfc} --min-pvalue {minp} --de {counts} --methods {methods} --output {output}".format(
                     script=os.path.realpath(os.path.join(scriptMain, "robustness", "calcRobustFCs.py")),
                     counts=robustRaw,
                     methods="ROB",
-                    output=robustDE
+                    output=robustDE,
+                    minfc=args.min_foldchange,
+                    minp = args.min_pvalue
                 )
 
                 runSysCall(sysCall, "Calculate Robust Results", statsLogger, "Calculate Robust Results",
@@ -1693,7 +1716,12 @@ if __name__ == '__main__':
                         for imgFile in filetuple:
 
                             if imgFile != None:
-                                tableOut += "<td><img src=\"" + str(os.path.relpath(os.path.realpath(imgFile), os.path.dirname(args.report.name))) + "\"/></td>"
+                                if imgFile.upper().endswith("TSV") or imgFile.upper().endswith("HTML"):
+                                    # data file
+                                    tableOut += "<td><a href=\"" + str(os.path.relpath(os.path.realpath(imgFile), os.path.dirname(args.report.name))) + "\">{}<a/></td>".format(os.path.basename(imgFile))
+                                else:    
+                                    #image
+                                    tableOut += "<td><img src=\"" + str(os.path.relpath(os.path.realpath(imgFile), os.path.dirname(args.report.name))) + "\"/></td>"
                             else:
                                 tableOut += "<td>N/A</td>"
 
@@ -1797,49 +1825,72 @@ if __name__ == '__main__':
                     for direction in ["all", "up", "down"]:
 
                         if args.run_david:
-                            sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
+                            sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir} {minpval} {minfc}".format(
                                 script=os.path.realpath(os.path.join(scriptMain, "R_enrich", "runDAVIDAnalysis.R")),
                                 de=deFile,
                                 org=args.organism_name,
-                                dir=direction
+                                dir=direction,
+                                minpval=args.min_pvalue,
+                                minfc=args.min_foldchange
                             )
 
                             hasOutfile = len(glob(deFile + ".david." + direction + "*")) > 0
                             if not args.simulate and (args.update and not hasOutfile):
                                 enrichCalls.append(sysCall)
 
-                        sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
+                        sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir} {minpval} {minfc}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "R_enrich", "runGOAnalysis.R")),
                             de=deFile,
                             org=args.organism_mapping,
-                            dir=direction)
+                            dir=direction,
+                            minpval=args.min_pvalue,
+                            minfc=args.min_foldchange)
 
                         hasOutfile = len(glob(deFile + ".GeneOntology.*." + direction + ".goenrich.tsv")) > 0
                         if not args.simulate and (args.update and not hasOutfile):
                             enrichCalls.append(sysCall)
 
                         if args.organism_name != None:
-                            sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
+                            sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir} {minpval} {minfc}".format(
                                 script=os.path.realpath(os.path.join(scriptMain, "R_enrich", "runReactomeAnalysis.R")),
                                 de=deFile,
                                 org=args.organism_name,
-                                dir=direction)
+                                dir=direction,
+                                minpval=args.min_pvalue,
+                                minfc=args.min_foldchange)
                             hasOutfile = len(glob(deFile + ".reactome." + direction + "*")) > 0
                             if not args.simulate and (args.update and not hasOutfile):
                                 enrichCalls.append(sysCall)
 
-                        sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
+                        sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir} {minpval} {minfc}".format(
                             script=os.path.realpath(os.path.join(scriptMain, "R_enrich", "runKeggAnalysis.R")),
                             de=deFile,
-                            org=args.organism_name,
-                            dir=direction)
+                            org=args.organism,
+                            dir=direction,
+                            minpval=args.min_pvalue,
+                            minfc=args.min_foldchange)
 
                         hasOutfile = len(glob(deFile + ".kegg." + direction + "*")) > 0
                         if not args.simulate and (args.update and not hasOutfile):
                             enrichCalls.append(sysCall)
 
+
+                        sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir} {minpval} {minfc}".format(
+                            script=os.path.realpath(os.path.join(scriptMain, "R_enrich", "runMKeggAnalysis.R")),
+                            de=deFile,
+                            org=args.organism,
+                            dir=direction,
+                            minpval=args.min_pvalue,
+                            minfc=args.min_foldchange)
+
+                        hasOutfile = len(glob(deFile + ".mkegg." + direction + "*")) > 0
+                        if not args.simulate and (args.update and not hasOutfile):
+                            enrichCalls.append(sysCall)
+
+
+
                         if direction == "all":
-                            sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
+                            sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir} {minpval} {minfc}".format(
                                 script=os.path.realpath(os.path.join(scriptMain, "R_enrich", "runGOGSEA.R")),
                                 de=deFile,
                                 org=args.organism_mapping,

@@ -12,13 +12,14 @@ filename = args[1]
 organism = args[2]
 mode=args[3]
 
+
+
 print(paste("Running in mode", mode, sep=" "))
 
 allGeneIDs = NULL
 bgGeneIDs = NULL
 indata = read.table(filename, header=TRUE, sep="\t")
 
-minFC = 1.0
 
 allGenes = indata
 allGenes = allGenes[allGenes$ROB_ADJ.PVAL != 1.0 & allGenes$ROB_log2FC != 0.0 & !is.na(allGenes$id) ,]
@@ -144,6 +145,7 @@ for (GODB in c("BP", "MF", "CC")) { #
         quit(status=0, save='no')
     }
 
+    kk <- setReadable(kk, OrgDb = orgDB, keyType="ENTREZID")
     rs = as.data.frame(kk)
 
     if (nrow(rs) == 0)

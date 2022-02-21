@@ -1,7 +1,7 @@
 FROM ubuntu:20.04
 
 LABEL maintainer="markus@compbio.cc"
-LABEL version="1.0"
+LABEL version="1.5"
 LABEL description="Differential Expression pipeline (robust)"
 
 RUN apt update && apt install -y dirmngr apt-transport-https ca-certificates gnupg2
@@ -15,7 +15,7 @@ RUN apt update && apt install -y python3-dev python3 python3-pip curl git cmake 
 RUN apt install -y python3-llvmlite libgit2-dev zlib1g-dev libcurl4-gnutls-dev libxml2-dev libhts-dev libssl-dev libpng-dev libjpeg-dev libbz2-dev liblzma-dev libncurses5-dev libncursesw5-dev libgl-dev libgsl-dev libcurl4-gnutls-dev libxml2-dev libssl-dev libpng-dev libjpeg-dev libbz2-dev liblzma-dev libncurses5-dev libncursesw5-dev libgl-dev libgsl-dev 
 RUN pip3 install matplotlib==3.3.2 numpy
 RUN pip3 install umap-learn 
-RUN pip3 install matplotlib_venn adjustText natsort openpyxl jinja2 biopython venn pandas numpy seaborn scikit-learn scipy statsmodels upsetplot HTSeq pysam dill pathos openpyxl h5py
+RUN pip3 install matplotlib_venn adjustText natsort openpyxl XlsxWriter jinja2 biopython venn pandas numpy seaborn scikit-learn scipy statsmodels upsetplot HTSeq pysam dill pathos openpyxl h5py
 
 RUN curl -fsSL https://deb.nodesource.com/setup_17.x | bash -
 RUN apt-get install -y nodejs
@@ -64,3 +64,4 @@ CMD ["python3", "/git/poreSTAT/porestat/DEtools/DifferentialAnalysis.py", "--hel
 #docker tag 09064d1399ebfdf78b45fe3f20d75fe213343eceeeb2e2bf445c5306ad6f2c53 mjoppich/porestat_de:v1.4
 #docker login
 #docker push mjoppich/porestat_de:v1.4
+#docker push mjoppich/porestat_de:latest

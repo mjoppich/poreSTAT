@@ -10,7 +10,7 @@ mpl.use('Agg')
 
 import matplotlib.pyplot as plt
 from collections import defaultdict
-
+import pandas as pd
 
 import argparse
 from upsetplot import from_contents,plot
@@ -200,7 +200,11 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--methods', nargs='+', type=str, required=True, help='alignment files')
     parser.add_argument('-o', '--output', nargs='+', type=argparse.FileType('w'), required=True, help='alignment files')
     parser.add_argument('-p', '--print', action="store_true", default=False)
-    parser.add_argument('-c', '--cutoff', type=float, help='alignment files', default=0.05)
+
+
+    #parser.add_argument('-c', '--cutoff', type=float, help='alignment files', default=0.05)
+    parser.add_argument('-minfc', '--min-foldchange', type=float, default=1.0, required=False)
+    parser.add_argument('-minpval', '--min-pvalue', type=float, default=0.05, required=False)
 
 
     args = parser.parse_args()
@@ -295,7 +299,7 @@ if __name__ == '__main__':
                         logFC = 0.0
                     
                     
-                    if float(adjPval) < args.cutoff:
+                    if float(adjPval) < args.min_pvalue and abs(logFC) > args.min_foldchange:
                         method2genes[method].add( line[col2idx[genesymname]] )
 
                     if not method in args.methods:
@@ -332,7 +336,7 @@ if __name__ == '__main__':
             #    print(methodsAdjPvals, methodsRawPvals, methodsLog2FCs)
             #    print(robustAdjPval, robustRawPval, robustLog2FC, allSameDirection)
 
-            if robustAdjPval < args.cutoff:
+            if robustAdjPval < args.min_pvalue  and abs(robustLog2FC) > args.min_foldchange:
                 signCount += 1
 
                 if args.print:
@@ -377,7 +381,7 @@ if __name__ == '__main__':
 
             fcPvalGene.append((rowFC, rowPV, rowGene))
 
-            if rowPV < 0.05 and abs(rowFC) >= 1.0:
+            if rowPV < args.min_pvalue and abs(rowFC) >= args.min_foldchange:
                 fcPvalsSig.append((rowFC, logRowPV))
             else:
                 fcPvals.append((rowFC, logRowPV))

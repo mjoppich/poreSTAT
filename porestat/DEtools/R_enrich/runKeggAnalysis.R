@@ -15,6 +15,8 @@ args = commandArgs(trailingOnly=TRUE)
 filename = args[1]
 organism = args[2]
 mode=args[3]
+minPVal = args[4]
+minFC = args[5]
 
 print(paste("Running in mode", mode, sep=" "))
 
@@ -26,15 +28,15 @@ minFC = 1.0
 
 if (mode == "all")
 {
-    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=0.05 & abs(indata$ROB_log2FC) > minFC,]$id)
-    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>0.05 | (indata$ROB_ADJ.PVAL<=0.05 & abs(indata$ROB_log2FC) <= minFC),]$id)
+    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=minPVal & abs(indata$ROB_log2FC) > minFC,]$id)
+    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>minPVal | (indata$ROB_ADJ.PVAL<=minPVal & abs(indata$ROB_log2FC) <= minFC),]$id)
 
     print(length(allGeneIDs))
     print(length(bgGeneIDs))
 } else if (mode == "up")
 {
-    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=0.05 & indata$ROB_log2FC > minFC,]$id)
-    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>0.05 | (indata$ROB_ADJ.PVAL<=0.05 & indata$ROB_log2FC <= minFC),]$id)
+    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=minPVal & indata$ROB_log2FC > minFC,]$id)
+    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>minPVal | (indata$ROB_ADJ.PVAL<=minPVal & indata$ROB_log2FC <= minFC),]$id)
 
 
     print(length(allGeneIDs))
@@ -43,8 +45,8 @@ if (mode == "all")
 
 } else if (mode == "down")
 {
-    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=0.05 & indata$ROB_log2FC < -minFC,]$id)
-    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>0.05 | (indata$ROB_ADJ.PVAL<=0.05 & indata$ROB_log2FC >= -minFC),]$id)
+    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=minPVal & indata$ROB_log2FC < -minFC,]$id)
+    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>minPVal | (indata$ROB_ADJ.PVAL<=minPVal & indata$ROB_log2FC >= -minFC),]$id)
 
 
     print(length(allGeneIDs))
@@ -66,21 +68,21 @@ bgGeneIDs = gsub("\\..*","",bgGeneIDs)
 
 annotTable = NULL;
 
-if (organism == "mouse")
+if (organism == "mmu")
 {
     annotTable = grcm38
     conversionTable = org.Mm.eg.db
     egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
 
-} else if (organism == "human")
+} else if (organism == "hsa")
 {
     annotTable = grch38
     conversionTable = org.Hs.eg.db
 
     egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
-} else if (organism == "yeast")
+} else if (organism == "sce")
 {
 
     suppressMessages(suppressWarnings(require(org.Sc.sgd.db)))
@@ -97,18 +99,18 @@ entrezGenes = as.vector(entrezGenes$entrez)
 
 annotTable = NULL;
 
-if (organism == "mouse")
+if (organism == "mmu")
 {
     annotTable = grcm38
     egid = annotTable %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
 
-} else if (organism == "human")
+} else if (organism == "hsa")
 {
     annotTable = grch38
     egid = annotTable %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
-} else if (organism == "yeast")
+} else if (organism == "sce")
 {
 
     suppressMessages(suppressWarnings(require(org.Sc.sgd.db)))
@@ -133,9 +135,7 @@ head(entrezBGC)
 #like
 #https://www.r-bloggers.com/kegg-enrichment-analysis-with-latest-online-data-using-clusterprofiler/
  
-kk <- enrichKEGG(entrezGenesC, organism=organism,
-keyType="kegg", pAdjustMethod="BH",
-universe=c(entrezGenesC, entrezBGC), pvalueCutoff=0.5, qvalueCutoff=0.5)
+kk <- enrichKEGG(entrezGenesC, organism=organism,pAdjustMethod="BH",universe=c(entrezGenesC, entrezBGC), pvalueCutoff=0.5, qvalueCutoff=0.5)
 
 if (is.null(kk))
 {
@@ -150,7 +150,7 @@ rs = as.data.frame(kk)
 if (nrow(rs) == 0)
 {
     print("NO DATA in DF. TERMINATING")
-    quit(status=0, save='no')
+     quit(status=0, save='no')
 }
 
 rsc = colnames(rs)

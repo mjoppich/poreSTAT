@@ -12,25 +12,27 @@ filename = args[1]
 organism = args[2]
 mode=args[3]
 
+minPVal = args[4]
+minFC = args[5]
+
 print(paste("Running in mode", mode, sep=" "))
 
 allGeneIDs = NULL
 bgGeneIDs = NULL
 indata = read.table(filename, header=TRUE, sep="\t")
 
-minFC = 1.0
 
 if (mode == "all")
 {
-    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=0.05 & abs(indata$ROB_log2FC) > minFC,]$id)
-    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>0.05 | (indata$ROB_ADJ.PVAL<=0.05 & abs(indata$ROB_log2FC) <= minFC),]$id)
+    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=minPVal & abs(indata$ROB_log2FC) > minFC,]$id)
+    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>minPVal | (indata$ROB_ADJ.PVAL<=minPVal & abs(indata$ROB_log2FC) <= minFC),]$id)
 
     print(length(allGeneIDs))
     print(length(bgGeneIDs))
 } else if (mode == "up")
 {
-    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=0.05 & indata$ROB_log2FC > minFC,]$id)
-    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>0.05 | (indata$ROB_ADJ.PVAL<=0.05 & indata$ROB_log2FC <= minFC),]$id)
+    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=minPVal & indata$ROB_log2FC > minFC,]$id)
+    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>minPVal | (indata$ROB_ADJ.PVAL<=minPVal & indata$ROB_log2FC <= minFC),]$id)
 
 
     print(length(allGeneIDs))
@@ -39,8 +41,8 @@ if (mode == "all")
 
 } else if (mode == "down")
 {
-    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=0.05 & indata$ROB_log2FC < -minFC,]$id)
-    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>0.05 | (indata$ROB_ADJ.PVAL<=0.05 & indata$ROB_log2FC >= -minFC),]$id)
+    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=minPVal & indata$ROB_log2FC < -minFC,]$id)
+    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>minPVal | (indata$ROB_ADJ.PVAL<=minPVal & indata$ROB_log2FC >= -minFC),]$id)
 
 
     print(length(allGeneIDs))
