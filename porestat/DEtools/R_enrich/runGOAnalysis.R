@@ -12,8 +12,8 @@ filename = args[1]
 organism = args[2]
 mode=args[3]
 
-minPVal = args[4]
-minFC = args[5]
+minPVal = as.numeric(args[4])
+minFC = as.numeric(args[5])
 
 print(paste("Running in mode", mode, sep=" "))
 
@@ -41,8 +41,8 @@ if (mode == "all")
 
 } else if (mode == "down")
 {
-    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=minPVal & indata$ROB_log2FC < -minFC,]$id)
-    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>minPVal | (indata$ROB_ADJ.PVAL<=minPVal & indata$ROB_log2FC >= -minFC),]$id)
+    allGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL<=minPVal & indata$ROB_log2FC < (0-minFC),]$id)
+    bgGeneIDs = as.vector(indata[indata$ROB_ADJ.PVAL>minPVal | (indata$ROB_ADJ.PVAL<=minPVal & indata$ROB_log2FC >= (0-minFC)),]$id)
 
 
     print(length(allGeneIDs))

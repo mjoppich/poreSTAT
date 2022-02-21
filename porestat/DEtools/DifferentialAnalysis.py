@@ -1890,7 +1890,7 @@ if __name__ == '__main__':
 
 
                         if direction == "all":
-                            sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir} {minpval} {minfc}".format(
+                            sysCall = "Rscript --no-save --no-restore {script} {de} {org} {dir}".format(
                                 script=os.path.realpath(os.path.join(scriptMain, "R_enrich", "runGOGSEA.R")),
                                 de=deFile,
                                 org=args.organism_mapping,

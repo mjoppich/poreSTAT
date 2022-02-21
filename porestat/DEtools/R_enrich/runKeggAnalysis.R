@@ -15,8 +15,8 @@ args = commandArgs(trailingOnly=TRUE)
 filename = args[1]
 organism = args[2]
 mode=args[3]
-minPVal = args[4]
-minFC = args[5]
+minPVal = as.numeric(args[4])
+minFC = as.numeric(args[5])
 
 print(paste("Running in mode", mode, sep=" "))
 

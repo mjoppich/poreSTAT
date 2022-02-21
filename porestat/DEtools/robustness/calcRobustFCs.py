@@ -45,7 +45,7 @@ def getColorVector(cnt, colormap="Viridis"):
 
 
 
-def plot_volcano(FcPvalGene, title, outfile, showGeneCount=30):
+def plot_volcano(FcPvalGene, title, outfile, minpval, minfc, showGeneCount=30):
 
 
 
@@ -71,7 +71,7 @@ def plot_volcano(FcPvalGene, title, outfile, showGeneCount=30):
         xydots = [(x, y if y <= maxally else maxally) for x,y in xydots]
         dotgene = [x[2] for x in FcPvalGene]
 
-        pvalThresh = -np.log10(0.05)
+        pvalThresh = -np.log10( minpval )
 
         showGeneCount_pos = showGeneCount
         showGeneCount_neg = showGeneCount
@@ -109,12 +109,12 @@ def plot_volcano(FcPvalGene, title, outfile, showGeneCount=30):
         for gi, (x,y) in enumerate(xydots):
 
             if x < 0:
-                if y < pvalThresh or abs(x) < 1:
+                if y < pvalThresh or abs(x) < minfc:
                     downregCount += 1
                 else:
                     downregSigCount += 1
             elif x > 0:
-                if y < pvalThresh or abs(x) < 1:
+                if y < pvalThresh or abs(x) < minfc:
                     upregCount += 1
                 else:
                     upregSigCount += 1
@@ -135,12 +135,12 @@ def plot_volcano(FcPvalGene, title, outfile, showGeneCount=30):
 
                 if x < 0:
 
-                    if y < pvalThresh or abs(x) < 1:
+                    if y < pvalThresh or abs(x) < minfc:
                         nosigless_down_xy.append((x,y))
                     else:
                         nosig_down_xy.append((x,y))
                 else:
-                    if y < pvalThresh or abs(x) < 1:
+                    if y < pvalThresh or abs(x) < minfc:
                         nosigless_up_xy.append((x,y))
                     else:
                         nosig_up_xy.append((x,y))
@@ -164,8 +164,8 @@ def plot_volcano(FcPvalGene, title, outfile, showGeneCount=30):
         plt.plot([x[0] for x in sel_down_xy], [x[1] for x in sel_down_xy], 'o', color=colors["down"][0])
 
 
-        plt.hlines(y=pvalThresh, xmin=plt.xlim()[0], xmax=-1, linestyle="dotted")
-        plt.hlines(y=pvalThresh, xmin=1, xmax=plt.xlim()[1], linestyle="dotted")
+        plt.hlines(y=pvalThresh, xmin=plt.xlim()[0], xmax=-minfc, linestyle="dotted")
+        plt.hlines(y=pvalThresh, xmin=minfc, xmax=plt.xlim()[1], linestyle="dotted")
 
         yMaxLim = plt.ylim()[1]
 
@@ -299,7 +299,7 @@ if __name__ == '__main__':
                         logFC = 0.0
                     
                     
-                    if float(adjPval) < args.min_pvalue and abs(logFC) > args.min_foldchange:
+                    if float(adjPval) < args.min_pvalue and abs(float(logFC)) > args.min_foldchange:
                         method2genes[method].add( line[col2idx[genesymname]] )
 
                     if not method in args.methods:
@@ -393,7 +393,7 @@ if __name__ == '__main__':
 
         volcanoOutfile = args.output[fidx].name + ".rob.volcano.png"
         print(volcanoOutfile)
-        plot_volcano(fcPvalGene, ";".join([str(x) for x in args.methods]), volcanoOutfile)
+        plot_volcano(fcPvalGene, ";".join([str(x) for x in args.methods]), volcanoOutfile, args.min_pvalue, args.min_foldchange)
 
         print("Writing out DF", args.output[fidx].name)
         indf.export(args.output[fidx].name)
