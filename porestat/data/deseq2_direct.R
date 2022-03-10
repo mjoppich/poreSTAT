@@ -103,14 +103,14 @@ for (geneName in rownames(head(res, n=6)))
 }
 dev.off()
 
-plotname = paste(out_dir_name, "/", "direct_deseq2.ma.", out_base_name, ".svg", sep="")
+plotname = paste(out_dir_name, "/", "DirectDESeq2.ma.", out_base_name, ".svg", sep="")
 svglite::svglite(file = plotname, width = fig.width, height = fig.height)
 plotMA(res, ylim=c(-2,2))
 dev.off()
 
-    resLFC <- lfcShrink(dds, coef="group_Grp1_vs_Grp0", type="apeglm")
-    resNorm <- lfcShrink(dds, coef="group_Grp1_vs_Grp0", type="normal")
-    resAsh <- lfcShrink(dds, coef="group_Grp1_vs_Grp0", type="ashr")
+resLFC <- lfcShrink(dds, coef="group_Grp1_vs_Grp0", type="apeglm")
+resNorm <- lfcShrink(dds, coef="group_Grp1_vs_Grp0", type="normal")
+resAsh <- lfcShrink(dds, coef="group_Grp1_vs_Grp0", type="ashr")
 
 plotname = paste(out_dir_name, "/", "DirectDESeq2.ma_by_methods.", out_base_name, ".svg", sep="")
 svglite::svglite(file = plotname, height = 6, width = 15)
