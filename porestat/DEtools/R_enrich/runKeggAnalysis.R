@@ -24,7 +24,6 @@ allGeneIDs = NULL
 bgGeneIDs = NULL
 indata = read.table(filename, header=TRUE, sep="\t")
 
-minFC = 1.0
 
 if (mode == "all")
 {

@@ -109,12 +109,12 @@ def plot_volcano(FcPvalGene, title, outfile, minpval, minfc, showGeneCount=30):
         for gi, (x,y) in enumerate(xydots):
 
             if x < 0:
-                if y < pvalThresh or abs(x) < minfc:
-                    downregCount += 1
-                else:
+                if y >= pvalThresh and abs(x) >= minfc:
                     downregSigCount += 1
+                else:
+                    downregCount += 1
             elif x > 0:
-                if y < pvalThresh or abs(x) < minfc:
+                if y >= pvalThresh and abs(x) >= minfc:
                     upregCount += 1
                 else:
                     upregSigCount += 1
@@ -135,25 +135,18 @@ def plot_volcano(FcPvalGene, title, outfile, minpval, minfc, showGeneCount=30):
 
                 if x < 0:
 
-                    if y < pvalThresh or abs(x) < minfc:
-                        nosigless_down_xy.append((x,y))
-                    else:
+                    if y >= pvalThresh and abs(x) >= minfc:
                         nosig_down_xy.append((x,y))
-                else:
-                    if y < pvalThresh or abs(x) < minfc:
-                        nosigless_up_xy.append((x,y))
                     else:
+                        nosigless_down_xy.append((x,y))
+                else:
+                    if y >= pvalThresh and abs(x) >= minfc:
                         nosig_up_xy.append((x,y))
+                    else:
+                        nosigless_up_xy.append((x,y))
 
 
         #print(len(sel_xy), "of", len(genes))
-
-        ymax = max([y for x,y in xydots])
-        xmin = min([x for x,y in xydots])
-        xmax = max([x for x,y in xydots])
-
-
-
         plt.plot([x[0] for x in nosigless_up_xy], [x[1] for x in nosigless_up_xy], '.', color=colors["up"][2])
         plt.plot([x[0] for x in nosigless_down_xy], [x[1] for x in nosigless_down_xy], '.', color=colors["down"][2])
 
@@ -169,8 +162,8 @@ def plot_volcano(FcPvalGene, title, outfile, minpval, minfc, showGeneCount=30):
 
         yMaxLim = plt.ylim()[1]
 
-        plt.vlines(x=-1, ymin=pvalThresh, ymax=yMaxLim, linestyle="dotted")
-        plt.vlines(x=1, ymin=pvalThresh, ymax=yMaxLim, linestyle="dotted")
+        plt.vlines(x=-minfc, ymin=pvalThresh, ymax=yMaxLim, linestyle="dotted")
+        plt.vlines(x=minfc, ymin=pvalThresh, ymax=yMaxLim, linestyle="dotted")
 
         adjust_text(texts, force_points=0.2, force_text=0.2, expand_points=(2, 2), expand_text=(1, 1), arrowprops=dict(arrowstyle="-", color='black', lw=0.5))
         #        texts.append(plt.text(x * (1 + 0.01), y * (1 + 0.01) , dotgene[gi], fontsize=12))

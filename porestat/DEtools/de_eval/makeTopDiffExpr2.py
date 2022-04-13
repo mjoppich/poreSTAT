@@ -41,6 +41,11 @@ if __name__ == "__main__":
 
     parser.add_argument('-n', '--num', type=int, default=-1)
     parser.add_argument('-t', '--tuple', type=int, nargs='+', default=[-3, -2])
+
+    parser.add_argument('-minfc', '--min-foldchange', type=float, default=1.0, required=False)
+    parser.add_argument('-minpval', '--min-pvalue', type=float, default=0.05, required=False)
+
+
     args = parser.parse_args()
 
     filename = args.fc.name
@@ -178,7 +183,7 @@ if __name__ == "__main__":
 
                     colVal = row[col]
 
-                    if row[targetColsPVal[cidx]] > 0.05:
+                    if row[targetColsPVal[cidx]] > args.min_pvalue:
                         continue
 
                     if abs(colVal) > abs(id2val[idVal]):

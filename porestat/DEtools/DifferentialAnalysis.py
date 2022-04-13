@@ -1127,13 +1127,15 @@ if __name__ == '__main__':
                     runSysCall(sysCall, plotName, statsLogger, plotName, robustDeFile + ".all.mpca.*.png", args, prefix, methods, deEnrichPlots)
 
 
-                    sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 100 --groups {groups1} --groups {groups2}".format(
-                        script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makeTopDiffExpr.py")),
+                    sysCall = "python3 {script} --min-foldchange {minfc} --min-pvalue {minp} --fc {counts} --output {output} --top_de ROB --num 100 --groups {groups1} --groups {groups2}".format(
+                        script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makeTopDiffExpr2.py")),
                         counts=robustDeFile,
                         methods=" ".join(methods),
                         groups1=" ".join(args.cond1[pidx]),
                         groups2=" ".join(args.cond2[pidx]),
-                        output=robustDeFile + ".expr_topde"
+                        output=robustDeFile + ".expr_topde",
+                        minfc= args.min_foldchange,
+                        minp = args.min_pvalue
                     )
 
                     plotId2Descr["Cluster Top 100 DE Genes by Counts ({})".format(" ".join(methods))] = "" \
@@ -1268,14 +1270,16 @@ if __name__ == '__main__':
                         Top DiffReg Analysis
                         """
 
-                        sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 100 {ct} --groups {groups1} --groups {groups2}".format(
-                            script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makeTopDiffExpr.py")),
+                        sysCall = "python3 {script} --min-foldchange {minfc} --min-pvalue {minp} --fc {counts} --output {output} --top_de ROB --num 100 {ct} --groups {groups1} --groups {groups2}".format(
+                            script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makeTopDiffExpr2.py")),
                             counts=robustDeFile,
                             methods=" ".join(methods),
                             groups1=" ".join(args.cond1[pidx]),
                             groups2=" ".join(args.cond2[pidx]),
                             output=robustDeFile + "." + countType + ".expr_topde",
-                            ct="--"+countType.lower() if len(countType) > 0 else ""
+                            ct="--"+countType.lower() if len(countType) > 0 else "",
+                            minfc= args.min_foldchange,
+                            minp = args.min_pvalue
                         )
 
                         plotName = "Cluster Top 100 DE Genes {} Counts ({})".format(countType, " ".join(methods))
@@ -1510,14 +1514,16 @@ if __name__ == '__main__':
     
                             """
 
-                            sysCall = "python3 {script} --fc {counts} --output {output} --top_de ROB --num 100 {ct}  --groups {groups1} --groups {groups2}".format(
-                                script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makeTopDiffExpr.py")),
+                            sysCall = "python3 {script} --min-foldchange {minfc} --min-pvalue {minp} --fc {counts} --output {output} --top_de ROB --num 100 {ct}  --groups {groups1} --groups {groups2}".format(
+                                script=os.path.realpath(os.path.join(scriptMain, "de_eval", "makeTopDiffExpr2.py")),
                                 counts=combinedDE,
                                 methods=" ".join(methods),
                                 groups1=" ".join(combinedSamples_1),
                                 groups2=" ".join(combinedSamples_2),
                                 output=combinedDE + "." + countType + ".expr_topde",
-                                ct="--"+countType.lower() if len(countType) > 0 else ""
+                                ct="--"+countType.lower() if len(countType) > 0 else "",
+                                minfc= args.min_foldchange,
+                                minp = args.min_pvalue
                             )
 
                             plotId2Descr["Cluster TopDE Combined {} Counts ({})".format(countType, " ".join(methods))] = ""\
@@ -1624,7 +1630,7 @@ if __name__ == '__main__':
                     counts=robustRaw,
                     methods="ROB",
                     output=robustDE,
-                    minfc=args.min_foldchange,
+                    minfc= args.min_foldchange,
                     minp = args.min_pvalue
                 )
 
