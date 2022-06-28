@@ -115,9 +115,9 @@ def plot_volcano(FcPvalGene, title, outfile, minpval, minfc, showGeneCount=30):
                     downregCount += 1
             elif x > 0:
                 if y >= pvalThresh and abs(x) >= minfc:
-                    upregCount += 1
-                else:
                     upregSigCount += 1
+                else:
+                    upregCount += 1
             elif x == 0:
                 unregCount += 1
 
@@ -173,11 +173,11 @@ def plot_volcano(FcPvalGene, title, outfile, minpval, minfc, showGeneCount=30):
         plt.ylabel("Neg. Log. Adj. P-Value", fontsize = 32)
         plt.xticks(fontsize=14)
 
-        infoText = "Total Genes: {}; Up-Reg. (sig.): {} ({}); Down-Reg. (sig.): {} ({}); Un-Reg.: {}".format(
-            upregCount+downregCount+upregSigCount+downregSigCount+unregCount,
-            upregCount, upregSigCount,
-            downregCount, downregSigCount,
-            unregCount
+        infoText = "Total Genes: {totalCount}; Down-Reg. (sig.): {downregCount} ({downregSigCount}); Up-Reg. (sig.): {upregCount} ({upregSigCount}); Un-Reg.: {unregCount}".format(
+            totalCount=upregCount+downregCount+upregSigCount+downregSigCount+unregCount,
+            upregCount=upregCount, upregSigCount=upregSigCount,
+            downregCount=downregCount, downregSigCount=downregSigCount,
+            unregCount=unregCount
         )
         plt.figtext(0.5, 0.01, infoText, wrap=True, horizontalalignment='center', fontsize=14)
 

@@ -1759,6 +1759,7 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output', type=argparse.FileType('w'), required=True, help="output base")
 
     parser.add_argument('-p', '--pval', type=float, required=False, default=0.05, help="output base")
+    parser.add_argument('-g', '--gene-symbol', type=str, required=False, default="gene_symbol", help="output base")
 
     parser.add_argument('--organisms', nargs='+', type=str, default=[], required=False)
     parser.add_argument('--disease', nargs='+', type=str, default=[], required=False)
@@ -1814,7 +1815,7 @@ if __name__ == '__main__':
             "NA": None
         })
 
-        geneSymCol = None
+        geneSymCol = args.gene_symbol
         inHeaders = indf.getHeader()
 
         deMIRs = defaultdict(lambda: (0, 1, ()))

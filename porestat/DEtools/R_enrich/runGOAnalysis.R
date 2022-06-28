@@ -3,6 +3,7 @@ suppressMessages(suppressWarnings(require(annotables)))
 suppressMessages(suppressWarnings(require(dplyr)))
 suppressMessages(suppressWarnings(require(RDAVIDWebService)))
 suppressMessages(suppressWarnings(require(qvalue)))
+suppressMessages(suppressWarnings(require(writexl)))
 
 
 
@@ -151,6 +152,7 @@ for (GODB in c("BP", "MF", "CC")) { #
     colnames(rs) = rsc
 
     write.table(rs, file=paste(filename,"GeneOntology", GODB, mode,"goenrich.tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+    write_xlsx(rs, path=paste(filename,"GeneOntology", GODB, mode,"goenrich.xlsx", sep="."))
 
 }
 

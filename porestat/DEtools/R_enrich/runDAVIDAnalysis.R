@@ -3,7 +3,7 @@ suppressMessages(suppressWarnings(require(annotables)))
 suppressMessages(suppressWarnings(require(dplyr)))
 suppressMessages(suppressWarnings(require(RDAVIDWebService)))
 suppressMessages(suppressWarnings(require(qvalue)))
-
+suppressMessages(suppressWarnings(require(writexl)))
 suppressMessages(suppressWarnings(require(dplyr)))
 args = commandArgs(trailingOnly=TRUE)
 
@@ -319,6 +319,7 @@ if (is.null(kk))
 
 rs = as.data.frame(kk)
 outname=paste(filename,"david",mode,"tsv", sep=".")
+outname_xlsx=paste(filename,"david",mode,"xlsx", sep=".")
 
 if (nrow(rs) == 0)
 {
@@ -333,6 +334,7 @@ rsc[1] = "TERM.ID"
 colnames(rs) = rsc
 
 write.table(rs, file=outname, sep="\t", quote=F, row.names=FALSE)
+write_xlsx(rs, path=outname_xlsx)
 
 print("finished")
 quit(status=0, save='no')

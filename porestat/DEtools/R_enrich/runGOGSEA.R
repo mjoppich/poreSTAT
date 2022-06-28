@@ -4,6 +4,7 @@ suppressMessages(suppressWarnings(require(annotables)))
 suppressMessages(suppressWarnings(require(dplyr)))
 suppressMessages(suppressWarnings(require(RDAVIDWebService)))
 suppressMessages(suppressWarnings(require(qvalue)))
+suppressMessages(suppressWarnings(require(writexl)))
 
 args = commandArgs(trailingOnly=TRUE)
 
@@ -165,14 +166,18 @@ for (GODB in c("BP", "MF", "CC")) { #
 
     mode="all"
     write.table(rs, file=paste(filename,"GeneOntology", GODB, mode,"gsea.tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+    write_xlsx(rs, path=paste(filename,"GeneOntology", GODB, mode,"gsea.xlsx", sep="."))
 
     mode="down"
     rsd = rs[rs$NES < 0,]
     write.table(rsd, file=paste(filename,"GeneOntology", GODB, mode,"gsea.tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+    write_xlsx(rsd, path=paste(filename,"GeneOntology", GODB, mode,"gsea.xlsx", sep="."))
 
     mode="up"
-    rsd = rs[rs$NES > 0,]
-    write.table(rsd, file=paste(filename,"GeneOntology", GODB, mode,"gsea.tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+    rsu = rs[rs$NES > 0,]
+    write.table(rsu, file=paste(filename,"GeneOntology", GODB, mode,"gsea.tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+    write_xlsx(rsu, path=paste(filename,"GeneOntology", GODB, mode,"gsea.xlsx", sep="."))
+
 }
 
 print("finished")

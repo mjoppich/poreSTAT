@@ -98,7 +98,7 @@ if __name__ == '__main__':
 
                 localTopNIDs = localTopNIDs[:topN]
 
-            print(pathwaysFile.name, topN, len(localTopNIDs))
+            #print(pathwaysFile.name, topN, len(localTopNIDs))
             foundRes[topN].append((os.path.basename(pathwaysFile.name), localTopNIDs, lqCount))
 
 

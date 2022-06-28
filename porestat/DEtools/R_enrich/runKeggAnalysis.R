@@ -4,7 +4,7 @@ suppressMessages(suppressWarnings(require(annotables)))
 suppressMessages(suppressWarnings(require(dplyr)))
 suppressMessages(suppressWarnings(require(RDAVIDWebService)))
 suppressMessages(suppressWarnings(require(qvalue)))
-
+suppressMessages(suppressWarnings(require(writexl)))
 suppressMessages(suppressWarnings(require(org.Hs.eg.db)))
 suppressMessages(suppressWarnings(require(org.Mm.eg.db)))
 
@@ -157,6 +157,7 @@ rsc[1] = "KEGG ID"
 colnames(rs) = rsc
 
 write.table(rs, file=paste(filename,"kegg",mode,"tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+write_xlsx(rs, path=paste(filename,"kegg", mode,"xlsx", sep="."))
 
 print("finished")
 quit(status=0, save='no')

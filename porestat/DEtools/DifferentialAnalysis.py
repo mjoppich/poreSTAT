@@ -15,6 +15,7 @@ sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../")
 #import os,sys
 #sys.path.insert(0, "/mnt/f/dev/git/poreSTAT")
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
+from porestat.utils.EnrichmentDF import EnrichmentDF
 #DataFrame.parseFromFile("diffregs/myh11_1_smc/smc_wt_ko.reads_exon.diffreg/count_smc_ko_1_smc_wt_1.tsv")
 
 from porestat.utils.OrderedDefaultDictClass import OrderedDefaultDict
@@ -190,26 +191,26 @@ def prepareDescriptions():
     plotId2Descr[
         "DAVID"] = "<p>DAVID gene set enrichment performed via <a href=\"https://david.ncifcrf.gov/\">DAVID Webclient</a></p>" \
                    "<p>The DAVID gene set enrichment performs an enrichment on all GO subsets, KEGG, REACTOME and Uniprot Keywords</p>" \
-                   "<p>Significant terms have been selected by pval.adj l.t. 0.05 and logFC g.t. 1.0</p>"
+                   "<p>Significant genes were selected by pval.adj l.t. {} and absolute logFC g.t. {}</p>".format(args.min_pvalue, args.min_foldchange)
 
     plotId2Descr["KEGG"] = "<p><a href=\"https://www.genome.jp/kegg/\">KEGG</a> gene set enrichment</p>" \
                            "<p></p>" \
-                           "<p>Significant terms have been selected by pval.adj l.t. 0.05 and logFC g.t. 1.0</p>"
+                            "<p>Significant genes were selected by pval.adj l.t. {} and absolute logFC g.t. {}</p>".format(args.min_pvalue, args.min_foldchange)
 
     plotId2Descr["REACTOME"] = "<p><a href=\"https://reactome.org/\">REACTOME</a> Pathway gene set enrichment.</p>" \
                                "<p>reactome is new in the business but aims at proving free, open-source, curated and peer-reviewed pathways.</p>" \
-                               "<p>Significant terms have been selected by pval.adj l.t. 0.05 and logFC g.t. 1.0</p>"
+                                "<p>Significant genes were selected by pval.adj l.t. {} and absolute logFC g.t. {}</p>".format(args.min_pvalue, args.min_foldchange)
 
     plotId2Descr[
         "GeneOntology (overrepresentation)"] = "<p><a href=\"http://geneontology.org/\">GeneOntology</a> based gene set overrepresentation analysis.</p>" \
                                                "<p>For this analysis, it is analysed whether significant genes are more common in a specific set than in the background.</p>" \
-                                               "<p>Significant terms have been selected by pval.adj l.t. 0.05 and logFC g.t. 1.0</p>"
+                                               "<p>Significant genes were selected by pval.adj l.t. {} and absolute logFC g.t. {}</p>".format(args.min_pvalue, args.min_foldchange)
 
     plotId2Descr[
         "GeneOntology (GSEA)"] = "<p><a href=\"http://geneontology.org/\">GeneOntology</a> based gene set enrichment analysis.</p>" \
                                  "<p>The input is the ranked list of genes (here abs(logFC)).</p>" \
                                  "<p>Up/Down-regulated genes can be identified by a positive/negative NES value.</p>" \
-                                 "<p>Significant terms have been selected by pval.adj l.t. 1.0 and logFC n.e. 0.0</p>"
+                                 "<p>All gene fold changes are considered in this analysis.</p>"
 
     return plotId2Descr
 
@@ -282,7 +283,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-remove-gene-stable', '--remove-gene-stable-identifier', dest='removestable', action='store_true', default=False)
 
-
+    #, choices=EnrichmentDF.supported_de_methods
     parser.add_argument('-m', '--de_methods', nargs='+', type=str, help="differential methods for analysis. If combination, write DESeq;msEmpiRe")
     parser.add_argument('-em', '--enrich-methods', nargs='+', type=str, default=None, required=False,
                         help="differential methods for enrichment analysis. If combination, write DESeq;msEmpiRe")
@@ -632,13 +633,11 @@ if __name__ == '__main__':
 
         if plotsPrefix != None:
             searchPref = plotsPrefix
-            if not searchPref.upper().endswith(".PNG"):
+            if not searchPref.upper().endswith((".PNG", ".PDF", ".XLSX", ".SVG")):
                 searchPref += "*.png"
 
             if args.update and len(glob(searchPref + "*")) > 0:
                 simulate = True
-
-
 
         if not simulate:
             subprocess.run(sysCall, shell=True, check=True)
@@ -910,8 +909,7 @@ if __name__ == '__main__':
         searchPref = plotsPrefix
 
         if plotsPrefix != None:
-            
-            if not searchPref.upper().endswith((".PNG",)) and len(glob(searchPref)) == 0:
+            if not searchPref.upper().endswith((".PNG", ".PDF", ".XLSX", ".SVG")) and len(glob(searchPref)) == 0:
                 searchPref += "*.png"
 
             if args.update and len(glob(searchPref + "*")) > 0:
@@ -1046,7 +1044,7 @@ if __name__ == '__main__':
                     robustDeFileXlsx[-1] = "xlsx"
                     robustDeFileXlsx = ".".join(robustDeFileXlsx)
 
-                    plotId2Descr["DE Methods Files ({})".format(" ".join(methods))] = [robustDeFile]
+                    plotId2Descr["DE Methods Files ({})".format(" ".join(methods))] = "Files containing DE Results. Please consider only the columns with ROB-prefix for analysis."
                     runSysCall("python3 {script} {input}".format(
                         script=os.path.realpath(os.path.join(scriptMain, "prepare", "tsv2excel.py")),
                         input=robustDeFile
@@ -1722,10 +1720,10 @@ if __name__ == '__main__':
                         for imgFile in filetuple:
 
                             if imgFile != None:
-                                if imgFile.upper().endswith("TSV") or imgFile.upper().endswith("HTML"):
+                                if imgFile.upper().endswith("TSV") or imgFile.upper().endswith("HTML") or imgFile.upper().endswith("XLSX"):
                                     # data file
                                     tableOut += "<td><a href=\"" + str(os.path.relpath(os.path.realpath(imgFile), os.path.dirname(args.report.name))) + "\">{}<a/></td>".format(os.path.basename(imgFile))
-                                else:    
+                                else:
                                     #image
                                     tableOut += "<td><img src=\"" + str(os.path.relpath(os.path.realpath(imgFile), os.path.dirname(args.report.name))) + "\"/></td>"
                             else:
@@ -1931,7 +1929,10 @@ if __name__ == '__main__':
 
                     #[method][plotid][prefix]
 
-            #deEnrichFiles[methods][prefix]
+            """
+            PLOT
+            
+            """
 
             statsLogger.info("Fetching Enrichment Data")
             for methods in deEnrichFiles:
@@ -1943,12 +1944,70 @@ if __name__ == '__main__':
                     deFile = deEnrichFiles[methods][prefix]
 
                     if args.run_david:
-                        deEnrichTables[methods]["DAVID"][prefix] = glob(deFile + ".david*.tsv")
+                        deEnrichTables[methods]["DAVID (TSV)"][prefix] = glob(deFile + ".david*.tsv")
 
-                    deEnrichTables[methods]["KEGG"][prefix] = glob(deFile + ".kegg*.tsv")
-                    deEnrichTables[methods]["REACTOME"][prefix] = glob(deFile + ".reactome*.tsv")
-                    deEnrichTables[methods]["GeneOntology (overrepresentation)"][prefix] = glob(deFile + ".GeneOntology*goenrich.tsv")
-                    deEnrichTables[methods]["GeneOntology (GSEA)"][prefix] = glob(deFile + ".GeneOntology*gsea.tsv")
+                    deEnrichTables[methods]["KEGG (TSV)"][prefix] = glob(deFile + ".kegg*.tsv")
+                    deEnrichTables[methods]["REACTOME (TSV)"][prefix] = glob(deFile + ".reactome*.tsv")
+                    deEnrichTables[methods]["GeneOntology (overrepresentation, TSV)"][prefix] = glob(deFile + ".GeneOntology*goenrich.tsv")
+                    deEnrichTables[methods]["GeneOntology (GSEA, TSV)"][prefix] = glob(deFile + ".GeneOntology*gsea.tsv")
+
+            for methods in deEnrichFiles:
+                statsLogger.info("Fetching Results for Methods {}".format(methods))
+                methodStr = "_".join(methods) + " XLSX"
+
+                for pidx, prefix in enumerate(deEnrichFiles[methods]):
+
+                    deFile = deEnrichFiles[methods][prefix]
+
+                    if args.run_david:
+                        deEnrichTables[methods]["DAVID (XLSX)"][prefix] = glob(deFile + ".david*.xlsx")
+
+                    deEnrichTables[methods]["KEGG (XLSX)"][prefix] = glob(deFile + ".kegg*.xlsx")
+                    deEnrichTables[methods]["REACTOME (XLSX)"][prefix] = glob(deFile + ".reactome*.xlsx")
+                    deEnrichTables[methods]["GeneOntology (overrepresentation, XLSX)"][prefix] = glob(deFile + ".GeneOntology*goenrich.xlsx")
+                    deEnrichTables[methods]["GeneOntology (GSEA, XLSX)"][prefix] = glob(deFile + ".GeneOntology*gsea.xlsx")
+
+            def plotSetEnrichmentVis(deFile, enrichmentFiles):
+
+                if enrichmentFiles == None or len(enrichmentFiles) == 0:
+                    return []
+
+                allResultFiles = []
+                for x in enrichmentFiles:
+
+                    sysCall = "python3 {script} --defile {defile} --enrichment {enrichfile} --elems {maxelems}".format(
+                        script=os.path.realpath(os.path.join(scriptMain, "enrichment", "enrichmentVisualization.py")),
+                        defile=deFile,
+                        enrichfile=x,
+                        maxelems=20
+                    )
+
+                    existingFiles = len(glob(x + "*.png"))
+
+                    if existingFiles == 0 and not args.simulate:
+                        subprocess.run(sysCall, shell=True, check=True)
+
+                    allResultFiles += glob(x + "*.png")
+
+                return allResultFiles
+
+            for methods in deEnrichFiles:
+
+                for pidx, prefix in enumerate(deEnrichFiles[methods]):
+
+                    deFile = deEnrichFiles[methods][prefix]
+
+                    if args.run_david:
+                        deEnrichTables[methods]["DAVID (COMP)"][prefix] = plotSetEnrichmentVis(deFile, glob(deFile + ".david*.tsv") )
+
+                    deEnrichTables[methods]["KEGG (COMP)"][prefix] = plotSetEnrichmentVis(deFile, glob(deFile + ".kegg*.tsv") )
+                    deEnrichTables[methods]["REACTOME (COMP)"][prefix] = plotSetEnrichmentVis(deFile, glob(deFile + ".reactome*.tsv") )
+                    deEnrichTables[methods]["GeneOntology (overrepresentation, COMP)"][prefix] = plotSetEnrichmentVis(deFile, glob(deFile + ".GeneOntology*goenrich.tsv") )
+                    deEnrichTables[methods]["GeneOntology (GSEA, COMP)"][prefix] = plotSetEnrichmentVis(deFile, glob(deFile + ".GeneOntology*gsea.tsv") )
+
+
+
+
 
 
             for methods in deEnrichFiles:

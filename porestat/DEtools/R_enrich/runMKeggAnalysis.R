@@ -1,19 +1,24 @@
-suppressMessages(suppressWarnings(require(ReactomePA)))
-#suppressMessages(suppressWarnings(require(clusterProfiler)))
+
+suppressMessages(suppressWarnings(require(clusterProfiler)))
 suppressMessages(suppressWarnings(require(annotables)))
 suppressMessages(suppressWarnings(require(dplyr)))
 suppressMessages(suppressWarnings(require(RDAVIDWebService)))
 suppressMessages(suppressWarnings(require(qvalue)))
 suppressMessages(suppressWarnings(require(writexl)))
 
-args = commandArgs(trailingOnly=TRUE)
+suppressMessages(suppressWarnings(require(org.Hs.eg.db)))
+suppressMessages(suppressWarnings(require(org.Mm.eg.db)))
 
+
+
+args = commandArgs(trailingOnly=TRUE)
 
 filename = args[1]
 organism = args[2]
 mode=args[3]
 minPVal = as.numeric(args[4])
 minFC = as.numeric(args[5])
+
 
 print(paste("Running in mode", mode, sep=" "))
 
@@ -64,62 +69,59 @@ bgGeneIDs = gsub("\\..*","",bgGeneIDs)
 
 annotTable = NULL;
 
-if (organism == "mouse")
+if (organism == "mmu")
 {
     annotTable = grcm38
+    conversionTable = org.Mm.eg.db
     egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
 
-} else if (organism == "human")
+} else if (organism == "hsa")
 {
     annotTable = grch38
+    conversionTable = org.Hs.eg.db
+
     egid = annotTable %>% dplyr::filter(ensgene %in% allGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
-} else if (organism == "yeast")
+} else if (organism == "sce")
 {
 
     suppressMessages(suppressWarnings(require(org.Sc.sgd.db)))
+    conversionTable = org.Sc.sgd.db
 
     readableState =F
-    allEntrez = sapply(allGeneIDs, function(x) {get(x, org.Sc.sgdENTREZID)} )
+    allEntrez = allGeneIDs#sapply(allGeneIDs, function(x) {get(x, org.Sc.sgdENTREZID)} )
     egid = data.frame("ensgene"=allGeneIDs, "entrez"=allEntrez)
 
 }
 
-#print("got egid")
-#head(egid)
-
 entrezGenes = egid[!is.na(egid$entrez),]
 entrezGenes = as.vector(entrezGenes$entrez)
 
-
 annotTable = NULL;
-readableState = T
 
-if (organism == "mouse")
+if (organism == "mmu")
 {
     annotTable = grcm38
     egid = annotTable %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
 
-} else if (organism == "human")
+} else if (organism == "hsa")
 {
     annotTable = grch38
     egid = annotTable %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 
-} else if (organism == "yeast")
+} else if (organism == "sce")
 {
 
     suppressMessages(suppressWarnings(require(org.Sc.sgd.db)))
+
     readableState =F
-    allEntrez = sapply(bgGeneIDs, function(x) {get(x, org.Sc.sgdENTREZID)} )
+    allEntrez = bgGeneIDs#sapply(bgGeneIDs, function(x) {get(x, org.Sc.sgdENTREZID)} )
     egid = data.frame("ensgene"=bgGeneIDs, "entrez"=allEntrez)
+
 }
 
-print("got egid")
-head(egid)
-
-#egid = grcm38 %>% dplyr::filter(ensgene %in% bgGeneIDs) %>% dplyr::select(ensgene, entrez) %>% as.data.frame()
 #head(egid)
 
 entrezBG = egid[!is.na(egid$entrez),]
@@ -131,10 +133,10 @@ entrezBGC = unlist(lapply(entrezBG, as.character))
 head(entrezGenesC)
 head(entrezBGC)
 
-#like 
+#like
 #https://www.r-bloggers.com/kegg-enrichment-analysis-with-latest-online-data-using-clusterprofiler/
  
-kk <- enrichPathway(entrezGenesC, organism=organism, pAdjustMethod="BH", universe=c(entrezGenesC, entrezBGC), pvalueCutoff=0.5, qvalueCutoff=0.5, readable=readableState)
+kk <- enrichMKEGG(entrezGenesC, organism=organism,pAdjustMethod="BH",universe=c(entrezGenesC, entrezBGC), pvalueCutoff=0.5, qvalueCutoff=0.5)
 
 if (is.null(kk))
 {
@@ -142,21 +144,22 @@ if (is.null(kk))
     quit(status=0, save='no')
 }
 
+kk <- setReadable(kk, OrgDb = conversionTable, keyType="ENTREZID")
+
 rs = as.data.frame(kk)
 
 if (nrow(rs) == 0)
 {
     print("NO DATA in DF. TERMINATING")
-    quit(status=0, save='no')
+     quit(status=0, save='no')
 }
 
-
 rsc = colnames(rs)
-rsc[1] = "Reactome ID"
+rsc[1] = "KEGG ID"
 colnames(rs) = rsc
 
-write.table(rs, file=paste(filename,"reactome",mode,"tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
-write_xlsx(rs, path=paste(filename,"reactome", mode,"xlsx", sep="."))
+write.table(rs, file=paste(filename,"mkegg",mode,"tsv", sep="."), sep="\t", quote=F, row.names=FALSE)
+write_xlsx(rs, path=paste(filename,"mkegg", mode,"xlsx", sep="."))
 
 print("finished")
 quit(status=0, save='no')
