@@ -168,8 +168,7 @@ class EnrichmentDF(DataFrame):
         return ['DESeq2', 'DirectDESeq2', 'DirectDESeq2Paired', 'msEmpiRe', 'nlEmpiRe', 'limma', 'edgeR', 'limmavoom', 'DirectEdgeR', "DESingle", "scde", "MAST"]
 
 
-    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['msEmpiRe', 'nlEmpiRe', 'limmavoom', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None):
-
+    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['msEmpiRe', 'nlEmpiRe', 'limmavoom', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None, deseq2df=None, deseq_design=None):
 
         filePrefix = prefix
         if prefix != None and prefix != "" and prefix[len(prefix)-1] != "_":
@@ -271,6 +270,10 @@ class EnrichmentDF(DataFrame):
                             pdata=pdataFile,
                             fdata=fdataFile,
                             outfile=outFile)
+                        
+                        if not deseq2df is None and not deseq_design is None:
+                            execStr = "{} {} {}".format(execStr, deseq2df, deseq_design)                        
+                        
                     elif method in ['DESingle']:
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/DESingle_direct.R"
                         execStr = deCallStr.format(

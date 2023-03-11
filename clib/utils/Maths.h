@@ -23,6 +23,7 @@
 #include <vector>
 #include <inttypes.h>
 #include <algorithm>
+#include <limits>
 
 template <typename T>
 class Maths {

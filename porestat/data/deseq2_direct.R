@@ -33,7 +33,7 @@ message(.libPaths())
 
 
 
-requiredPackages = c('DESeq2', "svglite")
+requiredPackages = c('DESeq2', "svglite", "summarytools")
 for (rPackage in requiredPackages) {
     if (! require(rPackage, character.only = TRUE))
     {
@@ -86,11 +86,49 @@ dds <- DESeqDataSetFromMatrix(countData=counts,
 
 message("DE analysis ...")
 
+dds <- estimateSizeFactors(dds)
+
+nQuant = 7
+calcQuantiles = c(0.25, 0.5, 0.75, 0.8, 0.9, 0.925, 0.95)
+ncountQuantiles = quantile(c(as.matrix(counts(dds, normalized=TRUE))), probs=calcQuantiles)
+
+print(paste("Filtering normalized counts by quantile=", calcQuantiles[nQuant], "and value=", ncountQuantiles[nQuant]))
+
+keep = rowSums( counts(dds, normalized=TRUE) >= ncountQuantiles[nQuant] ) >= 3
+
+
+
+dds <- dds[keep,]
+
+
 dds <- DESeq(dds)
-( res <- results(dds) )
+
+print(head(dds$baseMean))
+
+
+res <- results(dds, alpha=0.05)
+
+print(summary(res))
+
 res <- res[order(res$pvalue),]
+res$padj[is.na(res$padj)] = 1
 
+resNoFilt <- results(dds, independentFiltering=FALSE, alpha=0.05, cooksCutoff=FALSE)
+resNoFilt <- resNoFilt[order(resNoFilt$pvalue),]
 
+write.table(resNoFilt, file="test.tsv", row.names=T, quote=F, sep="\t")
+
+plotname = paste(out_dir_name, "/", "DirectDESeq2.FilterThreshold.", out_base_name, ".svg", sep="")
+svglite::svglite(file = plotname, width = fig.width, height = fig.height)
+plot(metadata(res)$filterNumRej, 
+     type="b", ylab="number of rejections",
+     xlab="quantiles of filter")
+lines(metadata(res)$lo.fit, col="red")
+abline(v=metadata(res)$filterTheta)
+dev.off()
+
+addmargins(table(filtering=(res$padj < .05),
+                 noFiltering=(resNoFilt$padj < .05)))
 
 
 plotname = paste(out_dir_name, "/", "DirectDESeq2.topgenes.", out_base_name, ".svg", sep="")
@@ -128,13 +166,14 @@ svglite::svglite(file = plotname, width = fig.width, height = fig.height)
 plotDispEsts(dds)
 dev.off()
 
-outres = res[! is.na(res$padj),]
 
 normExpr = counts(dds, normalized=T)
 cn = colnames(normExpr)
 normExpr2 = cbind(rownames(normExpr), normExpr)
 colnames(normExpr2) = c("Geneid", cn)
 
+
+outres = res[! is.na(res$padj),]
 finalres = data.frame(PROBEID=rownames(outres), FC=outres$log2FoldChange, PVAL=outres$pvalue, ADJ.PVAL=outres$padj)
 
 write.table(finalres, file=out.file, row.names=F, quote=F, sep="\t")

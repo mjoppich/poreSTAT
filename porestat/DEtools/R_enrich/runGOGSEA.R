@@ -2,7 +2,6 @@
 suppressMessages(suppressWarnings(require(clusterProfiler)))
 suppressMessages(suppressWarnings(require(annotables)))
 suppressMessages(suppressWarnings(require(dplyr)))
-suppressMessages(suppressWarnings(require(RDAVIDWebService)))
 suppressMessages(suppressWarnings(require(qvalue)))
 suppressMessages(suppressWarnings(require(writexl)))
 
@@ -159,7 +158,7 @@ for (GODB in c("BP", "MF", "CC")) { #
     rsc[1] = "GO.ID"
     colnames(rs) = rsc
 
-    if (match('qvalues',colnames(rs)))
+    if (match('qvalues',colnames(rs), nomatch = 0) > 0)
     {
         names(rs)[names(rs)=="qvalues"] <- "qvalue"
     }

@@ -65,7 +65,9 @@ class FoldChangeFeatureCountsDistributionFactory(PSToolInterfaceFactory):
 
         parser.add_argument('-anc', '--allow-nonexistant-cond', dest='allow_nonexistant_cond', action='store_true', default=False)
 
-    
+        parser.add_argument('-deseqdf', '--deseq-expdata', type=argparse.FileType('r'), help='experiment df for deseq2', default=None)
+        parser.add_argument('-deseqd', '--deseq-design', type=str, help='experiment design for deseq2', default=None)
+
 
         parser = PlotConfig.addParserArgs(parser)
         parser.set_defaults(func=self._prepObj)
@@ -392,7 +394,9 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                                                                                replicates=replicates,
                                                                                noDErun=args.noanalysis,
                                                                                enhanceSymbol=geneEnhancement,
-                                                                               geneLengths=geneLengths
+                                                                               geneLengths=geneLengths,
+                                                                               deseq2df = args.deseq_expdata,
+                                                                               deseq2design = args.deseq_design
                                                                                )
 
             self.prepareHTMLOut(createdComparisons, replicates, args)

@@ -18,7 +18,7 @@ from collections import Counter, OrderedDict
 import datetime as dt
 from matplotlib.ticker import Formatter
 
-from porestat.utils.OrderedSet import OrderedSet
+#from porestat.utils.OrderedSet import OrderedSet
 from .plotconfig import PlotConfig
 from matplotlib import gridspec, colors
 import scipy.cluster.hierarchy as sch
@@ -1217,7 +1217,8 @@ class PorePlot:
                     ax.text(rect.get_x() + rect.get_width() / 2., height+heightOffset, '%d' % int(height),ha='center', va='bottom')
 
         allRuns = []
-        allGroups = OrderedSet()
+        #allGroups = OrderedSet()
+        allGroups = dict() # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
         for x in sorted([run for run in plotData]):
 
             allRuns.append(x)

@@ -97,6 +97,8 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output', nargs='+', type=str, required=False, help="output base")
     parser.add_argument("-b", '--biotype', type=argparse.FileType('r'), required=True)
 
+    parser.add_argument('-p', '--pdf', action="store_true", default=False)
+
     args = parser.parse_args()
 
     if args.output == None:
@@ -230,6 +232,8 @@ if __name__ == '__main__':
 
 
         plt.savefig(args.output[fidx] + ".cpergenes.all." +str(fidx ) + ".png", bbox_inches ="tight")
+        if args.pdf:
+            plt.savefig(args.output[fidx] + ".cpergenes.all." +str(fidx ) + ".pdf", bbox_inches ="tight")
         plt.close()
 
 
@@ -250,4 +254,7 @@ if __name__ == '__main__':
 
 
         plt.savefig(args.output[fidx] + ".cpergenes.all_prot." +str(fidx ) + ".png", bbox_inches ="tight")
+
+        if args.pdf:
+            plt.savefig(args.output[fidx] + ".cpergenes.all_prot." +str(fidx ) + ".pdf", bbox_inches ="tight")
         plt.close()

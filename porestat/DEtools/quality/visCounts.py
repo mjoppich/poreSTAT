@@ -12,8 +12,8 @@ import pandas as pd
 import seaborn as sns
 import numpy as np
 
-mpl.style.use("seaborn")
-
+import sys
+sys.setrecursionlimit(100000)
 
 if __name__ == '__main__':
 
@@ -78,7 +78,7 @@ if __name__ == '__main__':
         dfPlot = df[df.sum(axis=1) > t]
         dfPlot = np.log2(dfPlot+1)
 
-        
+        print(dfPlot)
 
         sns.clustermap(dfPlot, figsize=(15, 15), method="ward", col_colors = colColor, row_cluster=True,xticklabels=True)
 

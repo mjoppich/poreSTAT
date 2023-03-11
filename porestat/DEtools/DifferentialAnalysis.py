@@ -304,6 +304,13 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--report', type=argparse.FileType('w'), required=True, help='report files')
 
     parser.add_argument('--parallel', type=int, required=False, default=4)
+    
+    #
+    ## DESeq2 specific methods
+    #
+    parser.add_argument('-deseqdf', '--deseq-expdata', type=argparse.FileType('r'), help='experiment df for deseq2', default=None)
+    parser.add_argument('-deseqd', '--deseq-design', type=str, help='experiment design for deseq2', default=None)
+
 
     args = parser.parse_args()
 
@@ -599,6 +606,12 @@ if __name__ == '__main__':
                 addFlags.append("--tpm")
             if not args.nols:
                 addFlags.append("--libsize")
+                
+            if not args.deseq_expdata is None and not args.deseq_design is None:
+                addFlags.append( "--deseq-design" )
+                addFlags.append( "\"{}\"".format(args.deseq_design) )
+                addFlags.append( "--deseq-expdata" )
+                addFlags.append( args.deseq_expdata.name )
 
                 
             sysCall = "python3 {script} foldchange_fc --methods {reqmethods} --output {outdir} --counts {countfile} --prefixes {prefix} --conditions {cond1} --conditions {cond2} --enhance {enhancePath} --lengths {lengthsPath} --no-rrna {flags}".format(

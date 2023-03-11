@@ -112,6 +112,11 @@ if __name__ == '__main__':
         
         df = df.iloc[::-1]
         colorValues = colorValues[::-1]
+
+        print(df.shape)
+
+        if df.shape[0] == 0:
+            return
         
         maxNLog = max(-np.log(df.qvalue))
         maxLine = ((maxNLog// 10)+1)*10
