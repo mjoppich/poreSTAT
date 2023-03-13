@@ -12,7 +12,7 @@
 
 
 if (length(commandArgs()) != 9) message("usage: Rscript de_rseq.R <exprs.file> <pdat.file> <fdat.file> <out.file>")
-stopifnot(length(commandArgs()) == 9)
+stopifnot((length(commandArgs()) != 9) || (length(commandArgs()) != 11))
 
 message("Loading Libraries")
 message("R paths")
@@ -33,7 +33,7 @@ message(.libPaths())
 
 
 
-requiredPackages = c('DESeq2', "svglite", "summarytools")
+requiredPackages = c('DESeq2', "svglite", "summarytools", "stringr")
 for (rPackage in requiredPackages) {
     if (! require(rPackage, character.only = TRUE))
     {
@@ -79,10 +79,37 @@ pdat$group = paste("Grp", pdat$group, sep="")
 counts <- read.delim(exprs.file, row.names = 1)
 counts = counts[, pdat$id]
 
+if (length(commandArgs()) == 9)
+{
+    
+
+
 dds <- DESeqDataSetFromMatrix(countData=counts, 
                               colData=pdat, 
                               design=~group, tidy = FALSE)
 
+plotgroups = c("group")
+
+} else {
+designDFFile <- commandArgs()[10]
+designFormular <- commandArgs()[11]
+
+print(designDFFile)
+print(designFormular)
+
+designDF <- read.delim(designDFFile, row.names = 1)
+designDF = designDF[ colnames(counts), ]
+print(designDF)
+
+plotgroups=str_split(str_replace(designFormular, "~|:", ""), "\\+")[[1]]
+
+dds <- DESeqDataSetFromMatrix(countData=counts, 
+                              colData=designDF, 
+                              design=as.formula(designFormular), tidy = FALSE)
+
+}
+print("PlotGroups")
+print(plotgroups)
 
 message("DE analysis ...")
 
@@ -116,7 +143,7 @@ res$padj[is.na(res$padj)] = 1
 resNoFilt <- results(dds, independentFiltering=FALSE, alpha=0.05, cooksCutoff=FALSE)
 resNoFilt <- resNoFilt[order(resNoFilt$pvalue),]
 
-write.table(resNoFilt, file="test.tsv", row.names=T, quote=F, sep="\t")
+#write.table(resNoFilt, file="test.tsv", row.names=T, quote=F, sep="\t")
 
 plotname = paste(out_dir_name, "/", "DirectDESeq2.FilterThreshold.", out_base_name, ".svg", sep="")
 svglite::svglite(file = plotname, width = fig.width, height = fig.height)
@@ -137,7 +164,7 @@ par(mfrow=c(2,3))
 
 for (geneName in rownames(head(res, n=6)))
 {
-    plotCounts(dds, gene=geneName, intgroup="group")
+    plotCounts(dds, gene=geneName, intgroup=plotgroups)
 }
 dev.off()
 
@@ -146,9 +173,17 @@ svglite::svglite(file = plotname, width = fig.width, height = fig.height)
 plotMA(res, ylim=c(-2,2))
 dev.off()
 
-resLFC <- lfcShrink(dds, coef="group_Grp1_vs_Grp0", type="apeglm")
-resNorm <- lfcShrink(dds, coef="group_Grp1_vs_Grp0", type="normal")
-resAsh <- lfcShrink(dds, coef="group_Grp1_vs_Grp0", type="ashr")
+print(resultsNames(dds))
+
+useCoefficient = resultsNames(dds)
+useCoefficient = useCoefficient[length(useCoefficient)] #last one
+
+print("Using Comparison")
+print(useCoefficient)
+
+resLFC <- lfcShrink(dds, coef=useCoefficient, type="apeglm")
+resNorm <- lfcShrink(dds, coef=useCoefficient, type="normal")
+resAsh <- lfcShrink(dds, coef=useCoefficient, type="ashr")
 
 plotname = paste(out_dir_name, "/", "DirectDESeq2.ma_by_methods.", out_base_name, ".svg", sep="")
 svglite::svglite(file = plotname, height = 6, width = 15)
