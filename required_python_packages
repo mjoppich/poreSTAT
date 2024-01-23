@@ -1,1 +1,1 @@
-matplotlib_venn jinja2 adjustText umap-learn pandas xlsxwriter scikit-learn scipy seaborn networkx statsmodels UpSetPlot natsort numpy scipy matplotlib pathos openpyxl h5py htseq
+venn biopython matplotlib_venn jinja2 adjustText umap-learn pandas xlsxwriter scikit-learn scipy seaborn networkx statsmodels UpSetPlot natsort numpy scipy matplotlib pathos openpyxl h5py htseq
