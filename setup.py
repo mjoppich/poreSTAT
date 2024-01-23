@@ -10,5 +10,5 @@ setup(name='porestat',
       packages=['.', 'porestat.hdf5tool', 'porestat.tools', 'porestat.plots', 'porestat.utils', 'porestat.analysis'],
       package_data = {'': ['porestat/data/*.*']},
       zip_safe=False,
-      install_requires=['pandas', 'scikit-learn', 'scipy', 'seaborn', 'networkx', 'statsmodels', 'upsetplot', 'natsort', 'numpy', 'scipy', 'matplotlib', 'pathos', 'openpyxl', 'h5py', 'htseq']
+      install_requires=['pandas', 'xlsxwriter', 'scikit-learn', 'scipy', 'seaborn', 'networkx', 'statsmodels', 'UpSetPlot', 'natsort', 'numpy', 'scipy', 'matplotlib', 'pathos', 'openpyxl', 'h5py', 'htseq']
       )
