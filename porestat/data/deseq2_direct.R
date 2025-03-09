@@ -12,7 +12,7 @@
 
 
 if (length(commandArgs()) != 9) message("usage: Rscript de_rseq.R <exprs.file> <pdat.file> <fdat.file> <out.file>")
-stopifnot((length(commandArgs()) != 9) || (length(commandArgs()) != 11))
+stopifnot((length(commandArgs()) != 10) || (length(commandArgs()) != 12))
 
 message("Loading Libraries")
 message("R paths")
@@ -55,6 +55,7 @@ exprs.file <- commandArgs()[6]
 pdat.file <- commandArgs()[7]
 fdat.file <- commandArgs()[8]
 out.file <- commandArgs()[9]
+filter.genes = (commandArgs()[10] == "TRUE")
 
 #exprs.file = "diffregs/myh11_2_cx3cr1/cx3cr1_wt_ko.umi_exon.diffreg/count_df"
 #exprs.file = "diffregs/kupffer_cells/kupffer_cells.umiexon.diffreg/count_df"
@@ -79,33 +80,31 @@ pdat$group = paste("Grp", pdat$group, sep="")
 counts <- read.delim(exprs.file, row.names = 1)
 counts = counts[, pdat$id]
 
-if (length(commandArgs()) == 9)
+if (length(commandArgs()) == 10)
 {
-    
 
+    dds <- DESeqDataSetFromMatrix(countData=counts, 
+                                colData=pdat, 
+                                design=~group, tidy = FALSE)
 
-dds <- DESeqDataSetFromMatrix(countData=counts, 
-                              colData=pdat, 
-                              design=~group, tidy = FALSE)
-
-plotgroups = c("group")
+    plotgroups = c("group")
 
 } else {
-designDFFile <- commandArgs()[10]
-designFormular <- commandArgs()[11]
+    designDFFile <- commandArgs()[11]
+    designFormular <- commandArgs()[12]
 
-print(designDFFile)
-print(designFormular)
+    print(designDFFile)
+    print(designFormular)
 
-designDF <- read.delim(designDFFile, row.names = 1)
-designDF = designDF[ colnames(counts), ]
-print(designDF)
+    designDF <- read.delim(designDFFile, row.names = 1)
+    designDF = designDF[ colnames(counts), ]
+    print(designDF)
 
-plotgroups=str_split(str_replace(designFormular, "~|:", ""), "\\+")[[1]]
+    plotgroups=str_split(str_replace(designFormular, "~|:", ""), "\\+")[[1]]
 
-dds <- DESeqDataSetFromMatrix(countData=counts, 
-                              colData=designDF, 
-                              design=as.formula(designFormular), tidy = FALSE)
+    dds <- DESeqDataSetFromMatrix(countData=counts, 
+                                colData=designDF, 
+                                design=as.formula(designFormular), tidy = FALSE)
 
 }
 print("PlotGroups")
@@ -115,17 +114,21 @@ message("DE analysis ...")
 
 dds <- estimateSizeFactors(dds)
 
-nQuant = 7
-calcQuantiles = c(0.25, 0.5, 0.75, 0.8, 0.9, 0.925, 0.95)
-ncountQuantiles = quantile(c(as.matrix(counts(dds, normalized=TRUE))), probs=calcQuantiles)
-
-print(paste("Filtering normalized counts by quantile=", calcQuantiles[nQuant], "and value=", ncountQuantiles[nQuant]))
-
-keep = rowSums( counts(dds, normalized=TRUE) >= ncountQuantiles[nQuant] ) >= 3
 
 
+if (filter.genes)
+{
+    nQuant = 7
+    calcQuantiles = c(0.25, 0.5, 0.75, 0.8, 0.9, 0.925, 0.95)
+    ncountQuantiles = quantile(c(as.matrix(counts(dds, normalized=TRUE))), probs=calcQuantiles)
 
-dds <- dds[keep,]
+    print(paste("Filtering normalized counts by quantile=", calcQuantiles[nQuant], "and value=", ncountQuantiles[nQuant]))
+
+    keep = rowSums( counts(dds, normalized=TRUE) >= ncountQuantiles[nQuant] ) >= 3
+
+    dds <- dds[keep,]
+}
+
 
 
 dds <- DESeq(dds)

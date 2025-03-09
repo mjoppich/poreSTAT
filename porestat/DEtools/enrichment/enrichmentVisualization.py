@@ -58,15 +58,14 @@ if __name__ == '__main__':
 
         # Prepare Data
         #df = df_raw[['cty', 'manufacturer']].groupby('manufacturer').apply(lambda x: x.mean())
-        df = pd.DataFrame(df_raw)
-
         #determine plot type
 
-        termIDColumn = df.columns[0]
-        termNameColumn = df.columns[1]
-        qvalueColumn = "qvalue"
+        termIDColumn = df_raw.columns[0]
+        termNameColumn = df_raw.columns[1]
+        sigValueColumn = "p.adjust"
 
-        df = df_raw[[termNameColumn, qvalueColumn]]
+        df = df_raw[[termNameColumn, sigValueColumn]].copy()
+        df.is_copy = False
 
         print(df_raw.columns)
         print("GeneRatio" in df_raw.columns)
@@ -102,10 +101,10 @@ if __name__ == '__main__':
         else:
             raise ValueError()
 
-        df['termtitle'] = makeTitle(df_raw[termNameColumn], df_raw[termIDColumn], df["sig_geneset_size"],df["geneset_size"])
+        df['termtitle'] = list(makeTitle(df_raw[termNameColumn], df_raw[termIDColumn], df["sig_geneset_size"],df["geneset_size"]))
 
 
-        df.sort_values('qvalue', inplace=True, ascending=True)
+        df.sort_values('p.adjust', inplace=True, ascending=True)
         df.reset_index()
         df = df[:numResults]
         colorValues = colorValues[:numResults]
@@ -118,7 +117,7 @@ if __name__ == '__main__':
         if df.shape[0] == 0:
             return
         
-        maxNLog = max(-np.log(df.qvalue))
+        maxNLog = max(-np.log(df["p.adjust"]))
         maxLine = ((maxNLog// 10)+1)*10
         #print(maxNLog, maxLine)
         
@@ -129,7 +128,7 @@ if __name__ == '__main__':
         ax.vlines(x=-np.log(0.05), ymin=0, ymax=numResults, color='red', alpha=0.7, linewidth=1, linestyles='dashdot')
         
         sizeFactor = 10    
-        scatter = ax.scatter(y=df.termtitle, x=-np.log(df.qvalue), s=df.geneset_size*sizeFactor, c=colorValues, alpha=0.7, )
+        scatter = ax.scatter(y=df.termtitle, x=-np.log(df["p.adjust"]), s=df.geneset_size*sizeFactor, c=colorValues, alpha=0.7, )
 
         handles, labels = scatter.legend_elements(prop="sizes", alpha=0.6, func=lambda x: x/sizeFactor)
         labels = [x for x in labels]
@@ -139,9 +138,11 @@ if __name__ == '__main__':
         ax.set_xlabel('Neg. Log. Adj. p-Value')
         ax.set_yticks(df.termtitle)
         ax.set_yticklabels(df.termtitle, fontdict={'horizontalalignment': 'right'})
-        plt.grid(b=None)
+        plt.grid(False)
         plt.tight_layout()
         plt.yticks(fontsize=16)
+        
+        print(df)
         
         if filename != None:
             for x in filename:

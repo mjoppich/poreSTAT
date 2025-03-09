@@ -6,7 +6,6 @@ import HTSeq
 import matplotlib
 from porestat.utils.ArgParseExt import FolderType
 
-from porestat.plots.poreplot import PorePlot, MultiAxesPointHTMLTooltip
 
 from porestat.plots.plotconfig import PlotConfig, PlotSaveTYPE
 from porestat.utils.EnrichmentDF import EnrichmentDF
@@ -67,6 +66,9 @@ class FoldChangeFeatureCountsDistributionFactory(PSToolInterfaceFactory):
 
         parser.add_argument('-deseqdf', '--deseq-expdata', type=argparse.FileType('r'), help='experiment df for deseq2', default=None)
         parser.add_argument('-deseqd', '--deseq-design', type=str, help='experiment design for deseq2', default=None)
+        parser.add_argument('-deseqfilter', '--deseq-filter', action='store_true', default=False, help='filter counts by quantiles')
+
+        parser.add_argument('-no-html', '--no-html', action='store_true', default=False, help='do not print html output file')
 
 
         parser = PlotConfig.addParserArgs(parser)
@@ -336,6 +338,7 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
 
             #vConds = sorted([x for x in counts])
             vConds = [x for x in counts]
+            print(vConds)
 
             createdComparisons = defaultdict(list)
             conditions = []
@@ -352,11 +355,11 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                     for condDataSample in condData:
                         geneNames = condDataSample.getColumnIndex('gene')
                         geneCounts = condDataSample.getColumnIndex(valueSource)
-
+                        
                         rowUpdates = []
                         sampleName = condDataSample.filepath
 
-                        print(sampleName, len(condDataSample))
+                        print("Sample:", sampleName, "Features:", len(condDataSample))
                         for row in condDataSample:
 
                             rowData = {
@@ -396,10 +399,12 @@ class FoldChangeFeatureCountsAnalysis(ParallelPSTInterface):
                                                                                enhanceSymbol=geneEnhancement,
                                                                                geneLengths=geneLengths,
                                                                                deseq2df = args.deseq_expdata,
-                                                                               deseq2design = args.deseq_design
+                                                                               deseq2design = args.deseq_design,
+                                                                               deseq2filter=args.deseq_filter
                                                                                )
 
-            self.prepareHTMLOut(createdComparisons, replicates, args)
+            if not args.no_html:
+                self.prepareHTMLOut(createdComparisons, replicates, args)
 
 
     def getValueSource(self, df):

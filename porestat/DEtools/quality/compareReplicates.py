@@ -14,9 +14,9 @@ sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../..
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 from collections import Counter
 import natsort
-from scipy.stats.stats import pearsonr
+from scipy.stats import pearsonr
 
-mpl.style.use("seaborn")
+mpl.style.use("seaborn-v0_8")
 
 
 

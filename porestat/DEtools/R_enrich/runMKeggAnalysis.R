@@ -2,7 +2,6 @@
 suppressMessages(suppressWarnings(require(clusterProfiler)))
 suppressMessages(suppressWarnings(require(annotables)))
 suppressMessages(suppressWarnings(require(dplyr)))
-suppressMessages(suppressWarnings(require(RDAVIDWebService)))
 suppressMessages(suppressWarnings(require(qvalue)))
 suppressMessages(suppressWarnings(require(writexl)))
 

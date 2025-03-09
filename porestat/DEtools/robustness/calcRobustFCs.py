@@ -13,12 +13,12 @@ from collections import defaultdict
 import pandas as pd
 
 import argparse
-from upsetplot import from_contents,plot
+from upsetplot import from_contents, plot
 import numpy as np
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 from adjustText import adjust_text
 
-mpl.style.use("seaborn")
+mpl.style.use("seaborn-v0_8")
 
 
 
@@ -165,7 +165,7 @@ def plot_volcano(FcPvalGene, title, outfile, minpval, minfc, showGeneCount=30):
         plt.vlines(x=-minfc, ymin=pvalThresh, ymax=yMaxLim, linestyle="dotted")
         plt.vlines(x=minfc, ymin=pvalThresh, ymax=yMaxLim, linestyle="dotted")
 
-        adjust_text(texts, force_points=0.2, force_text=0.2, expand_points=(2, 2), expand_text=(1, 1), arrowprops=dict(arrowstyle="-", color='black', lw=0.5))
+        adjust_text(texts, force_static=(0.1, 0.2), force_text=(0.1, 0.2), expand =(2, 2), expand_axes =(1, 1), arrowprops=dict(arrowstyle="-", color='black', lw=0.5))
         #        texts.append(plt.text(x * (1 + 0.01), y * (1 + 0.01) , dotgene[gi], fontsize=12))
 
         plt.title(title, fontsize = 40)

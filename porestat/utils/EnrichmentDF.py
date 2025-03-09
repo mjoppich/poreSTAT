@@ -9,7 +9,6 @@ from .DataFrame import DataFrame, DataRow, ExportTYPE
 import os, sys
 import mpld3
 from ..plots.plotconfig import PlotConfig, PlotSaveTYPE
-from ..plots.poreplot import PorePlot
 import pickle
 from ..tools.PTToolInterface import PSToolException
 import shutil
@@ -98,9 +97,9 @@ class EnrichmentDF(DataFrame):
         assert (type(cond1Samples) == list)
         assert (type(cond2Samples) == list)
 
-        print(cond1Samples)
-        print(cond2Samples)
-        print(self.column2idx)
+        print("Cond1 Samples", cond1Samples)
+        print("Cond2 Samples", cond2Samples)
+        print("Column2Idx", self.column2idx)
 
         header = ['gene'] + cond1Samples + cond2Samples
         prepData = [tuple(header)]
@@ -126,9 +125,13 @@ class EnrichmentDF(DataFrame):
 
                 if count != None:
                     baseRow.append(count)
+                else:
+                    print(sampleName, count)
 
             if len(baseRow) == len(cond1Samples) + len(cond2Samples) + 1:
                 prepData.append( tuple(baseRow) )
+
+        print("Number of Genes", len(prepData))
 
         return prepData
 
@@ -155,11 +158,12 @@ class EnrichmentDF(DataFrame):
                 fdataFile.write( "\t".join( [line[0]] * sampleCount) + "\n")
 
     def writeExpressionFile(self, file, prepData):
-
+        
         with open(file, 'w') as exprFile:
 
             for line in prepData[1:]:
                 exprFile.write( "\t".join([str(x) for x in line[1:]]) + "\n")
+                
 
 
 
@@ -168,7 +172,7 @@ class EnrichmentDF(DataFrame):
         return ['DESeq2', 'DirectDESeq2', 'DirectDESeq2Paired', 'msEmpiRe', 'nlEmpiRe', 'limma', 'edgeR', 'limmavoom', 'DirectEdgeR', "DESingle", "scde", "MAST"]
 
 
-    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['msEmpiRe', 'nlEmpiRe', 'limmavoom', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None, deseq2df=None, deseq2design=None):
+    def runDEanalysis(self, outputFolder, replicates, prefix= "", methods=['msEmpiRe', 'nlEmpiRe', 'limmavoom', "DirectDESeq2"], rscriptPath="/usr/bin/Rscript", javaPath="/usr/bin/java", noDErun=False, enhanceSymbol=None, geneLengths=None, deseq2filter=False, deseq2df=None, deseq2design=None):
 
         filePrefix = prefix
         if prefix != None and prefix != "" and prefix[len(prefix)-1] != "_":
@@ -271,8 +275,11 @@ class EnrichmentDF(DataFrame):
                             fdata=fdataFile,
                             outfile=outFile)
                         
+                        if not deseq2filter is None:
+                            execStr = "{} {}".format(execStr, str(deseq2filter).upper())
+                        
                         if not deseq2df is None and not deseq2design is None:
-                            execStr = "{} {} \"{}\"".format(execStr, deseq2df.name, deseq2design)                        
+                            execStr = "{} {} \"{}\"".format(execStr, deseq2df.name, deseq2design)
                         
                     elif method in ['DESingle']:
                         scriptPath = os.path.dirname(os.path.abspath(__file__)) + "/../data/DESingle_direct.R"
@@ -567,6 +574,8 @@ class EnrichmentDF(DataFrame):
         base = basePath + filePrefix
 
         import mpld3, shutil
+        from ..plots.poreplot import PorePlot
+
         d3js_path = mpld3.getD3js()
         mpld3_path = mpld3.getmpld3js(True)
 

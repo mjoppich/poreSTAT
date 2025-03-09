@@ -10,7 +10,7 @@ sys.path.insert(0, str(os.path.dirname(os.path.realpath(__file__))) + "/../../..
 from porestat.utils.DataFrame import DataFrame, DataRow, ExportTYPE
 
 
-mpl.style.use("seaborn")
+mpl.style.use("seaborn-v0_8")
 
 def makeplot(plotdata, filename, stats, outname):
 
